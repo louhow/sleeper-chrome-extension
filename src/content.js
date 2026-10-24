@@ -302,10 +302,11 @@
     }
     document.addEventListener('snp:admin-score-request', adminDeltas);
 
-    // The Players tab's Best and Worst (page-hook.js): each player's best or
-    // worst game of a week, by the league's scoring (as Sleeper's FPTS is), from
-    // the week's per-game stats. Answers before dispatchEvent returns: the
-    // picked games, or null while the week loads ('snp:week-games-ready' follows).
+    // The Players tab's week view (page-hook.js), from the week's per-game
+    // stats: for Avg, how many games each player played ('played'); for Best
+    // and Worst, each player's best or worst game by the league's scoring (as
+    // Sleeper's FPTS is). Answers before dispatchEvent returns, or with null
+    // while the week loads ('snp:week-games-ready' follows).
     const weekGames = {}; // `${season}|${week}` -> stat rows, or the load in flight
     function pickWeekGames(e) {
       const { season, week, mode } = JSON.parse(e.detail);
@@ -323,13 +324,15 @@
         const settings = state.league?.scoring_settings || {};
         const better = mode === 'worst' ? (a, b) => a < b : (a, b) => a > b;
         const best = {};
+        const played = {};
         for (const { player_id: id, stats } of rows) {
           // Games a player sat out come back with no stats.
           if (!(stats?.sp > 0 || stats?.min > 0)) continue;
+          played[id] = (played[id] || 0) + 1;
           const fpts = scoring.scoreStats(settings, stats);
           if (!best[id] || better(fpts, best[id].fpts)) best[id] = { ...stats, gp: 1, fpts };
         }
-        games = best;
+        games = mode === 'played' ? played : best;
       }
       document.dispatchEvent(new CustomEvent('snp:week-games', { detail: JSON.stringify(games) }));
     }

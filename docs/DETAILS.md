@@ -58,16 +58,21 @@ Rank comes from `roster_standings`; before any games are played, it falls back t
 
 ### Players tab
 
-Sleeper's own NBA Players table, with two additions in Stats (not Projection, where they'd mean nothing):
+Sleeper's own NBA Players table, with these additions:
 
-- Shot volume: FGM and FGA after PTS, 3PA after 3PM, FTM and FTA at the end.
+- It opens on Projection for the current week (Sleeper's own current week), once per league per visit; what you pick after that sticks.
+  It loads the week the way Sleeper's own week dropdown does.
+- Sleeper's week dropdown reads the week shown: on its own it shows the season ("2026") on load even with a week picked, because its option values are numbers and the value it starts with is a string.
+- Shot volume, in Stats (not Projection, where they'd mean nothing): FGM and FGA after PTS, 3PA after 3PM, FTM and FTA at the end.
   They don't score in the league, so they're dimmed.
   Sleeper's stats already carry them; they go into its table component as stat keys, so they sort from their headers like its own columns.
-- Avg / Best / Worst: with a week picked (not the season), a switch in the table's top-left corner.
-  Avg is Sleeper's own numbers, each player's average over the week's games.
-  Best and Worst show each player's single best or worst game that week, by the league's scoring; games a player sat out don't count.
+- Avg / Best / Worst: in Stats with a week picked (not the season), a switch in the table's top-left corner.
+  Avg is Sleeper's own numbers, each player's average over the week's games, plus a GP column (games played, after FPTS); Sleeper's week stats are per game and carry no count.
+  Best and Worst show each player's single best or worst game that week, by the league's scoring, in whole numbers (minutes rounded; fantasy points keep a half when they score one); games a player sat out don't count.
   The per-game stats come from `/stats/nba/<season>/<week>`, once per week per page load.
-- The columns narrow to fit Sleeper's 796px row (14 columns at 43px; 16 with the admin pair).
+  Sleeper prints every stat with one decimal (after dividing by games played), so GP and the picked games' numbers are drawn over its cells.
+- The columns narrow to fit the header's room after its corner, so the table never scrolls sideways (15 columns at 37px; 17 with the admin pair at 32px).
+  Each column also has Sleeper's 2px margin on both sides.
 
 ### Player card
 
@@ -174,7 +179,7 @@ The API log stays available, and once the page holds a new token (after logging 
 | `GET /v1/state/nba` | Current week |
 | `GET /v1/players/nba` | Names, teams, positions, injuries (~2.5 MB, cached 12h in `chrome.storage.local`) |
 | `GET /projections/nba/<season>/<week>` | Per-game projected stats, scored with the league's settings |
-| `GET /stats/nba/<season>/<week>` | Per-game actual stats (Team and Matchup tabs; the Players tab's Best and Worst) |
+| `GET /stats/nba/<season>/<week>` | Per-game actual stats (Team and Matchup tabs; the Players tab's GP, Best and Worst) |
 | `GET /players/nba/research/<type>/<season>/<week>?league_type=` | Rostered and start percentages |
 | `GET /players/nba/<id>`, `/stats/nba/player/<id>?season=&grouping=week`, `/projections/nba/player/<id>?...`, `/players/nba/<team>/depth_chart` | Player card: bio, game logs, career, depth chart |
 | `POST sleeper.com/graphql` `get_player_news`, `league_transactions_by_player` | Player card: latest news, transaction history |

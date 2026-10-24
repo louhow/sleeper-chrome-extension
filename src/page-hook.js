@@ -5,7 +5,8 @@
 // player id (and Sleeper's own waiver status) come from React props, which
 // only this world can read, and go to the extension as JSON in a DOM event.
 // It also keeps the Matchup tab when switching to an NBA league from the sidebar,
-// adds shot-volume columns (and the admin adminFPTS and adminDelta) to the Players tab, and for NFL leagues reads (and
+// opens the Players tab on this week's projections, adds games played and
+// shot-volume columns (and the admin adminFPTS and adminDelta) to it, and for NFL leagues reads (and
 // saves) the Team tab's lineup for Optimize lineup.
 (() => {
   const ACTION = '.player-action-button.waiver, .player-action-button.add';
@@ -67,12 +68,14 @@
     nav.router.push(`/leagues/${id}/matchup`);
   }, true);
 
-  // NBA Players tab, in Stats: shot-volume columns (FGM and FGA after PTS, 3PA
-  // after 3PM, FTM and FTA at the end), which Sleeper's stats already carry but
-  // don't score, so they show dimmed; and with a week picked, an Avg / Best /
-  // Worst switch in the table's corner that swaps each player's week average
-  // for their best or worst game. With admin tools on, adminFPTS and adminDelta
-  // columns beside Sleeper's FPTS.
+  // NBA Players tab. It opens on Projection for the current week (Sleeper's
+  // own default can be the season, and its week dropdown reads "2026" on load).
+  // In Stats: shot-volume columns (FGM and FGA after PTS, 3PA after 3PM, FTM
+  // and FTA at the end), which Sleeper's stats already carry but don't score,
+  // so they show dimmed; and with a week picked, an Avg / Best / Worst switch
+  // in the table's corner. Avg is Sleeper's week (per game) plus a GP column;
+  // Best and Worst swap in each player's best or worst game, in whole numbers.
+  // With admin tools on, adminFPTS and adminDelta columns beside Sleeper's FPTS.
   // adminFPTS is scored with the what-if values from the extension's Scoring
   // control; adminDelta is how many places that moves a player in the list on
   // screen. Both go into Sleeper's own table component (its stat keys and
@@ -86,9 +89,13 @@
   // Volume columns by the column they follow; the rest go at the end.
   const VOLUME_AFTER = { pts: ['fgm', 'fga'], tpm: ['tpa'] };
   const VOLUME = ['fgm', 'fga', 'tpa', 'ftm', 'fta'];
+  // Games played in the week (Sleeper's week stats are per game, with no count).
+  const GP_KEY = 'GP';
+  // Marks a picked game in the stats map, so its cells print as whole numbers.
+  const GAME = 'snpGame';
   const PICKS = [['avg', 'Avg', 'Average per game this week'], ['best', 'Best', 'Best game this week'], ['worst', 'Worst', 'Worst game this week']];
   let weekPick = 'avg';
-  const pickedGames = {}; // `${season}|${week}|${mode}` -> { [player id]: that game's stats }
+  const pickedGames = {}; // `${season}|${week}|${mode}` -> { [player id]: that game's stats, or (played) games played }
   // { leagueId, enabled, changed } from the extension; it does the scoring itself.
   // Not enabled (no ?snp-admin=1), the columns stay out.
   let admin = null;
@@ -115,9 +122,9 @@
     return out;
   }
 
-  // Each player's best or worst game of a week, from the extension (which
-  // answers before dispatchEvent returns). Null while the week loads; the
-  // extension sends 'snp:week-games-ready' once it has.
+  // Each player's best or worst game of a week, or games played, from the
+  // extension (which answers before dispatchEvent returns). Null while the week
+  // loads; the extension sends 'snp:week-games-ready' once it has.
   function weekGames(season, week, mode) {
     const key = `${season}|${week}|${mode}`;
     if (pickedGames[key]) return pickedGames[key];
@@ -142,16 +149,40 @@
   }
 
   // Sleeper's columns with ours worked in: the admin pair right after FPTS (when on),
-  // the volume columns (in Stats) after the stat they go with. Switching to
-  // Projection, or admin tools off (?snp-admin=0), takes them back out. Null
-  // until Sleeper has settled which FPTS it shows.
-  function columns(keys, base, other, adminOn, volumeOn) {
+  // then GP (a week's Avg), and the volume columns (in Stats) after the stat
+  // they go with. Switching to Projection, or admin tools off (?snp-admin=0),
+  // takes them back out. Null until Sleeper has settled which FPTS it shows.
+  function columns(keys, base, other, { adminOn, volumeOn, gpOn }) {
     if (keys[0] !== base || keys.includes(other)) return null;
-    const theirs = keys.filter((k) => k !== ADMIN_KEY && k !== DELTA_KEY && !VOLUME.includes(k));
+    const theirs = keys.filter((k) => k !== ADMIN_KEY && k !== DELTA_KEY && k !== GP_KEY && !VOLUME.includes(k));
     const out = volumeOn ? theirs.flatMap((k) => [k, ...(VOLUME_AFTER[k] || [])]) : theirs;
     if (volumeOn) out.push(...VOLUME.filter((k) => !out.includes(k)));
+    if (gpOn) out.splice(1, 0, GP_KEY);
     if (adminOn) out.splice(1, 0, ADMIN_KEY, DELTA_KEY);
     return out;
+  }
+
+  // Once per league, after Sleeper's first load: Projection for the current
+  // week (Sleeper's leg), through the state and fetch its own week dropdown uses.
+  function openOnThisWeek(panel) {
+    const { leagueId, leg } = panel.props;
+    if (panel.snpOpenedFor === leagueId || panel.state.loading) return;
+    panel.snpOpenedFor = leagueId;
+    const { statType, statInterval } = panel.state;
+    if (!(leg > 0) || (statType === 'proj' && String(statInterval) === String(leg))) return;
+    panel.setState({ statType: 'proj', statInterval: +leg, leg: +leg }, () => panel._fetchData?.(panel.props, panel.state));
+  }
+
+  // Sleeper's week dropdown keeps the value it was created with, as a string,
+  // while its options are numbers, so on load it shows its placeholder (the
+  // season) rather than "Week 1". It's set to the option the table shows.
+  function weekLabel(panel) {
+    for (const el of document.querySelectorAll(`${PLAYERS_PANEL} .filter-dropdown .app-dropdown`)) {
+      const f = fiber(el, (x) => Array.isArray(x.options) && x.options.some((o) => o.value === 'season'));
+      const dropdown = f?.stateNode;
+      const option = f?.memoizedProps.options.find((o) => String(o.value) === String(panel.state.statInterval));
+      if (dropdown?.state && option && dropdown.state.selectedValue !== option.value) dropdown.setState({ selectedValue: option.value });
+    }
   }
 
   // The players the list shows right now (after Sleeper's position, search and owned filters).
@@ -184,6 +215,8 @@
       };
       panel.snpHooked = true;
     }
+    openOnThisWeek(panel);
+    weekLabel(panel);
     const { playerStatsMap: map, statKeys = [], statType, statInterval, season } = panel.state;
     const base = statType === 'stat' ? 'fpts' : 'fpts_proj';
     const other = base === 'fpts' ? 'fpts_proj' : 'fpts';
@@ -192,17 +225,23 @@
     weekSwitch(week);
     const mode = week ? weekPick : 'avg';
     const picked = mode === 'avg' ? null : weekGames(season, week, mode);
+    const gpOn = Boolean(week && mode === 'avg');
+    const played = gpOn ? weekGames(season, week, 'played') : null;
     // Sleeper's own map: any map that isn't the one we last set.
     if (map && map !== panel.snpMap) panel.snpSource = map;
     const source = panel.snpSource;
     const view = adminOn ? playersInView() : [];
     // Order doesn't matter (sorting by adminDelta reorders it), only who is in view.
-    const key = [mode, picked ? season : '', picked ? week : '', adminOn ? adminVersion : 'off', [...view].sort().join(',')].join('|');
+    const loaded = picked || played ? `${season}|${week}` : '';
+    const key = [mode, loaded, gpOn, adminOn ? adminVersion : 'off', [...view].sort().join(',')].join('|');
     const update = {};
     if (source && (panel.snpSourceSeen !== source || panel.snpKey !== key)) {
       // That game alone, as one game played, so Sleeper's per-game numbers are its own.
       let stats = picked ? Object.fromEntries(Object.entries(source).map(([id, s]) =>
-        [id, picked[id] ? { ...picked[id], fpts_proj: s?.fpts_proj } : s])) : source;
+        [id, picked[id] ? { ...picked[id], fpts_proj: s?.fpts_proj, [GAME]: 1 } : s])) : source;
+      // GP shows "-" until the week's games load.
+      if (gpOn) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
+        [id, s && played ? { ...s, [GP_KEY]: played[id] ?? 0 } : s]));
       if (adminOn) {
         const scores = admin.changed ? adminScores(stats, view, base) : { points: {}, shifts: {}, tints: {}, places: {} };
         const inView = new Set(view);
@@ -223,7 +262,7 @@
       panel.snpSourceSeen = source;
       panel.snpKey = key;
     }
-    const keys = columns(statKeys, base, other, adminOn, statType === 'stat');
+    const keys = columns(statKeys, base, other, { adminOn, volumeOn: statType === 'stat', gpOn });
     if (keys && keys.join() !== statKeys.join()) update.statKeys = keys;
     if (Object.keys(update).length) {
       if (update.playerStatsMap) panel.snpMap = update.playerStatsMap;
@@ -277,34 +316,61 @@
     return el;
   }
 
+  function clearOverlay(cell) {
+    if (!cell.hasAttribute('data-snp-cell')) return;
+    cell.removeAttribute('data-snp-cell');
+    cell.querySelector(':scope > .snp-value')?.remove();
+  }
+
+  // A single game's numbers are counts: whole, but for fantasy points that score in halves.
+  const whole = (v) => (v == null ? '0' : Number.isInteger(v) ? String(v) : v.toFixed(1));
+
+  // What a cell should read when Sleeper's own text is wrong for it, else null.
   // Sleeper divides every stored stat by games played and prints one decimal.
-  // adminFPTS is stored per game already (to sort right), so its number is
-  // drawn over the cell; adminDelta shows as a badge: "+3" in green, "−2" in
-  // red, deeper the further the player moves, with both places under it
-  // ("#13→#42"). The sorted column's header gets a thin bar under it.
-  // Rows mount as the list scrolls, so they're watched.
+  function cellText(key, s) {
+    if (key === GP_KEY) return s?.[GP_KEY] == null ? '-' : String(s[GP_KEY]);
+    if (key === ADMIN_KEY) return s?.[ADMIN_KEY] == null ? '-' : s[GAME] ? whole(s[ADMIN_KEY]) : s[ADMIN_KEY].toFixed(1);
+    if (!s?.[GAME]) return null;
+    return key === 'sp' ? String(Math.round((s.sp || 0) / 60)) : whole(s[key]);
+  }
+
+  // Cells whose number Sleeper can't print right get ours drawn over them:
+  // GP and a picked game's whole numbers, and adminFPTS, which is stored per
+  // game already (to sort right). adminDelta shows as a badge: "+3" in green,
+  // "−2" in red, deeper the further the player moves, with both places under
+  // it ("#13→#42"). The sorted column's header gets a thin bar under it.
+  // Rows mount (and are reused) as the list scrolls, so they're watched.
   function decorateRows() {
     const panel = playersPanel();
-    const keys = panel?.state.statKeys || [];
-    const k = keys.indexOf(DELTA_KEY);
-    if (k < 0) return;
-    const labels = document.querySelectorAll(`${PLAYERS_PANEL} .stat-key-header > .label`);
-    labels.forEach((label, i) => {
-      const sorted = keys[i] === panel.state.sort;
-      if (label.hasAttribute('data-snp-sorted') !== sorted) label.toggleAttribute('data-snp-sorted', sorted);
-    });
-    const kAdmin = keys.indexOf(ADMIN_KEY);
+    if (!panel) return;
+    const keys = panel.state.statKeys || [];
     const map = panel.state.playerStatsMap || {};
+    const k = keys.indexOf(DELTA_KEY);
+    if (k >= 0) {
+      const labels = document.querySelectorAll(`${PLAYERS_PANEL} .stat-key-header > .label`);
+      labels.forEach((label, i) => {
+        const sorted = keys[i] === panel.state.sort;
+        if (label.hasAttribute('data-snp-sorted') !== sorted) label.toggleAttribute('data-snp-sorted', sorted);
+      });
+    }
     for (const row of document.querySelectorAll(`${PLAYERS_PANEL} .player-list-item`)) {
       const cells = row.querySelectorAll(':scope > .cell');
-      const cell = cells[k];
       const id = fiber(row, (x) => x.player?.player_id)?.memoizedProps.player.player_id;
-      if (!cell || id == null) continue;
-      const perGame = map[id]?.[ADMIN_KEY];
-      const value = overlay(cells[kAdmin], 'snp-admin-value');
-      const shown = perGame == null ? '-' : perGame.toFixed(1);
-      if (value.textContent !== shown) value.textContent = shown;
-      const stored = map[id]?.[DELTA_KEY];
+      if (id == null) continue;
+      const s = map[id];
+      keys.forEach((key, i) => {
+        if (key === DELTA_KEY || !cells[i]) return;
+        const text = cellText(key, s);
+        if (text == null) {
+          clearOverlay(cells[i]);
+          return;
+        }
+        const value = overlay(cells[i], 'snp-value');
+        if (value.textContent !== text) value.textContent = text;
+      });
+      const cell = cells[k];
+      if (!cell) continue;
+      const stored = s?.[DELTA_KEY];
       const shift = stored == null ? null : stored - DELTA_OFFSET;
       const text = shift == null ? '-' : shift > 0 ? `+${shift}` : shift < 0 ? `−${-shift}` : '0';
       if (!cell.hasAttribute('data-snp-delta')) cell.setAttribute('data-snp-delta', '');
@@ -347,19 +413,30 @@
     if (document.documentElement.dataset.snpNbaLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
   }, 500);
 
-  // Sleeper's rows are 796px (overflow hidden), with 60px stat columns that
-  // start 161px in, after the name area; that fits its 9 columns. With more,
-  // the name area would shrink and pull every value left of its header, and the
-  // last columns would be cut off. So the columns narrow to share the 635px
-  // (each has a 2px margin), and the name area keeps the 118px Sleeper's own
+  // Sleeper's stat columns are 60px with 2px each side, which fits its 9 in
+  // the header after its 176px corner (and in the 796px rows, after the name
+  // area). With more, the table would scroll sideways and the name area would
+  // shrink, pulling every value left of its header. So the columns narrow to
+  // share the header's room, and the name area keeps the 118px Sleeper's own
   // rows have, which centers each value under its (left-aligned) header as
   // Sleeper's table does. The volume columns are dimmed: they don't score.
-  const ROW_ROOM = 635;
   const volumeStyle = document.createElement('style');
+  function headerRoom() {
+    const header = document.querySelector(`${PLAYERS_PANEL} .stat-key-header`);
+    const label = header?.querySelector(':scope > .label');
+    if (!label) return null;
+    const box = getComputedStyle(header);
+    const cell = getComputedStyle(label);
+    return {
+      room: header.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight),
+      margins: parseFloat(cell.marginLeft) + parseFloat(cell.marginRight),
+    };
+  }
   function sizeColumns(panel) {
     const keys = panel?.state.statKeys || [];
     const html = document.documentElement;
-    const width = keys.length > 9 ? `${Math.min(60, Math.floor(ROW_ROOM / keys.length) - 2)}px` : '';
+    const fit = keys.length > 9 && headerRoom();
+    const width = fit ? `${Math.min(60, Math.floor(fit.room / keys.length - fit.margins))}px` : '';
     if (html.style.getPropertyValue('--snp-col') !== width) {
       if (width) html.style.setProperty('--snp-col', width);
       else html.style.removeProperty('--snp-col');
@@ -383,7 +460,7 @@
     html[data-snp-admin-changed] ${PLAYERS_PANEL} .stat-key-header > ${ours} span,
     html[data-snp-admin-changed] ${PLAYERS_PANEL} .player-list-item > :nth-child(2 of .cell) { color: #b69cff !important; }
     ${PLAYERS_PANEL} [data-snp-cell] { font-size: 0 !important; }
-    ${PLAYERS_PANEL} .snp-admin-value { font-size: 12px; }
+    ${PLAYERS_PANEL} .snp-value { font-size: 12px; }
     ${PLAYERS_PANEL} [data-snp-delta] { flex-direction: column; gap: 2px; }
     ${PLAYERS_PANEL} .stat-key-header > .label { position: relative; }
     ${PLAYERS_PANEL} .stat-key-header > .label[data-snp-sorted]::after {
