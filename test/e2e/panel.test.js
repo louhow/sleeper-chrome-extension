@@ -1505,9 +1505,10 @@ test('players tab in Stats: games played, dimmed shot-volume columns, and a week
   const STAT_KEYS = ['fpts', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'];
   documentBody = playersTable([
     // Sleeper's week stats are per game already, with no games-played count.
-    { id: 'shooter', pos: 'SG', stats: { fpts: 18, sp: 1750, pts: 18, fgm: 7.5, fga: 17, tpa: 4, ftm: 2, fta: 2.5 } },
-    { id: 'steady', pos: 'C', stats: { fpts: 20, sp: 1800, pts: 20, fgm: 8, fga: 15, tpa: 1, ftm: 4, fta: 4 } },
-  ], { statType: 'stat', statInterval: 1, statKeys: STAT_KEYS, sort: 'fpts' });
+    // Projected the other way round from how they scored.
+    { id: 'shooter', pos: 'SG', stats: { fpts: 18, fpts_proj: 30, sp: 1750, pts: 18, fgm: 7.5, fga: 17, tpa: 4, ftm: 2, fta: 2.5 } },
+    { id: 'steady', pos: 'C', stats: { fpts: 20, fpts_proj: 10, sp: 1800, pts: 20, fgm: 8, fga: 15, tpa: 1, ftm: 4, fta: 4 } },
+  ], { statType: 'stat', statInterval: 1, statKeys: STAT_KEYS, sort: 'fpts_proj' });
   await page.goto(PLAYERS_URL);
   const labels = () => page.locator('.stat-key-header .label').allTextContents();
   // A cell as it reads: our number when one is drawn over Sleeper's.
@@ -1523,6 +1524,13 @@ test('players tab in Stats: games played, dimmed shot-volume columns, and a week
   assert.deepEqual(await labels(), ['FPTS', 'GP', 'MIN', 'PTS', 'Fgm', 'Fga', '3PM', '3pa', 'REB', 'AST', 'STL', 'BLK', 'TO', 'Ftm', 'Fta']);
   await cellIs('shooter', 'GP', '2');
   assert.equal(await cell('steady', 'GP'), '1');
+  // Sleeper leaves Stats sorted by the projection, which isn't a column; it sorts by the FPTS shown instead.
+  const order = () => page.locator('.player-list-item').evaluateAll((rows) => rows.map((r) => r.dataset.id));
+  // Highest first by what a column shows (picked games included).
+  const byShown = (key) => page.evaluate((k) => Object.keys(panel.state.playerStatsMap)
+    .sort((a, b) => (panel.state.playerStatsMap[b][k] || -1) - (panel.state.playerStatsMap[a][k] || -1)), key);
+  await page.waitForFunction(() => panel.state.sort === 'fpts');
+  assert.deepEqual(await order(), ['steady', 'shooter']);
   assert.deepEqual([await cell('shooter', 'pts'), await cell('shooter', 'fga'), await cell('shooter', 'fta')], ['18.0', '17.0', '2.5'], 'the week average, as Sleeper shows it');
   // They don't score, so they're dimmed; Sleeper's own columns and GP aren't.
   const opacity = (id, key) => page.evaluate(([i, k]) =>
@@ -1562,17 +1570,34 @@ test('players tab in Stats: games played, dimmed shot-volume columns, and a week
   await pick.locator('button', { hasText: 'Best' }).click();
   await cellIs('shooter', 'pts', '30');
   assert.ok(!(await labels()).includes('GP'), 'one game each');
+  assert.deepEqual(await order(), await byShown('fpts'), 'sorted by the best game\'s FPTS');
   assert.deepEqual([await cell('shooter', 'sp'), await cell('shooter', 'fga'), await cell('shooter', 'fta'), await cell('steady', 'pts')], ['33', '20', '5', '20']);
   assert.equal(await pick.locator('[aria-checked="true"]').textContent(), 'Best');
   await fits();
   await page.screenshot({ path: `${OUT}players-stats-best.png` });
   await pick.locator('button', { hasText: 'Worst' }).click();
   await cellIs('shooter', 'pts', '6');
+  assert.deepEqual(await order(), ['steady', 'shooter'], 'the shooter\'s worst game sinks them');
   assert.deepEqual([await cell('shooter', 'fga'), await cell('shooter', 'fta')], ['14', '0'], 'no free throws that game');
+  // A column sort carries over: by PTS, then the best games.
+  await page.locator('.stat-key-header .label[data-key="pts"]').click();
+  await pick.locator('button', { hasText: 'Best' }).click();
+  await cellIs('shooter', 'pts', '30');
+  assert.equal(await page.evaluate(() => panel.state.sort), 'pts');
+  assert.deepEqual(await order(), ['shooter', 'steady'], '30 points beats 20');
   await pick.locator('button', { hasText: 'Avg' }).click();
   await cellIs('shooter', 'pts', '18.0');
   await cellIs('shooter', 'GP', '2');
   assert.equal(await page.locator('.player-list-item [data-snp-cell]').count(), 2, 'only GP is drawn over');
+  assert.deepEqual(await order(), ['steady', 'shooter'], 'back to the averages, still by PTS');
+  // Sorted by GP, Best drops the column, so FPTS takes over; back on Avg it stays FPTS.
+  await page.locator('.stat-key-header .label[data-key="GP"]').click();
+  assert.deepEqual(await order(), ['shooter', 'steady']);
+  await pick.locator('button', { hasText: 'Best' }).click();
+  await page.waitForFunction(() => panel.state.sort === 'fpts');
+  assert.deepEqual(await order(), await byShown('fpts'));
+  await pick.locator('button', { hasText: 'Avg' }).click();
+  await cellIs('shooter', 'pts', '18.0');
 
   // The whole season has no switch or GP, and Projection has no volume columns.
   await page.locator('.table-header .snp-week-pick button', { hasText: 'Best' }).click();

@@ -92,6 +92,8 @@ Sleeper's own NBA Players table, with these additions:
   Avg is Sleeper's own numbers, each player's average over the week's games, plus a GP column (games played, after FPTS); Sleeper's week stats are per game and carry no count.
   Best and Worst show each player's single best or worst game that week, by the league's scoring, in whole numbers (minutes rounded; fantasy points keep a half when they score one); games a player sat out don't count.
   The per-game stats come from `/stats/nba/<season>/<week>`, once per week per page load.
+  Switching keeps the column you sorted by and re-sorts by the new numbers.
+- Sorting in Stats follows the numbers on screen: Sleeper keeps sorting by the projection there (not a column in Stats), so that sort, or one on a column that goes away (GP in Best or Worst), becomes FPTS.
   Sleeper prints every stat with one decimal (after dividing by games played), so GP and the picked games' numbers are drawn over its cells.
 - The columns narrow to fit the header's room after its corner, so the table never scrolls sideways (15 columns at 37px; 17 with the admin pair at 32px).
   Each column also has Sleeper's 2px margin on both sides.

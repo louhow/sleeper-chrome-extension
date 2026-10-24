@@ -264,6 +264,13 @@
     }
     const keys = columns(statKeys, base, other, { adminOn, volumeOn: statType === 'stat', gpOn });
     if (keys && keys.join() !== statKeys.join()) update.statKeys = keys;
+    // In Stats, Sleeper keeps sorting by the projection (fpts_proj), which isn't
+    // a column there, so the list never follows the numbers shown (and Best or
+    // Worst wouldn't reorder it). A sort on a column that isn't shown (that, or
+    // GP once Best or Worst drops it) goes to the FPTS on screen; any column
+    // sort carries over, and Sleeper re-sorts by the new numbers.
+    const shown = keys || statKeys;
+    if (statType === 'stat' && panel.state.sort && shown[0] === base && !shown.includes(panel.state.sort)) update.sort = base;
     if (Object.keys(update).length) {
       if (update.playerStatsMap) panel.snpMap = update.playerStatsMap;
       panel.setState(update);
