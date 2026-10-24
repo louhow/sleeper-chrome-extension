@@ -753,6 +753,49 @@ test('matchup: locks in a finished game for your starter', async () => {
   documentBody = LOGGED_OUT;
 });
 
+test('team: locks a finished game from its cell, after asking', async () => {
+  documentBody = LOGGED_IN;
+  await startMidWeek();
+  sleeper.legs = {};
+  const myRoster = await openMyTeam(TEAM_URL);
+  const cell = page.locator(panel('.card button.cell[data-lock]')).first();
+  await cell.waitFor({ timeout: 30000 });
+  const ref = await cell.getAttribute('data-lock');
+  const [rosterId, playerId] = ref.split(':');
+  assert.equal(Number(rosterId), myRoster.roster_id);
+  const card = page.locator(panel('.card')).filter({ has: page.locator(`img.headshot[data-player="${playerId}"]`) });
+  // Hovering asks.
+  assert.equal(await cell.locator('.ask').isVisible(), false);
+  await cell.hover();
+  assert.equal(await cell.locator('.ask').innerText(), 'Lock?');
+  assert.equal(await cell.locator('.when').isVisible(), false);
+  await page.screenshot({ path: `${OUT}team-lock-hover.png` });
+  // Clicking confirms in the cell; No backs out without saving.
+  const before = sleeper.mutations.length;
+  await cell.click();
+  const confirming = page.locator(panel('.day.confirming'));
+  const score = (await confirming.locator('.ask').innerText()).match(/^Lock\s+(\d+\.\d\d)\?$/)[1];
+  assert.notEqual(score, '0.00', 'the finished game has stats');
+  await page.screenshot({ path: `${OUT}team-lock-confirm.png` });
+  await confirming.locator('button.no').click();
+  await confirming.waitFor({ state: 'detached' });
+  assert.equal(sleeper.mutations.length, before, 'nothing saved');
+  // Yes locks it.
+  await page.locator(panel(`button.cell[data-lock="${ref}"]`)).click();
+  await page.locator(panel(`.day.confirming [data-lock-confirm="${ref}"]`)).click();
+  await page.locator(panel('.notice.ok')).waitFor();
+  assert.match(await shadowText('.notice.ok'), new RegExp(`^Locked .+: ${score.replace('.', '\\.')}$`));
+  assert.equal(sleeper.mutations.length, before + 1);
+  const locks = JSON.parse(sleeper.mutations.at(-1).variables.starters_games);
+  assert.ok(sleeper.finished.has(locks[playerId]), 'locks the finished game');
+  await card.locator('.day.locked').waitFor();
+  assert.equal(await card.locator('button.cell[data-lock]').count(), 0, 'nothing left to lock for them');
+  assert.match(await card.locator('.week-pts.locked').textContent(), new RegExp(`lock ${score.replace('.', '\\.')}`));
+  await page.screenshot({ path: `${OUT}team-lock-done.png` });
+  sleeper.midWeek = false;
+  documentBody = LOGGED_OUT;
+});
+
 async function openMyTeam(url) {
   const users = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}/users`)).json();
   const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}/rosters`)).json();

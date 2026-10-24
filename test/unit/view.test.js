@@ -157,9 +157,23 @@ test('game cells: locked, still lockable, past locking, live, today and later re
     ['today', 'Sat @ UTA, 7:00pm'],
     ['future', 'Sun vs SAC, 7:00pm'],
   ]);
-  assert.match(html.split('<article').find((c) => c.includes('Luka Doncic')), /<span class="time"><svg class="lock-icon"/, 'an open lock on the lockable game');
+  assert.match(html.split('<article').find((c) => c.includes('Luka Doncic')), /<span class="when"><svg class="lock-icon"/, 'an open lock on the lockable game');
   // A bench player's finished game can't be locked; a game under way reads live.
   assert.deepEqual(cells(html, 'Bench Guard').map(([kind]) => kind), ['past', 'live']);
+  assert.doesNotMatch(html, /data-lock=/, 'only your own lineup, in season, can lock');
+  // Your own lineup in season: the lockable cell is a button that asks "Lock?" on hover, then confirms in the cell.
+  s.league = { ...s.league, status: 'in_season' };
+  s.weeks[1].legs = [{ roster_id: 1, starters: ['a', 'b', '0'], points: 0, starters_games: {} }];
+  const mine = render(s, []);
+  assert.equal((mine.match(/data-lock="/g) || []).length, 1, 'just the lockable game');
+  assert.match(mine, /<button class="cell" data-lock="1:a"[^>]*aria-label="Lock in 20\.00, Thu vs PHX, Final, can still be locked in">[\s\S]*?<span class="ask"><svg class="lock-icon"[^>]*>.*?<\/svg>Lock\?<\/span>/);
+  s.lockConfirm = '1:a';
+  const confirming = render(s, []);
+  assert.match(confirming, /class="day game lockable confirming"/);
+  assert.match(text(confirming), /Lock 20\.00\? Yes No/);
+  assert.match(confirming, /<button class="yes" data-lock-confirm="1:a"/);
+  assert.match(confirming, /<button class="no" data-lock-cancel/);
+  s.lockConfirm = null;
   // Locked: filled, and the points column says so.
   s.weeks[1].legs = [{ roster_id: 1, starters: ['a', 'b', '0'], points: 20, starters_games: { a: 'w2' } }];
   const locked = render(s, []);

@@ -20,6 +20,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
   | Later in the week | Quiet outline, projection muted |
 
 - The points column marks a locked-in score with a padlock, in yellow, so it reads apart from a score still in play.
+- Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
 - Rostered and start percentages, as the mobile app shows them (rounded up, for the league's type).
 - Draft picks held, including picks acquired by trade.
 - Lineup swaps on your own roster: tap a slot badge, then one of the highlighted players (G takes PG/SG, F takes SF/PF, UTIL and bench take anyone).

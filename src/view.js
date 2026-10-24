@@ -62,6 +62,8 @@
       // Sleeper's own per-player points use the league's scoring; what-if rebuilds them from Lock-In rules.
       points: whatIfOn(s) ? null : matchup?.players_points || {},
       locks: l.locks,
+      // Your own lineup's lockable games can be locked from their cell.
+      lockRoster: l.lockable ? l.roster.roster_id : null,
       editable: editable && !s.saving,
       selecting: Boolean(editable && s.swap),
       targets,
@@ -161,7 +163,7 @@
   }
 
   function playerCard(ctx, slot, id, spot) {
-    const { s, week, points, locks, editable, movable } = ctx;
+    const { s, week, points, locks, editable, movable, lockRoster } = ctx;
     const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
     const cls = cardClass(ctx, spot);
     if (!id || id === '0') {
@@ -183,7 +185,7 @@
         <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${positions(p)}<span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</div>
         <div class="line2" title="Started and rostered in leagues like this one"><b>${pct(research?.started)}</b> Start<span class="bar">|</span><b>${pct(research?.owned)}</b> Rostered</div>
       </div>
-      <div class="days">${days.map((d) => dayCell(d, s, d === lockable)).join('')}</div>
+      <div class="days">${days.map((d) => dayCell(d, s, d === lockable, d === lockable && lockRoster != null ? `${lockRoster}:${id}` : null)).join('')}</div>
       <div class="week-pts${lockedDay ? ' locked' : ''}">
         <b>${lockedDay ? lockIcon() : ''}${f2(points ? points[id] : st.points)}</b>
         <span>${lockedDay ? `lock ${f2(lockedDay.actual ?? lockedDay.proj)}` : `proj ${f2(lockInDefault(days))}`}</span>
@@ -195,8 +197,10 @@
   // tip-off, styled by where the game stands. A game locked in is filled; a
   // finished one that can still be locked is outlined bright, with an open
   // lock; finished games past locking recede; live and today's games stand out
-  // from the rest of the week.
-  function dayCell(d, s, lockable) {
+  // from the rest of the week. With `lockRef` (your own lineup), the lockable
+  // cell is a button: hovering it asks "Lock?", and clicking it asks to
+  // confirm in the cell, since a lock is final.
+  function dayCell(d, s, lockable, lockRef = null) {
     if (!d.game) return `<div class="day${d.date === s.today ? ' today' : ''}"><div class="cell"></div></div>`;
     const done = d.game.status === 'complete';
     const live = !done && (d.game.status === 'in_game' || (d.game.start != null && d.game.start <= s.now));
@@ -206,13 +210,22 @@
     const note = { locked: 'locked in', lockable: 'can still be locked in', past: 'too late to lock in' }[kind];
     const title = `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}${time ? `, ${time}` : ''}${note ? `, ${note}` : ''}`;
     const icon = d.locked || lockable ? lockIcon(!d.locked) : '';
+    const shown = value == null ? '–' : f2(value);
+    if (lockRef && s.lockConfirm === lockRef) {
+      return `<div class="day game lockable confirming" title="${esc(`Lock in ${shown}? Locking is final.`)}">
+      <div class="cell">
+        <span class="ask"><span>Lock</span><span>${esc(shown)}?</span></span>
+        <span class="yes-no"><button class="yes" data-lock-confirm="${esc(lockRef)}" ${s.saving ? 'disabled' : ''}>Yes</button><button class="no" data-lock-cancel ${s.saving ? 'disabled' : ''}>No</button></span>
+      </div>
+    </div>`;
+    }
+    const inner = `<span class="o">${d.home ? 'vs ' : '@'}${esc(d.opponent)}</span>
+        <span class="v">${shown}</span>
+        <span class="time"><span class="when">${icon}${esc(time)}</span>${lockRef ? `<span class="ask">${lockIcon(true)}Lock?</span>` : ''}</span>`;
     // Today's games read by their state; "today" is one still to tip off.
     return `<div class="day game ${kind}" title="${esc(title)}">
-      <div class="cell">
-        <span class="o">${d.home ? 'vs ' : '@'}${esc(d.opponent)}</span>
-        <span class="v">${value == null ? '–' : f2(value)}</span>
-        <span class="time">${icon}${esc(time)}</span>
-      </div>
+      ${lockRef ? `<button class="cell" data-lock="${esc(lockRef)}" ${s.saving ? 'disabled' : ''} aria-label="${esc(`Lock in ${shown}, ${title}`)}">${inner}</button>`
+        : `<div class="cell">${inner}</div>`}
     </div>`;
   }
 
