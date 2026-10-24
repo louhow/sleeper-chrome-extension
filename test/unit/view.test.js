@@ -130,6 +130,43 @@ test('logged-in leg data wins: starters, projection and locked games', () => {
   assert.match(out, /lock 30\.79/);
 });
 
+test('game cells: locked, still lockable, past locking, live, today and later read apart', () => {
+  const at = (date, hour) => Date.parse(`${date}T${hour}:00:00Z`);
+  const g = (game_id, date, home, away, status, hour = 23) => ({ game_id, date, start_time: at(date, hour), status, metadata: { home_team: { team: home }, away_team: { team: away } } });
+  const schedule = [
+    g('w1', '2026-10-20', 'LAL', 'GSW', 'complete'), g('w2', '2026-10-22', 'LAL', 'PHX', 'complete'),
+    g('w3', '2026-10-24', 'UTA', 'LAL', 'pre_game'), g('w4', '2026-10-25', 'LAL', 'SAC', 'pre_game'),
+    g('b1', '2026-10-22', 'BOS', 'NYK', 'complete'), g('b2', '2026-10-24', 'BOS', 'MIA', 'in_game', 15),
+  ];
+  const stat = (player_id, game_id, pts) => ({ player_id, game_id, stats: { pts } });
+  const s = state({ me: 'u1', currentWeek: 1, today: '2026-10-24', now: at('2026-10-24', 12) });
+  s.weeks = { 1: { ...week,
+    days: model.weekDays(schedule), gamesByTeam: model.gamesByTeam(schedule),
+    games: schedule.map((x) => ({ start: x.start_time, status: x.status })),
+    proj: model.pointsByGame([stat('a', 'w3', 25), stat('a', 'w4', 30), stat('g', 'b2', 18)], { pts: 1 }, scoring.scoreStats),
+    actual: model.pointsByGame([stat('a', 'w1', 8), stat('a', 'w2', 20), stat('g', 'b1', 40)], { pts: 1 }, scoring.scoreStats),
+  } };
+  const cells = (html, name) => {
+    const card = html.split('<article').find((c) => c.includes(name));
+    return [...card.matchAll(/class="day game (\w+)" title="([^"]+)"/g)].map((m) => [m[1], m[2]]);
+  };
+  const html = render(s, []);
+  assert.deepEqual(cells(html, 'Luka Doncic'), [
+    ['past', 'Tue vs GSW, Final, too late to lock in'],
+    ['lockable', 'Thu vs PHX, Final, can still be locked in'],
+    ['today', 'Sat @ UTA, 7:00pm'],
+    ['future', 'Sun vs SAC, 7:00pm'],
+  ]);
+  assert.match(html.split('<article').find((c) => c.includes('Luka Doncic')), /<span class="time"><svg class="lock-icon"/, 'an open lock on the lockable game');
+  // A bench player's finished game can't be locked; a game under way reads live.
+  assert.deepEqual(cells(html, 'Bench Guard').map(([kind]) => kind), ['past', 'live']);
+  // Locked: filled, and the points column says so.
+  s.weeks[1].legs = [{ roster_id: 1, starters: ['a', 'b', '0'], points: 20, starters_games: { a: 'w2' } }];
+  const locked = render(s, []);
+  assert.deepEqual(cells(locked, 'Luka Doncic').map(([kind]) => kind), ['past', 'locked', 'today', 'future']);
+  assert.match(locked, /<div class="week-pts locked">\s*<b><svg class="lock-icon"/);
+});
+
 const taxiState = (overrides = {}) => {
   // Week 1's first game tips off Oct 21; nothing has been played on Oct 19.
   const schedule = { ...week, games: [{ start: Date.parse('2026-10-21T23:00:00Z'), status: 'pre_game' }] };

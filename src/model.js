@@ -272,12 +272,32 @@
   // for the next day of games: a starter with no game that day can sit and come
   // back later, while whoever plays gets a shot at a score worth locking. A
   // player's worth is their projection that day; a starter whose finished game
-  // can still be locked, and beats what they're projected to score later, is
-  // worth at least that score, which benching them gives up. The rest of the
-  // week (projected points per game left) breaks ties. Locked players and
-  // players in a game right now stay put.
+  // can still be locked, and beats what leaving the slot open is worth, is
+  // worth that score, which benching them gives up, and it's recommended for
+  // locking when the lineup keeps them. The rest of the week (projected points
+  // per game left) breaks ties. Locked players and players in a game right now stay put.
   const gameLive = (game, now) => game.status === 'in_game' ||
     (game.status === 'pre_game' && game.start != null && game.start <= now);
+
+  // How far a game's fantasy points stray from the projection, as a share of
+  // it (a standard deviation): NBA game logs run about a third either way.
+  const GAME_SPREAD = 0.35;
+
+  // E[max(X, floor)] for X ~ Normal(mean, sd).
+  function expectedMax(mean, sd, floor) {
+    if (!(sd > 0)) return Math.max(mean, floor);
+    const z = (mean - floor) / sd;
+    const below = 0.5 * erfc(z / Math.SQRT2);
+    return mean * (1 - below) + sd * Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI) + floor * below;
+  }
+
+  // What leaving a slot open is worth, given the player's projections for the
+  // games left: the last game counts unless an earlier one gets locked, and a
+  // game gets locked when it beats what the games after it are worth.
+  function openValue(projections) {
+    return projections.reduceRight((after, mean, i) =>
+      (i === projections.length - 1 ? mean : expectedMax(mean, GAME_SPREAD * mean, after)), 0);
+  }
 
   function outlook(days, lockValue, starting, now) {
     const st = lockState(days, lockValue, now);
@@ -290,6 +310,7 @@
       gamesLeft: left.length,
       left,
       banked,
+      open: openValue(left.map((d) => Math.max(0, d.proj ?? 0))),
       value: Math.max(perGame, banked?.actual ?? 0),
       fixed: st.locked ? 'locked' : st.games.some((d) => gameLive(d.game, now)) ? 'live' : null,
     };
@@ -404,8 +425,10 @@
     return { starters, changes, fixed, before: total(current), after: total(starters) };
   }
 
-  // NBA (Lock-In): the best lineup for the next day of games (`date`).
-  function bestLineup(l, now = Date.now()) {
+  // NBA (Lock-In): the best lineup for the next day of games (`date`), and the
+  // finished games worth locking in. `noLock`: players not to lock now (unticked
+  // in the dialog); they're still worth their score, so they keep the chance to lock it later.
+  function bestLineup(l, now = Date.now(), { noLock = [] } = {}) {
     if (!l.week) return null;
     const look = {};
     const consider = (id, starting) => {
@@ -414,24 +437,39 @@
     l.starters.forEach((id) => id && id !== '0' && consider(id, true));
     l.bench.forEach((id) => consider(id, false));
     const date = Object.values(look).map((o) => o.left[0]?.date).filter(Boolean).sort()[0] ?? null;
-    // A finished game is worth keeping only if it beats what the player is projected to score later.
-    const keep = (o) => (o.banked && o.banked.actual > 0 && o.banked.actual >= o.perGame ? o.banked : null);
-    const today = (id) => {
-      const o = look[id];
-      return Math.max(o.left.find((d) => d.date === date)?.proj ?? 0, keep(o)?.actual ?? 0);
-    };
-    const plan = solveLineup({
+    // A finished game is worth keeping if it beats what leaving the slot open is worth.
+    const worthy = (o) => (o.banked && o.banked.actual > 0 && o.banked.actual > o.open ? o.banked : null);
+    const skip = new Set(noLock);
+    const today = (id) => Math.max(look[id].left.find((d) => d.date === date)?.proj ?? 0, worthy(look[id])?.actual ?? 0);
+    const solve = (locking) => solveLineup({
       slots: l.slots, starters: l.starters, bench: l.bench, players: l.players,
       worth: today,
       later: (id) => look[id].value,
-      fixedReason: (id) => look[id].fixed,
+      fixedReason: (id) => look[id].fixed || (locking.has(id) ? 'locking' : null),
     });
+    // Locks go to starters worth keeping that the best lineup keeps, and who
+    // still have a game left (with none, the last game counts anyway). A lock
+    // is final and pins the player to their slot, so the lineup is worked out
+    // again around them.
+    const lockable = (id) => Boolean(look[id]) && l.lockable !== false && worthy(look[id]) && look[id].gamesLeft > 0;
+    const first = solve(new Set());
+    const locking = new Set(l.starters.filter((id) => lockable(id) && !skip.has(id) && first.starters.includes(id)));
+    const plan = locking.size ? solve(locking) : first;
+    plan.fixed = plan.fixed.filter((f) => f.reason !== 'locking');
     plan.date = date;
+    // Unticked ones stay listed, so they can be ticked again.
+    plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {
+      const o = look[id];
+      return { id, on: locking.has(id), game: o.banked, actual: o.banked.actual, open: o.open, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
+    });
+    // Starters whose finished game can still be locked, but isn't worth it yet.
+    plan.notYet = l.starters.filter((id) => look[id]?.banked?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
+      .map((id) => ({ id, actual: look[id].banked.actual, open: look[id].open }));
     plan.changes = plan.changes.map((c) => {
       const o = look[c.id];
       const { perGame, gamesLeft, banked } = o;
       // Benching a starter whose finished game could still be locked throws that score away.
-      const lost = c.to === 'BN' && banked?.actual > 0 && (keep(o) || scoreTier(banked.actual) === 'green') ? banked : null;
+      const lost = c.to === 'BN' && banked?.actual > 0 && (worthy(o) || scoreTier(banked.actual) === 'green') ? banked : null;
       return {
         ...c,
         perGame,
@@ -580,7 +618,7 @@
     ranks, rankShift, shiftTint,
     weekDays, gamesByTeam, pointsByGame, playerDays, lockInDefault, ownedPicks, spotRefs, swapTargets, applyMove, describeMove,
     taxiEligible, taxiOpen, reserveEligible,
-    lockedGameId, lockState, scoreTier, bestLineup, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
+    lockedGameId, lockState, scoreTier, openValue, bestLineup, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
   };
 })();

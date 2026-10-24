@@ -555,29 +555,79 @@ button.slot:hover {
   line-height: 12px;
   white-space: nowrap;
 }
+.lock-icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+/* Game cells, by where the game stands. Upcoming: outlined, the projection muted. */
 .day.game .cell {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
 }
-.day.done .cell {
-  border-color: rgba(0, 206, 184, 0.5);
+.day.game .v {
+  color: rgba(255, 255, 255, 0.7);
 }
+/* Today's games, and a live one, stand out from the rest of the week. */
 .day.today .cell {
-  background: rgba(0, 206, 184, 0.08);
+  background: rgba(255, 255, 255, 0.03);
 }
-.day.today.game .cell {
-  background: rgba(0, 206, 184, 0.14);
+.day.game.today .cell {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.12);
 }
+.day.game.today .time {
+  color: var(--text);
+  font-weight: 700;
+}
+.day.live .cell {
+  border-color: var(--danger);
+  background: rgba(255, 91, 110, 0.12);
+}
+.day.live .v {
+  color: var(--text);
+}
+.day.live .time {
+  color: var(--danger);
+  font-weight: 700;
+}
+/* Finished and past locking: recedes. */
+.day.past .cell {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.025);
+}
+.day.past .cell > * {
+  opacity: 0.45;
+}
+.day.past .v {
+  color: var(--text);
+}
+/* Finished and still lockable: the one to act on. */
+.day.lockable .cell {
+  border-color: var(--accent);
+  background: rgba(0, 206, 184, 0.16);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.day.lockable .v {
+  color: var(--text);
+  font-weight: 800;
+}
+.day.lockable .time {
+  color: var(--accent);
+  font-weight: 700;
+}
+/* Locked in: filled. */
 .day.locked .cell {
   border-color: var(--warn);
-  background: rgba(248, 210, 75, 0.12);
+  background: var(--warn);
+  color: #1d2230;
 }
-.lock {
-  position: absolute;
-  top: -5px;
-  right: -3px;
-  font-size: 9px;
-  line-height: 1;
+.day.locked .v {
+  color: #1d2230;
+  font-weight: 800;
+}
+.day.locked .time {
+  color: rgba(29, 34, 48, 0.75);
 }
 .cell .o {
   font-size: 10.5px;
@@ -588,11 +638,29 @@ button.slot:hover {
   font-variant-numeric: tabular-nums;
 }
 .cell .time {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   color: var(--muted);
   font-size: 9.5px;
 }
-.day.today .time {
-  color: var(--accent);
+.cell .time .lock-icon {
+  width: 8px;
+  height: 8px;
+}
+/* A locked-in score reads as banked. */
+.week-pts.locked b {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--warn);
+}
+.week-pts.locked b .lock-icon {
+  width: 11px;
+  height: 11px;
+}
+.week-pts.locked span {
+  color: var(--warn);
 }
 
 /* Narrow panels: the week drops under the player. */
@@ -1601,6 +1669,51 @@ button.optimize:hover:not(:disabled) {
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.op-lock-head {
+  color: var(--accent);
+}
+.op-row.op-lock {
+  border: 1px solid rgba(0, 206, 184, 0.45);
+  border-radius: 10px;
+  background: rgba(0, 206, 184, 0.06);
+  margin-bottom: 4px;
+}
+.op-row.op-lock.off {
+  border-color: var(--line);
+  background: none;
+}
+.op-row.op-lock.off .dp-pts,
+.op-row.op-lock.off .dp-avg {
+  opacity: 0.6;
+}
+.op-lock-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.op-lock-pick input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.lock-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.op-lock.off .lock-tag {
+  color: var(--muted);
+}
+.op-lock .dp-avg {
+  color: var(--muted);
 }
 .op-fixed {
   margin: 12px 4px 0;

@@ -1,16 +1,17 @@
-// "Optimize lineup" dialog: the changes model.bestLineup proposes for the shown
-// week, with any score benching would throw away. Nothing saves until the
-// owner applies. Pure: state -> HTML.
+// "Optimize lineup" dialog: the finished games worth locking in and the changes
+// model.bestLineup proposes for the shown week, with any score benching would
+// throw away. Nothing saves until the owner applies. Pure: state -> HTML.
 (globalThis.SNP ||= {}).optimize = (() => {
   const { playerDays, scoreTier } = globalThis.SNP.model;
-  const { esc, f2, headshot, positions, injuryTag, slotBadge, weekday, nextGame, dialog, dialogErrors, shortName } = globalThis.SNP.ui;
+  const { esc, f2, headshot, positions, injuryTag, slotBadge, weekday, gameTime, nextGame, lockIcon, dialog, dialogErrors, shortName } = globalThis.SNP.ui;
 
   // Plain text for the "How it picks" tooltip.
   const HOW = [
     'How it picks:',
     'Starts your best projected players for the next day of games.',
     'Starters without a game that day can sit. Run it again before their next one.',
-    'Keeps a finished game worth locking in, and leaves locked-in and live players alone.',
+    'Locks a finished game when it beats what keeping the slot open is likely to bring.',
+    'Leaves locked-in and live players alone.',
   ].join('\n');
 
   const games = (n) => `${n} game${n === 1 ? '' : 's'}`;
@@ -37,24 +38,39 @@
       </div>` : '') + (soft.length ? `<div class="warn-banner" role="status">
         <p>${who(soft)} ${soft.length > 1 ? 'have finished games' : 'has a finished game'} you could still lock in. On the bench ${soft.length > 1 ? 'those scores' : 'that score'} can't be locked.</p>
       </div>` : '');
+    const locks = plan.locks || [];
+    const on = locks.filter((k) => k.on);
+    const actionable = plan.changes.length > 0 || on.length > 0;
     const fixed = plan.fixed.length ? `<p class="op-fixed">Staying put: ${plan.fixed.map((f) =>
       `${esc(shortName(s.players[f.id]))} (${f.reason === 'locked' ? 'locked in' : 'playing now'})`).join(', ')}</p>` : '';
-    const body = plan.changes.length ? `
+    const notYet = plan.notYet?.length ? `<p class="op-fixed">Not worth locking yet: ${plan.notYet.map((k) =>
+      `${esc(shortName(s.players[k.id]))} ${f2(k.actual)} (open ${f2(k.open)})`).join(', ')}</p>` : '';
+    const lockList = locks.length ? `
+        <div class="op-head op-lock-head"><span>Lock in</span><span>Player</span><span class="dp-pts" title="The finished game's fantasy points">Score</span><span class="dp-avg" title="What keeping the slot open is likely to bring">Open</span></div>
+        ${locks.map((k) => lockRow(s, k, m.saving)).join('')}` : '';
+    const moves = plan.changes.length ? `
+        <div class="op-head"><span>Move</span><span>Player</span><span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span><span class="dp-avg" title="Projected points per game left this week">Pts/G</span></div>
+        ${plan.changes.map((c) => row(s, c)).join('')}` : '';
+    const body = plan.changes.length || locks.length ? `
         ${summary(plan)}
         ${warning}
-        <div class="op-head"><span>Move</span><span>Player</span><span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span><span class="dp-avg" title="Projected points per game left this week">Pts/G</span></div>
-        ${plan.changes.map((c) => row(s, c)).join('')}
+        ${lockList}
+        ${moves}
+        ${notYet}
         ${fixed}`
-      : `${summary(plan)}<p class="msg">This is already your best lineup for week ${esc(s.week)}.</p>${fixed}`;
-    const apply = good.length ? `Apply and lose ${f2(goodTotal)} pts` : 'Apply changes';
+      : `${summary(plan)}<p class="msg">This is already your best lineup for week ${esc(s.week)}.</p>${notYet}${fixed}`;
+    const lockText = `Lock ${on.length === 1 ? 'in 1 game' : `in ${on.length} games`}`;
+    const apply = on.length && !plan.changes.length ? lockText
+      : on.length ? `${lockText} and ${good.length ? `apply, losing ${f2(goodTotal)} pts` : 'apply'}`
+      : good.length ? `Apply and lose ${f2(goodTotal)} pts` : 'Apply changes';
     return dialog('Optimize Lineup', `Week ${s.week}`, `
       <div class="dialog-body">
         ${dialogErrors(m.errors)}
         ${body}
       </div>
       <footer class="dialog-foot op-foot">
-        <button data-action="close-modal" ${m.saving ? 'disabled' : ''}>${plan.changes.length ? 'Cancel' : 'Close'}</button>
-        ${plan.changes.length ? `<button class="primary${good.length ? ' risky' : ''}" data-action="apply-lineup" ${m.saving || blocked ? 'disabled' : ''}
+        <button data-action="close-modal" ${m.saving ? 'disabled' : ''}>${actionable ? 'Cancel' : 'Close'}</button>
+        ${actionable ? `<button class="primary${good.length ? ' risky' : ''}" data-action="apply-lineup" ${m.saving || blocked ? 'disabled' : ''}
           ${blocked ? 'title="Tick the box above to confirm giving up that score"' : ''}>${m.saving ? 'Saving…' : esc(apply)}</button>` : ''}
       </footer>`, how);
   }
@@ -89,6 +105,25 @@
       </span>
       <span class="dp-pts">${pts(c.today)}</span>
       <span class="dp-avg" title="${esc(games(c.gamesLeft))} left">${f2(c.perGame)}</span>
+    </div>`;
+  }
+
+  // A finished game worth locking in: ticked unless the owner unticked it. Final once saved.
+  function lockRow(s, k, saving) {
+    const p = s.players[k.id] || { name: `Player #${k.id}`, positions: [] };
+    // Lockable until the next game tips off.
+    const until = k.until ? ` · until ${new Date(k.until).toLocaleDateString(undefined, { weekday: 'short' })} ${gameTime(k.until)}` : '';
+    const left = `${games(k.gamesLeft)} left`;
+    return `<div class="op-row op-lock${k.on ? '' : ' off'}">
+      <label class="op-lock-pick"><input type="checkbox" data-op-lock="${esc(k.id)}" ${k.on ? 'checked' : ''} ${saving ? 'disabled' : ''}>
+        <span class="lock-tag">${lockIcon(!k.on)}${k.on ? 'Lock' : 'Keep open'}</span></label>
+      <img class="headshot" src="${headshot(k.id)}" alt="" data-player="${esc(k.id)}">
+      <span class="dp-info">
+        <span class="dp-name"><button class="name" data-player="${esc(k.id)}">${esc(p.name)}</button> ${positions(p)} <span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</span>
+        <span class="sub">${esc(gameText(k.game))}${esc(until)}</span>
+      </span>
+      <span class="dp-pts">${score(k.actual)}</span>
+      <span class="dp-avg" title="${esc(left)}">${f2(k.open)}</span>
     </div>`;
   }
 

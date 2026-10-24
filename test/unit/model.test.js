@@ -353,6 +353,57 @@ test('best lineup: benching a starter with a lockable finished game flags the lo
   assert.deepEqual(plain(model.bestLineup(close, OPT_NOW).changes), []);
 });
 
+test('open value: the last game counts, and an earlier one gets locked when it beats what is left', () => {
+  assert.equal(model.openValue([]), 0);
+  assert.equal(model.openValue([20]), 20);
+  // Two games left: the first is worth locking only when it beats the second, so the open slot is worth more than either.
+  const two = model.openValue([22.42, 22.99]);
+  assert.ok(two > 25.7 && two < 26, `about 25.8 (${two})`);
+  assert.ok(model.openValue([10, 20, 30]) > 30, 'each extra game adds a chance');
+  assert.equal(model.openValue([0, 0]), 0, 'nothing projected is worth nothing');
+});
+
+test('best lineup: recommends locking a finished game that beats leaving the slot open', () => {
+  const l = optimizerLineup(['F'], ['kj'], ['wing'], { kj: ['SF', 'PF'], wing: ['SF'] }, {
+    kj: [['k1', '2026-10-20', 'complete', 10, 12.5], ['k2', '2026-10-23', 'pre_game', 9]],
+    wing: [['w1', '2026-10-22', 'pre_game', 12]],
+  });
+  const plan = model.bestLineup(l, OPT_NOW);
+  assert.deepEqual(plain(plan.changes), []);
+  assert.deepEqual(plain(plan.locks.map((k) => [k.id, k.on, k.game.game.id, k.actual, k.open, k.gamesLeft])), [['kj', true, 'k1', 12.5, 9, 1]]);
+  assert.deepEqual(plain(plan.fixed), [], 'the lock isn\'t a reason to list them as staying put');
+  // Unticked: not locked now, but kj keeps the slot (and the chance to lock it later).
+  const open = model.bestLineup(l, OPT_NOW, { noLock: ['kj'] });
+  assert.deepEqual(plain(open.locks.map((k) => [k.id, k.on])), [['kj', false]], 'still listed, to tick again');
+  assert.deepEqual(plain(open.changes), []);
+  // Behind what's still to come: not worth locking yet.
+  l.week = optimizerWeek({
+    kj: [['k1', '2026-10-20', 'complete', 10, 12.5], ['k2', '2026-10-23', 'pre_game', 20]],
+    wing: [['w1', '2026-10-22', 'pre_game', 5]],
+  });
+  const later = model.bestLineup(l, OPT_NOW);
+  assert.deepEqual(plain(later.locks), []);
+  assert.deepEqual(plain(later.notYet), [{ id: 'kj', actual: 12.5, open: 20 }]);
+  // No game left: the last game counts anyway, so there's nothing to lock.
+  l.week = optimizerWeek({ kj: [['k1', '2026-10-20', 'complete', 10, 12.5]], wing: [['w1', '2026-10-22', 'pre_game', 5]] });
+  assert.deepEqual(plain(model.bestLineup(l, OPT_NOW).locks), []);
+  // Not your lineup to lock.
+  assert.deepEqual(plain(model.bestLineup({ ...l, lockable: false }, OPT_NOW).locks), []);
+});
+
+test('best lineup: a player being locked keeps their slot, and the lineup works around them', () => {
+  // Without the lock, kj would slide to UTIL to make room for the pure SF at F.
+  const l = optimizerLineup(['F', 'UTIL'], ['kj', 'pg'], ['sf'], { kj: ['SF', 'PF'], pg: ['PG'], sf: ['SF'] }, {
+    kj: [['k1', '2026-10-20', 'complete', 10, 12.5], ['k2', '2026-10-23', 'pre_game', 9]],
+    pg: [['p1', '2026-10-22', 'pre_game', 5]],
+    sf: [['s1', '2026-10-22', 'pre_game', 20]],
+  });
+  const plan = model.bestLineup(l, OPT_NOW);
+  assert.deepEqual(plain(plan.starters), ['kj', 'sf']);
+  assert.deepEqual(plain(plan.changes.map((c) => [c.id, c.from, c.to])), [['sf', 'BN', 'UTIL'], ['pg', 'UTIL', 'BN']]);
+  assert.deepEqual(plain(plan.locks.map((k) => k.id)), ['kj']);
+});
+
 test('best lineup: locked players and players in a game right now stay put', () => {
   const l = optimizerLineup(['G', 'UTIL'], ['lock', 'live'], ['star', 'benchLive'], { lock: ['PG'], live: ['SG'], star: ['PG'], benchLive: ['SG'] }, {
     lock: [['l1', '2026-10-20', 'complete', 5, 4]],

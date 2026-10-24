@@ -57,6 +57,12 @@
       : `<span class="slot ${esc(cls)}"${style}>${esc(slot)}</span>`;
   }
 
+  // A padlock, shut for a locked-in game, open for one that can still be locked.
+  function lockIcon(open = false) {
+    const shackle = open ? 'M5 7V5a3 3 0 0 1 5.8-1.1' : 'M5 7V5a3 3 0 0 1 6 0v2';
+    return `<svg class="lock-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="${shackle}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="2.5" y="7" width="11" height="8" rx="2" fill="currentColor"/></svg>`;
+  }
+
   // A player's next game this week, e.g. "Thu @ MIA 7:30pm".
   function nextGame(days) {
     const d = days.find((x) => x.game && x.game.status !== 'complete');
@@ -213,6 +219,6 @@
   return {
     reserveRule, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
     esc, f2, CDN, headshot, teamLogo, teamName, avatar, record, shortName, injuryTag, positions,
-    gameTime, weekday, nextGame, dialog, dialogErrors, slotBadge, weekNav, notice, lineup, taxiRule, owns,
+    gameTime, weekday, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, lineup, taxiRule, owns,
   };
 })();

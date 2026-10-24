@@ -8,6 +8,18 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
 
 - Team card: avatar, record, this week's points, Lock-In projection, opponent.
 - Starters, bench, injured reserve and taxi squad, each player with a Monday-Sunday strip of games: projected points (actual once played), opponent, tip-off time.
+- Each game cell shows where the game stands under Lock-In:
+
+  | State | Looks like |
+  | --- | --- |
+  | Locked in | Filled yellow, closed padlock |
+  | Finished, can still be locked (a starter, before their next tip-off) | Bright teal outline, open padlock |
+  | Finished, too late to lock (or a bench player's) | Faded, no outline |
+  | Live | Red outline, "Live" |
+  | Today, still to tip off | Bright outline, bold time |
+  | Later in the week | Quiet outline, projection muted |
+
+- The points column marks a locked-in score with a padlock, in yellow, so it reads apart from a score still in play.
 - Rostered and start percentages, as the mobile app shows them (rounded up, for the league's type).
 - Draft picks held, including picks acquired by trade.
 - Lineup swaps on your own roster: tap a slot badge, then one of the highlighted players (G takes PG/SG, F takes SF/PF, UTIL and bench take anyone).
@@ -27,22 +39,32 @@ The projection follows Lock-In rules: an unlocked player scores their final game
 
 #### Optimize lineup
 
-The Team tab's **Optimize lineup** button (your own team, a week you can still edit) proposes the best starting lineup and shows every change in a dialog before anything saves.
+The Team tab's **Optimize lineup** button (your own team, a week you can still edit) proposes the best starting lineup and the finished games worth locking in, and shows all of it in a dialog before anything saves.
 Nothing is written until you press Apply; Cancel, ✕, the backdrop or Esc leave the lineup as it was.
 
 - It picks for the next day of games, since Lock-In lineups can change daily: a starter with no game that day can sit for someone who plays, and come back for their next game.
   Run it again each game day.
 - Worth: a player's projection for that day (0 with no game). Out games project 0, so injuries count.
-- A starter with a finished game that can still be locked, scoring at least their projection per game left, is worth at least that score.
+- Open value: what leaving a starter's slot open is worth, from their projections for the games left.
+  The week's last game counts unless an earlier one gets locked, and a game is worth locking when it beats what the games after it are worth.
+  Each game's points are taken to spread about 35% of the projection either way (a normal distribution), so two games left are worth more than either alone.
+- A starter with a finished game that can still be locked, scoring more than the open value, is worth that score.
+- Lock in: such a starter is recommended for locking when the best lineup keeps them and they have a game left (with none, the last game counts anyway).
+  Each recommendation shows the score, the open value and when the window closes (their next tip-off), with a box ticked.
+  Unticking one keeps the player in the lineup, so the score can still be locked later; the rest of the plan is worked out again.
+  A player being locked keeps their slot, and the lineup is worked out around them.
+- Starters whose finished game can be locked but isn't worth it yet are listed under the moves ("Not worth locking yet: L. Doncic 16.50 (open 31.91)").
 - Slots no one can fill that day go to the players with the most projected points per game left this week.
 - Lineup: tries every way to fit the movable players into the starting slots and keeps the highest total, so scarce slots go to the players who can only fill them. Ties keep the most players where they are, then put players in their most specific slot.
 - Locked-in players and players in a game right now stay put.
 - Losses: benching a starter whose finished game was worth locking (or green) gives that score up (bench players can't lock in). The row turns yellow ("Can't lock 12.42 · Tue vs OKC") with a yellow note at the top; Apply still works.
 - Green scores (24+): giving one up turns the row red, explains it at the top, and keeps Apply ("Apply and lose N pts") disabled until you tick "Bench … anyway".
 - Scores in the dialog are colored by tier, like the game log.
-- Apply works the plan out again first; if a game tipped off meanwhile and the plan changed, it shows the new plan instead of saving. The lineup saves in one `update_matchup_leg` (in season) or `roster_update_starters`, leaving Lock-In picks untouched.
+- Apply works the plan out again first; if a game tipped off meanwhile and the plan changed, it shows the new plan instead of saving.
+  With locks ticked, the lineup and the locks save together in one `update_matchup_leg` (the button says "Lock in N games and apply"); locks are final.
+  Without, the lineup saves in one `update_matchup_leg` (in season) or `roster_update_starters`, leaving Lock-In picks untouched.
 - The top of the dialog shows the starters' projected points for that day now and after the changes; each row shows that day's projection and points per game left.
-- The dialog's "How it picks" label sums these rules up in three lines on hover or focus.
+- The dialog's "How it picks" label sums these rules up in a few lines on hover or focus.
 - Clicking a player in the dialog opens their player card over it; closing the card returns to the dialog.
 
 ### Matchup
@@ -199,5 +221,5 @@ npm run test:e2e  # headless Chromium with the extension loaded
 Logged-out visitors get redirected away from league pages, so the e2e test serves a stand-in page that mirrors the empty Team tab's markup, and keeps public API calls live.
 Authenticated GraphQL calls are answered by a mock in the test, so tests never change a real lineup or place a real bid.
 The waiver tests use a stand-in Players tab whose W and ADD buttons carry React-style props, plus a document listener standing in for Sleeper's own handler, which must never fire.
-The Lock-In test fakes a mid-week state (each team's first game finished, projections standing in for stats), since nothing is lockable before games are played.
+The Lock-In test fakes a mid-week state (each team's first game finished, projections standing in for stats, every later game moved to still come), since nothing is lockable before games are played.
 Screenshots land in `test-results/`.

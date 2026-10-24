@@ -722,6 +722,10 @@ test('matchup: locks in a finished game for your starter', async () => {
   const [rosterId, playerId] = ref.split(':');
   assert.equal(Number(rosterId), myRoster.roster_id);
   const before = sleeper.mutations.length;
+  // The header adds up every slot that counts: locks, and players whose week is over.
+  const headerPts = async () => Number((await page.locator(panel('.mu-team.mine .mu-pts')).textContent()).match(/\d+\.\d\d/)[0]);
+  const counted = (await page.locator(panel('.mp.mine')).filter({ has: page.locator(`[data-lock="${ref}"]`) }).locator('.mp-pts b').textContent()).trim();
+  const headerBefore = await headerPts();
   await open.first().click();
   const go = page.locator(panel(`[data-lock-confirm="${ref}"]`));
   assert.match(await go.textContent(), /^Lock \d+\.\d\d$/);
@@ -742,7 +746,8 @@ test('matchup: locks in a finished game for your starter', async () => {
   await card.first().waitFor();
   assert.equal(await card.first().locator('.lk.locked').count(), 1, 'shows the lock');
   const locked = (await card.first().locator('.mp-pts b').textContent()).trim();
-  assert.match(await page.locator(panel('.mu-team.mine .mu-pts')).textContent(), new RegExp(locked.replace('.', '\\.')), 'header counts the locked game');
+  const added = Number(locked) - (counted === '–' ? 0 : Number(counted));
+  assert.ok(Math.abs(await headerPts() - (headerBefore + added)) < 0.01, `header counts the locked game (${headerBefore} + ${added})`);
   await page.screenshot({ path: `${OUT}lock-done.png` });
   sleeper.midWeek = false;
   documentBody = LOGGED_OUT;
@@ -1128,11 +1133,21 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const bench = myRoster.players.filter((id) => !placed.has(id) && ahead(players[id].team).some((g) => g.date === nextDay));
   assert.ok(bench.length, `a bench player plays on ${nextDay}`);
   const star = bench[0];
+  // Another starter with a game left had a big finished game, worth locking over
+  // the 10s they're projected after it. Every other starter's finished game
+  // scored nothing, so there's nothing else to lock or lose.
+  const existing = { ...leg.starters_games };
+  const locker = leg.starters.find((id) => id !== victim && id !== '0' && !(id in existing) && ahead(players[id]?.team).length);
+  assert.ok(locker, 'a starter with a game left');
+  const starting = new Set(leg.starters);
+  const quiet = (r) => (starting.has(r.player_id) && sleeper.finished.has(r.game_id) ? { ...r, stats: { pts: 0 } } : r);
+  const big = (r) => ({ ...r, stats: { pts: statPts(sleeper.finished.has(r.game_id) ? 70 : 10) } });
   // The UTIL starter scored a little in their finished game and is projected nothing after it.
   sleeper.projections = (rows) => rows.map((r) => {
     if (r.player_id === star) return { ...r, stats: { pts: statPts(50) } };
     if (r.player_id === victim) return { ...r, stats: { pts: sleeper.finished.has(r.game_id) ? statPts(3) : 0 } };
-    return r;
+    if (r.player_id === locker) return big(r);
+    return quiet(r);
   });
   await page.reload();
   await page.locator(panel('.taxi-head .hint')).waitFor({ timeout: 30000 });
@@ -1162,7 +1177,23 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.equal(await page.locator(dialog('.lose-banner')).count(), 0, 'no hard stop for a red score');
   assert.equal(await page.locator(dialog('[data-action="apply-lineup"]')).isDisabled(), false);
   assert.equal(await page.locator(dialog('.op-row')).filter({ hasText: players[star].full_name }).count(), 1, 'the must-start comes in');
+  // The big finished game is recommended for locking, ticked, with what keeping it open would bring.
+  const lockRow = page.locator(dialog('.op-row.op-lock'));
+  assert.equal(await lockRow.count(), 1, 'one game worth locking');
+  assert.match(await lockRow.innerText(), new RegExp(`^Lock\\s+${players[locker].full_name}[\\s\\S]*\\w{3} (vs|@) \\w+ · until \\w{3} \\d{1,2}:\\d\\d(am|pm)`));
+  assert.ok(Number(await lockRow.locator('.score.green').textContent()) >= 70, 'the score, in its tier color');
+  assert.ok(Number(await lockRow.locator('.dp-avg').textContent()) < 20, 'keeping it open is worth far less');
+  assert.equal(await lockRow.locator('[data-op-lock]').isChecked(), true);
+  const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
+  assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply');
   await page.screenshot({ path: `${OUT}optimize-dialog.png` });
+  // Unticked, it stays listed and the plan goes on without it.
+  await lockRow.locator('[data-op-lock]').uncheck();
+  await page.locator(dialog('.op-row.op-lock.off')).waitFor();
+  assert.match(await page.locator(dialog('.op-row.op-lock')).textContent(), /Keep open/);
+  assert.equal(await applyButton.textContent(), 'Apply changes');
+  await page.locator(dialog('[data-op-lock]')).check();
+  await page.locator(dialog('.op-row.op-lock:not(.off)')).waitFor();
 
   // A player's card opens over the dialog; closing it comes back to the dialog.
   await page.locator(dialog(`.op-row button.name[data-player="${star}"]`)).click();
@@ -1182,9 +1213,10 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   // the star most of all, so ties among the bench can't leave them out.
   sleeper.projections = (rows) => rows.map((r) => {
     if (r.player_id === star) return { ...r, stats: { pts: statPts(60) } };
-    if (bench.includes(r.player_id)) return { ...r, stats: { pts: statPts(50) } };
+    if (bench.includes(r.player_id)) return { ...r, stats: { pts: sleeper.finished.has(r.game_id) ? 0 : statPts(50) } };
     if (r.player_id === victim) return { ...r, stats: { pts: sleeper.finished.has(r.game_id) ? statPts(30) : 0 } };
-    return r;
+    if (r.player_id === locker) return big(r);
+    return quiet(r);
   });
   await page.reload();
   await page.locator(panel('button.optimize')).click();
@@ -1194,7 +1226,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const given = Number((await page.locator(dialog('.op-row.losing')).filter({ hasText: players[victim].full_name }).textContent()).match(/Can't lock (\d+\.\d\d)/)[1]);
   assert.ok(given >= 24, `a green score (${given})`);
   const apply = page.locator(dialog('[data-action="apply-lineup"]'));
-  assert.match(await apply.textContent(), /^Apply and lose \d+\.\d\d pts$/);
+  assert.match(await apply.textContent(), /^Lock in 1 game and apply, losing \d+\.\d\d pts$/);
   assert.equal(await apply.isDisabled(), true, 'giving up a green score needs the tick box');
   await page.screenshot({ path: `${OUT}optimize-green.png` });
   await page.locator(dialog('[data-op-ack]')).check();
@@ -1202,12 +1234,16 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
   await page.locator(panel('.notice.ok')).waitFor();
   const saved = sleeper.mutations.slice(before);
-  assert.equal(saved.length, 1, 'one lineup save');
+  assert.equal(saved.length, 1, 'the lineup and the lock in one save');
   assert.match(saved[0].query, /mutation update_matchup_leg/);
-  assert.deepEqual(saved[0].variables, {}, 'existing locks are left alone');
+  const locks = JSON.parse(saved[0].variables.starters_games);
+  assert.deepEqual(Object.keys(locks).filter((id) => !(id in existing)), [locker], 'one new lock');
+  for (const [id, game] of Object.entries(existing)) assert.equal(String(locks[id]), String(game), 'existing locks are left alone');
+  assert.ok(sleeper.finished.has(locks[locker]), 'locks the finished game');
   const starters = JSON.parse(saved[0].query.match(/starters: (\[[^\]]*\])/)[1]);
-  assert.ok(starters.includes(star) && !starters.includes(victim));
-  assert.match(await shadowText('.notice.ok'), /^Saved: (\d+ lineup changes|.*to bench)$/);
+  assert.ok(starters.includes(star) && !starters.includes(victim) && starters.includes(locker));
+  assert.equal(starters.indexOf(locker), leg.starters.indexOf(locker), 'the locked player keeps their slot');
+  assert.match(await shadowText('.notice.ok'), /^Locked .+ \d+\.\d\d · Saved: (\d+ lineup changes|.*to bench)$/);
   await page.screenshot({ path: `${OUT}optimize-saved.png` });
 
   // Applied again, the lineup is already the best one.

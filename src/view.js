@@ -1,7 +1,7 @@
 // Pure render functions: (state, api log) -> HTML string for the shadow root.
 (globalThis.SNP ||= {}).view = (() => {
   const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId } = globalThis.SNP.model;
-  const { esc, f2, headshot, teamName, avatar, record, injuryTag, positions, gameTime, weekday, slotBadge, weekNav, notice, lineup, taxiRule, reserveRule,
+  const { esc, f2, headshot, teamName, avatar, record, injuryTag, positions, gameTime, weekday, lockIcon, slotBadge, weekNav, notice, lineup, taxiRule, reserveRule,
     whatIfOn, whatIfBanner } = globalThis.SNP.ui;
   const PREVIEW_CHARS = 20000;
   const PAGES = { team: 'Team', matchup: 'Matchup' };
@@ -171,6 +171,9 @@
     const locked = lockedGameId(locks[id]);
     const days = playerDays(week, p.team, id).map((d) => ({ ...d, locked: locked != null && String(d.game?.id) === String(locked) }));
     const lockedDay = days.find((d) => d.locked);
+    const st = lockState(days, locks[id], s.now);
+    // Only a starter's finished game can be locked in.
+    const lockable = !['BN', 'TX', 'IR'].includes(slot) && st.lockable ? st.current : null;
     const research = week.research[id];
     const pct = (n) => (n == null ? '–' : `${Math.ceil(n)}%`);
     return `<article class="card${cls}">
@@ -180,28 +183,35 @@
         <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${positions(p)}<span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</div>
         <div class="line2" title="Started and rostered in leagues like this one"><b>${pct(research?.started)}</b> Start<span class="bar">|</span><b>${pct(research?.owned)}</b> Rostered</div>
       </div>
-      <div class="days">${days.map((d) => dayCell(d, s.today)).join('')}</div>
-      <div class="week-pts">
-        <b>${f2(points ? points[id] : lockState(days, locks[id], s.now).points)}</b>
+      <div class="days">${days.map((d) => dayCell(d, s, d === lockable)).join('')}</div>
+      <div class="week-pts${lockedDay ? ' locked' : ''}">
+        <b>${lockedDay ? lockIcon() : ''}${f2(points ? points[id] : st.points)}</b>
         <span>${lockedDay ? `lock ${f2(lockedDay.actual ?? lockedDay.proj)}` : `proj ${f2(lockInDefault(days))}`}</span>
       </div>
     </article>`;
   }
 
-  // One day of a player's week: opponent, points (projected until played) and tip-off.
-  function dayCell(d, today) {
-    const cls = (d.date === today ? ' today' : '') + (d.locked ? ' locked' : '');
-    if (!d.game) return `<div class="day${cls}"><div class="cell"></div></div>`;
+  // One day of a player's week: opponent, points (projected until played) and
+  // tip-off, styled by where the game stands. A game locked in is filled; a
+  // finished one that can still be locked is outlined bright, with an open
+  // lock; finished games past locking recede; live and today's games stand out
+  // from the rest of the week.
+  function dayCell(d, s, lockable) {
+    if (!d.game) return `<div class="day${d.date === s.today ? ' today' : ''}"><div class="cell"></div></div>`;
     const done = d.game.status === 'complete';
+    const live = !done && (d.game.status === 'in_game' || (d.game.start != null && d.game.start <= s.now));
+    const kind = d.locked ? 'locked' : lockable ? 'lockable' : done ? 'past' : live ? 'live' : d.date === s.today ? 'today' : 'future';
     const value = done || d.actual != null ? d.actual : d.proj;
-    const time = done ? 'Final' : d.game.status === 'in_game' ? 'Live' : d.game.start ? gameTime(d.game.start) : '';
-    const title = `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}${time ? `, ${time}` : ''}${d.locked ? ', locked in' : ''}`;
-    return `<div class="day game${cls}${done ? ' done' : ''}" title="${esc(title)}">
-      ${d.locked ? '<span class="lock" aria-label="Locked in">🔒</span>' : ''}
+    const time = done ? 'Final' : live ? 'Live' : d.game.start ? gameTime(d.game.start) : '';
+    const note = { locked: 'locked in', lockable: 'can still be locked in', past: 'too late to lock in' }[kind];
+    const title = `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}${time ? `, ${time}` : ''}${note ? `, ${note}` : ''}`;
+    const icon = d.locked || lockable ? lockIcon(!d.locked) : '';
+    // Today's games read by their state; "today" is one still to tip off.
+    return `<div class="day game ${kind}" title="${esc(title)}">
       <div class="cell">
         <span class="o">${d.home ? 'vs ' : '@'}${esc(d.opponent)}</span>
         <span class="v">${value == null ? '–' : f2(value)}</span>
-        <span class="time">${esc(time)}</span>
+        <span class="time">${icon}${esc(time)}</span>
       </div>
     </div>`;
   }
