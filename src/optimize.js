@@ -126,7 +126,7 @@
       : info.fixed === 'live' ? 'Playing'
       : 'No change';
     const sub = info.fixed === 'locked' ? `${score(info.locked.actual ?? 0)} ${esc(gameText(info.locked))}`
-      : notYet ? `${score(notYet.actual)} ${esc(gameText(notYet.game))} · open ${f2(notYet.open)} · ${esc(upcoming(s, cur))}`
+      : notYet ? `${score(notYet.actual)} ${esc(gameText(notYet.game))} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
       : esc(upcoming(s, cur));
     return `<div class="os-row same${info.fixed === 'locked' ? ' locked' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>
@@ -144,7 +144,8 @@
     const toggle = k.on
       ? `<button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open</button>`
       : `<button class="os-link" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
-    const sub = `<span class="sub">${score(k.actual)} ${esc(gameText(k.game))} · open ${f2(k.open)} · ${k.on ? `lockable${esc(until)}` : 'keeping open'} · ${toggle}</span>`;
+    const sub = `<span class="sub">${score(k.actual)} ${esc(gameText(k.game))} · ${openText(s, k)}</span>
+      <span class="sub">${k.on ? `Lockable${esc(until)}` : 'Keeping open'} · ${toggle}</span>`;
     return `<div class="os-row lock${k.on ? '' : ' off'}">
       <span class="os-slot">${slotBadge(slot)}</span>
       ${player(s, k.id, 'keep', sub)}
@@ -182,6 +183,11 @@
     const k = (kind === 'out' ? plan.starters : plan.current).indexOf(id);
     const where = k < 0 ? 'bench' : plan.slots[k];
     return `${kind === 'out' ? 'To' : 'From'} ${esc(where)}`;
+  }
+
+  // What keeping the slot open is worth, and who from the bench would bring it.
+  function openText(s, k) {
+    return `open ${f2(k.open)}${k.openBy ? ` with ${esc(shortName(s.players[k.openBy]))}` : ''}`;
   }
 
   // The player's next game this week, e.g. "Fri vs BOS 7:00pm".

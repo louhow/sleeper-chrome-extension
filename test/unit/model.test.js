@@ -384,7 +384,8 @@ test('best lineup: recommends locking a finished game that beats leaving the slo
   });
   const plan = model.bestLineup(l, OPT_NOW);
   assert.deepEqual(plain(plan.changes), []);
-  assert.deepEqual(plain(plan.locks.map((k) => [k.id, k.on, k.game.game.id, k.actual, k.open, k.gamesLeft])), [['kj', true, 'k1', 12.5, 9, 1]]);
+  // Keeping it open is worth the bench wing's 12 (more than kj's own 9), still short of 12.5.
+  assert.deepEqual(plain(plan.locks.map((k) => [k.id, k.on, k.game.game.id, k.actual, k.open, k.openBy, k.gamesLeft])), [['kj', true, 'k1', 12.5, 12, 'wing', 1]]);
   assert.deepEqual(plain(plan.fixed), [], 'the lock isn\'t a reason to list them as staying put');
   // Unticked: not locked now, but kj keeps the slot (and the chance to lock it later).
   const open = model.bestLineup(l, OPT_NOW, { noLock: ['kj'] });
@@ -403,6 +404,21 @@ test('best lineup: recommends locking a finished game that beats leaving the slo
   assert.deepEqual(plain(model.bestLineup(l, OPT_NOW).locks), []);
   // Not your lineup to lock.
   assert.deepEqual(plain(model.bestLineup({ ...l, lockable: false }, OPT_NOW).locks), []);
+});
+
+test('best lineup: a lock shuts the slot to the bench too, so a bench player who fits it counts as keeping it open', () => {
+  // tre's finished 20 beats his own game left (13), but locking him would shut luka out of PG for the week.
+  const games = {
+    tre: [['t1', '2026-10-20', 'complete', 10, 20], ['t2', '2026-10-22', 'pre_game', 13]],
+    luka: [['l1', '2026-10-23', 'pre_game', 32]],
+  };
+  const l = optimizerLineup(['PG'], ['tre'], ['luka'], { tre: ['PG', 'SG'], luka: ['PG'] }, games);
+  const plan = model.bestLineup(l, OPT_NOW);
+  assert.deepEqual(plain(plan.locks), []);
+  assert.deepEqual(plain(plan.notYet.map(({ id, open, openBy }) => ({ id, open, openBy }))), [{ id: 'tre', open: 32, openBy: 'luka' }]);
+  // A bench player who can't play the slot doesn't count.
+  const c = optimizerLineup(['PG'], ['tre'], ['luka'], { tre: ['PG', 'SG'], luka: ['C'] }, games);
+  assert.deepEqual(plain(model.bestLineup(c, OPT_NOW).locks.map((k) => [k.id, k.openBy])), [['tre', null]]);
 });
 
 test('best lineup: a player being locked keeps their slot, and the lineup works around them', () => {

@@ -453,6 +453,22 @@
     // is final and pins the player to their slot, so the lineup is worked out
     // again around them.
     const lockable = (id) => Boolean(look[id]) && l.lockable !== false && worthy(look[id]) && look[id].gamesLeft > 0;
+    // A lock closes the slot for the rest of the week, to the bench too: keeping
+    // it open is worth the best of the starter's own games left or a player the
+    // best lineup leaves on the bench who fits the slot (`openBy`). Those bench
+    // players depend on the lineup, so it's worked out once more after.
+    const pick = solve(new Set());
+    const free = [...l.starters, ...l.bench].filter((id) => id && id !== '0' && !pick.starters.includes(id));
+    pick.starters.forEach((id, i) => {
+      if (!id || id === '0') return;
+      const o = look[id];
+      for (const b of free) {
+        if (look[b].open > o.open && fits(l.slots[i] ?? 'UTIL', l.players[b] || {})) {
+          o.open = look[b].open;
+          o.openBy = b;
+        }
+      }
+    });
     const first = solve(new Set());
     const locking = new Set(l.starters.filter((id) => lockable(id) && !skip.has(id) && first.starters.includes(id)));
     const plan = locking.size ? solve(locking) : first;
@@ -461,11 +477,11 @@
     // Unticked ones stay listed, so they can be ticked again.
     plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {
       const o = look[id];
-      return { id, on: locking.has(id), game: o.banked, actual: o.banked.actual, open: o.open, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
+      return { id, on: locking.has(id), game: o.banked, actual: o.banked.actual, open: o.open, openBy: o.openBy ?? null, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
     });
     // Starters whose finished game can still be locked, but isn't worth it yet.
     plan.notYet = l.starters.filter((id) => look[id]?.banked?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
-      .map((id) => ({ id, actual: look[id].banked.actual, open: look[id].open, game: look[id].banked }));
+      .map((id) => ({ id, actual: look[id].banked.actual, open: look[id].open, openBy: look[id].openBy ?? null, game: look[id].banked }));
     plan.changes = plan.changes.map((c) => {
       const o = look[c.id];
       const { perGame, gamesLeft, banked } = o;

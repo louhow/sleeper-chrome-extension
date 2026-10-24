@@ -1239,7 +1239,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const lockRow = page.locator(dialog('.os-row.lock'));
   assert.equal(await lockRow.count(), 1, 'one game worth locking');
   assert.equal(await lockRow.locator('.os-p [data-player]').first().getAttribute('data-player'), locker);
-  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d · lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
+  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
   assert.ok(Number(await lockRow.locator('.score.green').textContent()) >= 70, 'the score, in its tier color');
   assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < 20, 'keeping it open is worth far less');
   assert.equal(await lockRow.locator('[data-op-lock-row]').textContent(), 'Lock');
@@ -1251,7 +1251,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   // Kept open, it stays listed and the plan goes on without it.
   await lockRow.locator('[data-op-keep]').click();
   await page.locator(dialog('.os-row.lock.off')).waitFor();
-  assert.match(await page.locator(dialog('.os-row.lock')).innerText(), /keeping open · Lock instead/);
+  assert.match(await page.locator(dialog('.os-row.lock')).innerText(), /Keeping open · Lock instead/);
   assert.equal(await applyButton.textContent(), 'Apply all');
   await page.locator(dialog('[data-op-relock]')).click();
   await page.locator(dialog('.os-row.lock:not(.off)')).waitFor();
