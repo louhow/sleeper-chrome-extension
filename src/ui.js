@@ -136,6 +136,9 @@
     return {
       roster, week, slots, leg, matchup, starters, bench, taxi, reserve, players: s.players, settings,
       locks: leg?.starters_games || {},
+      // Your own lineup: whether a player was starting at a game's tip-off, from
+      // the lineups the extension has seen (Sleeper keeps no history). Others: unknown, assumed so.
+      started: mine && leg ? (id, game) => globalThis.SNP.model.startedAt(s.lineupHistory?.[s.week]?.[roster.roster_id], id, game.start) : null,
       mine,
       editable,
       // Locks only exist on an in-season matchup leg. A lock is real points, so not under what-if scoring.

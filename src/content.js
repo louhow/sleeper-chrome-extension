@@ -15,6 +15,9 @@
   const FLOAT_AFTER_MS = 4000;
   const NOTICE_MS = 3000;
   const CLOCK_MS = 60e3;
+  // How often your own matchup leg is read again while the tab is visible, so
+  // the lineup history (who started which game, for Lock-In) has fewer gaps.
+  const LEG_POLL_MS = 3 * 60e3;
   // Career seasons fetched for the player card (one request each).
   const CAREER_SEASONS = 10;
   const CARD_SEASON_TABS = 6;
@@ -118,6 +121,8 @@
       minWeek: 1,
       maxWeek: Infinity,
       weeks: {},
+      // week -> roster id -> lineups seen: [{ from, to, starters }] (see model.startedAt). Your own rosters only.
+      lineupHistory: {},
       today: new Date().toLocaleDateString('en-CA'),
       openCalls: new Set(),
       me: null, // logged-in user id, when the page has a session
@@ -515,7 +520,8 @@
       const standingsQuery = `query roster_standings {
   roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)}) { roster_id rank }
 }`;
-      const [matchups, projections, stats, scores, research, legs, standings] = await Promise.all([
+      const historyKey = `lineups:${leagueId}:${week}`;
+      const [matchups, projections, stats, scores, research, legs, standings, stored] = await Promise.all([
         api.get(`/v1/league/${leagueId}/matchups/${week}`),
         api.get(`/projections/nba/${season}/${week}?season_type=${seasonType}`),
         api.get(`/stats/nba/${season}/${week}?season_type=${seasonType}`),
@@ -525,7 +531,9 @@
         api.graphql(`roster_standings (week ${week})`, standingsQuery)
           .then((data) => data?.roster_standings ?? [])
           .catch(() => []),
+        chrome.storage.local.get(historyKey),
       ]);
+      state.lineupHistory[week] = stored[historyKey] || {};
       const games = scores?.scores || [];
       const scoringSettings = ui.scoringOf(state);
       state.weeks[week] = {
@@ -542,6 +550,33 @@
         legs,
         ranks: model.standingsRanks(state.rosters, standings),
       };
+      seeLineups(week, legs);
+      schedule();
+    }
+
+    // Remembers your own lineups as read from the week's legs. Sleeper keeps no
+    // lineup history, and a game can be locked only if the player was starting
+    // when it tipped off, so this is how the extension knows.
+    function seeLineups(week, legs) {
+      if (!legs || !state.lineupHistory[week]) return;
+      const at = Date.now();
+      const history = state.lineupHistory[week];
+      for (const leg of legs) {
+        const roster = state.rosters.find((r) => r.roster_id === leg.roster_id);
+        if (!roster || !ui.owns(state, roster) || !leg.starters) continue;
+        history[leg.roster_id] = model.seeLineup(history[leg.roster_id], leg.starters, at);
+      }
+      chrome.storage.local.set({ [`lineups:${leagueId}:${week}`]: history });
+    }
+
+    // Reads the current week's legs again (lineups can change on Sleeper's apps too).
+    async function pollLegs() {
+      const week = state.currentWeek;
+      if (document.visibilityState !== 'visible' || !state.weeks[week] || state.saving || state.modal?.saving) return;
+      const legs = await loadLegs(week);
+      if (!legs || !state.weeks[week]) return;
+      state.weeks[week].legs = legs;
+      seeLineups(week, legs);
       schedule();
     }
 
@@ -575,6 +610,7 @@
   }
 }`, { auth: true, variables });
       state.weeks[week].legs = await loadLegs(week);
+      seeLineups(week, state.weeks[week].legs);
     }
 
     // Saves a lineup the way Sleeper's web app does: during the season starters
@@ -871,9 +907,10 @@
       state.lockConfirm = null;
       if (!lineup?.lockable || !lineup.starters.includes(playerId)) return;
       const days = model.playerDays(lineup.week, player?.team, playerId);
-      const st = model.lockState(days, lineup.locks[playerId], Date.now());
-      if (!st.lockable) {
-        state.notice = { kind: 'error', text: 'That game can no longer be locked' };
+      const st = model.lockState(days, lineup.locks[playerId], Date.now(), lineup.started ? (game) => lineup.started(playerId, game) : null);
+      // A game whose start the extension didn't see can still be locked; the cell said so.
+      if (!st.lockable && !st.unsure) {
+        state.notice = { kind: 'error', text: st.benched ? 'That game was played on your bench, so it can\'t be locked' : 'That game can no longer be locked' };
         return schedule();
       }
       const locks = { ...lineup.locks, [playerId]: st.current.game.id };
@@ -1212,6 +1249,9 @@
     document.addEventListener('keydown', onKey);
     // Lock windows and game states move with the clock.
     const clock = setInterval(schedule, CLOCK_MS);
+    const legPoll = setInterval(() => pollLegs().catch(() => {}), LEG_POLL_MS);
+    const onVisible = () => pollLegs().catch(() => {});
+    document.addEventListener('visibilitychange', onVisible);
 
     // Same league, other tab (Team <-> Matchup): keep the data, swap the view.
     function show(next) {
@@ -1230,6 +1270,8 @@
 
     function teardown() {
       clearInterval(clock);
+      clearInterval(legPoll);
+      document.removeEventListener('visibilitychange', onVisible);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('click', onOutsideClick, true);
       document.removeEventListener('snp:admin-score-request', adminDeltas);

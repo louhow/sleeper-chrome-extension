@@ -104,7 +104,7 @@
       const outToday = plan.info[cur]?.today;
       const outWhy = !real(cur) ? '' : ` · ${outToday == null ? `no game ${esc(day(plan))}` : `${esc(day(plan))} ${f2(outToday)}`} · ${f2(plan.info[cur]?.perGame ?? 0)}/g`;
       const outSub = `<span class="sub move">${moveText(plan, cur, 'out')}<span class="why">${outWhy}</span></span>${drops
-        ? `<span class="sub drops ${tone}">Drops lock-in ${score(drops.actual)} ${esc(gameText(drops))}</span>` : ''}`;
+        ? `<span class="sub drops ${tone}"${change.dropsUnsure ? ' title="If they were starting when it tipped off; the extension didn\'t see your lineup then"' : ''}>${change.dropsUnsure ? 'May drop' : 'Drops'} lock-in ${score(drops.actual)} ${esc(gameText(drops))}</span>` : ''}`;
       return `<div class="os-row swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
         <span class="os-slot">${slotBadge(slot)}</span>
         ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>`)}
@@ -121,12 +121,14 @@
     if (lock) return lockRow(s, m, plan, slot, lock);
     const info = plan.info[cur] || {};
     const notYet = plan.notYet?.find((k) => k.id === cur);
+    const maybe = plan.maybe?.find((k) => k.id === cur);
     const status = !real(cur) ? 'Empty'
       : info.fixed === 'locked' ? `${lockIcon()}Locked`
       : info.fixed === 'live' ? 'Playing'
       : 'No change';
     const sub = info.fixed === 'locked' ? `${score(info.locked.actual ?? 0)} ${esc(gameText(info.locked))}`
       : notYet ? `${score(notYet.actual)} ${esc(gameText(notYet.game))} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
+      : maybe ? `<span title="Lockable only if they were starting when it tipped off; the extension didn't see your lineup then">${score(maybe.actual)} ${esc(gameText(maybe.game))} · lockable if started</span> · ${esc(upcoming(s, cur))}`
       : esc(upcoming(s, cur));
     return `<div class="os-row same${info.fixed === 'locked' ? ' locked' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>

@@ -35,6 +35,8 @@ User-facing docs: `README.md` (feature list, install, privacy), `docs/DETAILS.md
 - Logged-in calls send `localStorage.token` as `Authorization`; never log or render it.
 - Public `/v1/league/<id>/rosters` is CDN-cached for minutes; when logged in read rosters via GraphQL `league_rosters`.
 - In season, lineups live on the week's matchup leg (`update_matchup_leg`); outside it, `roster_update_starters`.
+- Lock-In: a finished game can be locked only if the player was starting when it tipped off. Sleeper's API keeps no lineup history (`subs` is empty, nothing in the schema), so the extension records your lineups as it reads legs (`lineups:<league>:<week>` in `chrome.storage.local`, see `model.startedAt`); without a record a game is only a maybe.
+- Sleeper's running total counts each starter's locked game, else their latest finished one. The public `/matchups/<week>` lags minutes behind a lineup change, so with a leg the totals are added up from its lineup.
 - Save order: taxi before starters; a starter going to IR leaves the lineup, then IR saves, then the final lineup.
 - Nothing renders until the first league + week load is done, so the user never sees a half-built panel or Sleeper's placeholder.
 - Writing style: no em-dashes; one sentence per line in long Markdown.

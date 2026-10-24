@@ -299,6 +299,8 @@ const sleeper = {
   // to lock; every other game is still to come, `laterDays` days on.
   midWeek: false,
   finished: new Set(),
+  // When set, the finished games tipped off at this time instead (see seenThroughTipOff).
+  tipAt: null,
   laterDays: 0,
   // When set, it is week 1 of the regular season and no game has tipped off yet.
   beforeTipoff: false,
@@ -330,6 +332,18 @@ async function startMidWeek() {
   const later = data.scores.filter((g) => !sleeper.finished.has(g.game_id)).map((g) => g.start_time);
   sleeper.laterDays = Math.max(0, Math.ceil((Date.now() + 2 * 3600e3 - Math.min(...later)) / 864e5));
   sleeper.midWeek = true;
+  sleeper.tipAt = null;
+}
+
+// Lock-In needs the player starting when the game tipped off, and Sleeper keeps
+// no lineup history, so the extension remembers the lineups it sees. Like a
+// real visit, the page already open shows the lineup before the finished games
+// tip off; then they tip off and the page is opened again.
+async function seenThroughTipOff(ready) {
+  await page.locator(panel(ready)).first().waitFor({ timeout: 30000 });
+  sleeper.tipAt = Date.now();
+  await page.reload();
+  await page.locator(panel(ready)).first().waitFor({ timeout: 30000 });
 }
 
 function fakeMidWeek(scores) {
@@ -337,7 +351,7 @@ function fakeMidWeek(scores) {
   for (const g of scores) {
     if (sleeper.finished.has(g.game_id)) {
       g.status = 'complete';
-      g.start_time = Date.now() - 3 * 3600e3;
+      g.start_time = sleeper.tipAt ?? Date.now() - 3 * 3600e3;
     } else {
       g.status = 'pre_game';
       g.start_time += sleeper.laterDays * 864e5;
@@ -712,8 +726,9 @@ test('matchup: locks in a finished game for your starter', async () => {
   const myRoster = rosters.find((r) => r.owner_id === sleeper.me);
 
   await page.goto(MATCHUP_URL);
+  await seenThroughTipOff('select');
   await page.locator(panel('select')).selectOption(String(myRoster.roster_id));
-  const open = page.locator(panel('.mp.mine button.lk.open'));
+  const open = page.locator(panel('.mp.mine button.lk.open:not(.maybe)'));
   await open.first().waitFor({ timeout: 30000 });
   assert.ok(!(await page.locator(panel('.mp.theirs button.lk')).count()), "no lock buttons on the opponent's side");
   await page.screenshot({ path: `${OUT}lock-open.png` });
@@ -722,9 +737,8 @@ test('matchup: locks in a finished game for your starter', async () => {
   const [rosterId, playerId] = ref.split(':');
   assert.equal(Number(rosterId), myRoster.roster_id);
   const before = sleeper.mutations.length;
-  // The header adds up every slot that counts: locks, and players whose week is over.
+  // The header is Sleeper's running total: each starter's locked game, else their latest finished one.
   const headerPts = async () => Number((await page.locator(panel('.mu-team.mine .mu-pts')).textContent()).match(/\d+\.\d\d/)[0]);
-  const counted = (await page.locator(panel('.mp.mine')).filter({ has: page.locator(`[data-lock="${ref}"]`) }).locator('.mp-pts b').textContent()).trim();
   const headerBefore = await headerPts();
   await open.first().click();
   const go = page.locator(panel(`[data-lock-confirm="${ref}"]`));
@@ -745,9 +759,8 @@ test('matchup: locks in a finished game for your starter', async () => {
   const card = page.locator(panel('.mp.mine.is-locked'));
   await card.first().waitFor();
   assert.equal(await card.first().locator('.lk.locked').count(), 1, 'shows the lock');
-  const locked = (await card.first().locator('.mp-pts b').textContent()).trim();
-  const added = Number(locked) - (counted === '–' ? 0 : Number(counted));
-  assert.ok(Math.abs(await headerPts() - (headerBefore + added)) < 0.01, `header counts the locked game (${headerBefore} + ${added})`);
+  assert.ok(Number((await card.first().locator('.mp-pts b').textContent()).trim()) > 0, 'the locked game counts');
+  assert.ok(Math.abs(await headerPts() - headerBefore) < 0.01, `the finished game already counted, so the lock keeps the total (${headerBefore})`);
   await page.screenshot({ path: `${OUT}lock-done.png` });
   sleeper.midWeek = false;
   documentBody = LOGGED_OUT;
@@ -758,8 +771,16 @@ test('team: locks a finished game from its cell, after asking', async () => {
   await startMidWeek();
   sleeper.legs = {};
   const myRoster = await openMyTeam(TEAM_URL);
-  const cell = page.locator(panel('.card button.cell[data-lock]')).first();
+  // Opened after the finished games, the extension never saw who was starting then: maybe lockable, dashed.
+  await page.locator(panel('.day.game.lockable.maybe button.cell[data-lock]')).first().waitFor({ timeout: 30000 });
+  assert.equal(await page.locator(panel('.day.game.lockable:not(.maybe)')).count(), 0);
+  assert.match(await page.locator(panel('.day.game.lockable.maybe')).first().getAttribute('title'), /only if they were starting at tip-off/);
+  await page.screenshot({ path: `${OUT}team-lock-unseen.png` });
+  // Seen before and after tip-off: lockable for sure.
+  await seenThroughTipOff('.card');
+  const cell = page.locator(panel('.day.game.lockable:not(.maybe) button.cell[data-lock]')).first();
   await cell.waitFor({ timeout: 30000 });
+  assert.equal(await page.locator(panel('.day.game.lockable.maybe')).count(), 0);
   const ref = await cell.getAttribute('data-lock');
   const [rosterId, playerId] = ref.split(':');
   assert.equal(Number(rosterId), myRoster.roster_id);
@@ -1192,6 +1213,8 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
     if (r.player_id === locker) return big(r);
     return quiet(r);
   });
+  // The lineup was seen (by openMyTeam) before the finished games tip off now.
+  sleeper.tipAt = Date.now();
   await page.reload();
   await page.locator(panel('.taxi-head .hint')).waitFor({ timeout: 30000 });
 

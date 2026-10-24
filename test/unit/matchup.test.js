@@ -50,12 +50,15 @@ const state = (overrides = {}) => ({
   maxWeek: 21,
   now: Date.parse('2026-10-22T12:00:00Z'),
   weeks: { 1: week(legs()) },
+  // The extension saw Luka starting from before his Wednesday game until now.
+  lineupHistory: { 1: { 10: [{ from: Date.parse('2026-10-21T12:00:00Z'), to: Date.parse('2026-10-22T12:00:00Z'), starters: ['luka'] }] } },
   ...overrides,
 });
 
 test('header pairs both teams with win %, record, rank and projection', () => {
   const out = text(matchup.render(state()));
-  assert.match(out, /@louhow COOKIE MONSTER – 37% WIN 0-0 \(#3\) Yet to play \(1\) 157\.23 VS @badonkeyds Cling Kong – 63% WIN 0-0 \(#7\) Yet to play \(1\) 181\.21/);
+  // Sleeper's running total counts each starter's latest finished game (the leg's points are empty).
+  assert.match(out, /@louhow COOKIE MONSTER 41\.50 36% WIN 0-0 \(#3\) Yet to play \(1\) 157\.23 VS @badonkeyds Cling Kong – 64% WIN 0-0 \(#7\) Yet to play \(1\) 181\.21/);
 });
 
 test('starter rows mirror the slot with the lockable game and logos', () => {
@@ -66,6 +69,19 @@ test('starter rows mirror the slot with the lockable game and logos', () => {
   assert.match(html, /class="chip done current"[^>]*><img src="https:\/\/sleepercdn\.com\/images\/team_logos\/nba\/gsw\.webp"/);
   assert.match(out, /Bench B\. Guy SF • BOS No games – BN Empty/);
   assert.match(out, /Injured Reserve Empty IR H\. Guy Out/);
+});
+
+test('lock-in needs the player starting at tip-off: a bench game can\'t lock, and an unseen one may', () => {
+  const at = (iso) => Date.parse(iso);
+  // Benched for his Wednesday game, moved in after it.
+  const benched = matchup.render(state({ lineupHistory: { 1: { 10: [
+    { from: at('2026-10-21T12:00:00Z'), to: at('2026-10-22T03:00:00Z'), starters: ['0'] },
+    { from: at('2026-10-22T10:00:00Z'), to: at('2026-10-22T12:00:00Z'), starters: ['luka'] },
+  ] } } }));
+  assert.match(benched, /<button class="lk" disabled title="Their last game was played on your bench, so it can't be locked in">LOCK/);
+  // Never seen around tip-off: it may be lockable, and says so.
+  const unseen = matchup.render(state({ lineupHistory: { 1: {} } }));
+  assert.match(unseen, /<button class="lk open maybe" data-lock="10:luka"[^>]*title="Lock in [^"]*only if they were starting at tip-off/);
 });
 
 test('lock-in asks to confirm, and shows locked games as final', () => {

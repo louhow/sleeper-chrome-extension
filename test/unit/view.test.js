@@ -164,9 +164,22 @@ test('game cells: locked, still lockable, past locking, live, today and later re
   // Your own lineup in season: the lockable cell is a button that asks "Lock?" on hover, then confirms in the cell.
   s.league = { ...s.league, status: 'in_season' };
   s.weeks[1].legs = [{ roster_id: 1, starters: ['a', 'b', '0'], points: 0, starters_games: {} }];
+  // Only a game they were starting for can be locked; the extension saw the lineup through Thursday's tip-off.
+  s.lineupHistory = { 1: { 1: [{ from: at('2026-10-21', 12), to: at('2026-10-24', 12), starters: ['a', 'b', '0'] }] } };
   const mine = render(s, []);
   assert.equal((mine.match(/data-lock="/g) || []).length, 1, 'just the lockable game');
   assert.match(mine, /<button class="cell" data-lock="1:a"[^>]*aria-label="Lock in 20\.00, Thu vs PHX, Final, can still be locked in">[\s\S]*?<span class="ask"><svg class="lock-icon"[^>]*>.*?<\/svg>Lock\?<\/span>/);
+  // Played on the bench: the game recedes, with why, and can't be locked.
+  const bench = render({ ...s, lineupHistory: { 1: { 1: [
+    { from: at('2026-10-21', 12), to: at('2026-10-23', '01'), starters: ['b', '0', '0'] },
+    { from: at('2026-10-23', 12), to: at('2026-10-24', 12), starters: ['a', 'b', '0'] },
+  ] } } }, []);
+  assert.deepEqual(cells(bench, 'Luka Doncic')[1], ['past', 'Thu vs PHX, Final, played on your bench, so it can&#39;t be locked in']);
+  assert.doesNotMatch(bench, /data-lock="1:a"/);
+  // Never seen around tip-off: dashed, and still a button, saying it depends on that.
+  const unseen = render({ ...s, lineupHistory: { 1: {} } }, []);
+  assert.match(unseen, /class="day game lockable maybe" title="Thu vs PHX, Final, can be locked in only if they were starting at tip-off/);
+  assert.match(unseen, /data-lock="1:a"/);
   s.lockConfirm = '1:a';
   const confirming = render(s, []);
   assert.match(confirming, /class="day game lockable confirming"/);

@@ -7,20 +7,26 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
 ### Team
 
 - Team card: avatar, record, this week's points, Lock-In projection, opponent.
+  Points are Sleeper's running total, added up from your lineup as Sleeper does (each starter's locked game, else their latest finished one), because the public matchup Sleeper serves is cached for minutes and lags a lineup change. Sleeper's leg points, or a commissioner's custom points, win when set.
 - Starters, bench, injured reserve and taxi squad, each player with a Monday-Sunday strip of games: projected points (actual once played), opponent, tip-off time.
 - Each game cell shows where the game stands under Lock-In:
 
   | State | Looks like |
   | --- | --- |
   | Locked in | Filled yellow, closed padlock |
-  | Finished, can still be locked (a starter, before their next tip-off) | Bright teal outline, open padlock |
-  | Finished, too late to lock (or a bench player's) | Faded, no outline |
+  | Finished, can still be locked (a starter who was starting at tip-off, before their next tip-off) | Bright teal outline, open padlock |
+  | Finished, may be lockable (the extension didn't see your lineup at tip-off) | Dashed teal outline, open padlock |
+  | Finished, too late to lock, played on your bench, or a bench player's | Faded, no outline |
   | Live | Red outline, "Live" |
   | Today, still to tip off | Bright outline, bold time |
   | Later in the week | Quiet outline, projection muted |
 
 - The points column marks a locked-in score with a padlock, in yellow, so it reads apart from a score still in play.
 - Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
+- Lock-In needs the player starting when the game tipped off: a game played on the bench can't be locked after moving them in.
+  Sleeper keeps no lineup history, so the extension remembers your lineups as it reads them (on each load, after each save, and every 3 minutes while the tab is visible), in the browser's extension storage.
+  A game it saw them starting for (or saw the same lineup both before and after tip-off) is lockable; one it saw them benched for isn't; anything else is a maybe, still lockable from the strip, with a title saying it depends on whether they started.
+  Optimize only recommends locks it's sure of; a maybe shows in its row ("lockable if started"), and benching that player says "May drop lock-in".
 - Rostered and start percentages, as the mobile app shows them (rounded up, for the league's type).
 - Draft picks held, including picks acquired by trade.
 - Lineup swaps on your own roster: tap a slot badge, then one of the highlighted players (G takes PG/SG, F takes SF/PF, UTIL and bench take anyone).
@@ -84,7 +90,8 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - Both teams side by side: points, projection, win probability, record and standings rank, and how many starters are yet to play.
 - Each starter against the opposing starter in the same slot, then bench, IR and taxi.
 - Per player: the game that matters for Lock-In (the locked game, the one that can be locked, or the next one), its points or projection, and team logos for the week's games.
-- Lock-In for your own starters: once a game ends, `LOCK-IN` stays open until that player's next game starts. Locking is final, so it asks to confirm.
+- Lock-In for your own starters: once a game ends, `LOCK-IN` stays open until that player's next game starts, if they were starting when it tipped off (see the Team tab). Locking is final, so it asks to confirm.
+- Team totals are Sleeper's running total, added up from the leg's lineup as on the Team tab.
 - Switching leagues in the sidebar from any Matchup tab opens an NBA league on its Matchup tab, where Sleeper would open its League tab.
 
 Win probability is Sleeper's own formula, ported from its web app: each side is a normal distribution centred on its projection, narrowing as the score approaches it.

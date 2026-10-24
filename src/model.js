@@ -239,28 +239,65 @@
   const lockedGameId = (value) => (value && typeof value === 'object' ? value.game_id ?? value.id : value) ?? null;
 
   // Where a player stands under Lock-In rules this week:
-  // - a finished game can be locked until the player's next game starts;
+  // - a finished game can be locked until the player's next game starts, and
+  //   only if they were starting when it tipped off (a game played on the bench
+  //   can't be locked after moving them in);
   // - a lock is final, and only one game counts;
-  // - with no lock, the final game of the week counts.
-  function lockState(days, lockValue, now = Date.now()) {
+  // - with no lock, the final game of the week counts. Until then Sleeper's
+  //   running total counts each starter's latest finished game (`live`).
+  // `started(game)`: whether the player was starting at that game's tip-off
+  // (true, false, or null when unknown; see startedAt). Without it, assumed true.
+  function lockState(days, lockValue, now = Date.now(), started = null) {
     const games = days.filter((d) => d.game);
     const lockId = lockedGameId(lockValue);
     const locked = lockId == null ? null : games.find((d) => String(d.game.id) === String(lockId)) ?? null;
     const lastDone = games.filter((d) => d.game.status === 'complete').at(-1) ?? null;
     const next = games.find((d) => d.game.status !== 'complete') ?? null;
     const nextStarted = Boolean(next) && (next.game.status === 'in_game' || (next.game.start != null && next.game.start <= now));
-    const lockable = !locked && Boolean(lastDone) && !nextStarted;
+    const open = !locked && Boolean(lastDone) && !nextStarted;
+    const was = open ? (started ? started(lastDone.game) : true) : null;
+    const lockable = open && was === true;
+    // Can't tell whether they started it, so it may or may not be lockable.
+    const unsure = open && was == null;
     const counted = locked ?? (next ? null : games.at(-1) ?? null);
+    const live = locked ?? lastDone;
     return {
       games,
       locked,
       lockable,
-      // The game to show: the lock, else the one that can be locked, else what's next.
-      current: locked ?? (lockable ? lastDone : next ?? lastDone),
+      unsure,
+      // Finished, still in the window, but played on the bench.
+      benched: open && was === false,
+      // The game to show: the lock, else the one that can (or may) be locked, else what's next.
+      current: locked ?? (lockable || unsure ? lastDone : next ?? lastDone),
       counted,
       points: counted ? counted.actual ?? 0 : null,
+      livePoints: live ? live.actual ?? 0 : 0,
       yetToPlay: !locked && Boolean(next),
     };
+  }
+
+  // Whether a player was in the starting lineup at `time`, from lineups the
+  // extension saw: [{ from, to, starters }], each lineup seen unchanged from
+  // `from` to `to`. Inside a span it's that lineup; between two spans that
+  // agree, it's what both say. Otherwise null: Sleeper keeps no lineup history.
+  function startedAt(history, id, time) {
+    if (!history?.length || time == null) return null;
+    const has = (h) => h.starters.includes(id);
+    const span = history.find((h) => h.from <= time && time <= h.to);
+    if (span) return has(span);
+    const before = history.filter((h) => h.to < time).at(-1);
+    const after = history.find((h) => h.from > time);
+    return before && after && has(before) === has(after) ? has(before) : null;
+  }
+
+  // Adds a lineup seen at `at` to a history (see startedAt): extends the last
+  // span when unchanged, else starts a new one. Returns a new array.
+  function seeLineup(history = [], starters, at) {
+    const last = history.at(-1);
+    if (last && at < last.to) return history;
+    if (last && JSON.stringify(last.starters) === JSON.stringify(starters)) return [...history.slice(0, -1), { ...last, to: at }];
+    return [...history, { from: at, to: at, starters: [...starters] }];
   }
 
   // Score colors as Sleeper's mobile app shows a game's fantasy points
@@ -299,13 +336,15 @@
       (i === projections.length - 1 ? mean : expectedMax(mean, GAME_SPREAD * mean, after)), 0);
   }
 
-  function outlook(days, lockValue, starting, now) {
-    const st = lockState(days, lockValue, now);
+  function outlook(days, lockValue, starting, now, started) {
+    const st = lockState(days, lockValue, now, started);
     const left = st.games.filter((d) => d.game.status === 'pre_game' && !gameLive(d.game, now));
     const perGame = left.length ? left.reduce((sum, d) => sum + (d.proj ?? 0), 0) / left.length : 0;
     // Only starters can lock, so only a starter's finished game is worth keeping.
     const banked = starting && st.lockable ? st.current : null;
     return {
+      // A finished game that may be lockable: it's unknown whether they started it.
+      maybe: starting && st.unsure ? st.current : null,
       perGame,
       gamesLeft: left.length,
       left,
@@ -433,7 +472,8 @@
     if (!l.week) return null;
     const look = {};
     const consider = (id, starting) => {
-      look[id] = outlook(playerDays(l.week, l.players[id]?.team, id), l.locks?.[id], starting, now);
+      look[id] = outlook(playerDays(l.week, l.players[id]?.team, id), l.locks?.[id], starting, now,
+        l.started ? (game) => l.started(id, game) : null);
     };
     l.starters.forEach((id) => id && id !== '0' && consider(id, true));
     l.bench.forEach((id) => consider(id, false));
@@ -480,6 +520,9 @@
       return { id, on: locking.has(id), game: o.banked, actual: o.banked.actual, open: o.open, openBy: o.openBy ?? null, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
     });
     // Starters whose finished game can still be locked, but isn't worth it yet.
+    // Starters with a finished game that may be lockable: whether they started it is unknown.
+    plan.maybe = l.starters.filter((id) => look[id]?.maybe && look[id].gamesLeft > 0)
+      .map((id) => ({ id, actual: look[id].maybe.actual ?? 0, game: look[id].maybe }));
     plan.notYet = l.starters.filter((id) => look[id]?.banked?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
       .map((id) => ({ id, actual: look[id].banked.actual, open: look[id].open, openBy: look[id].openBy ?? null, game: look[id].banked }));
     plan.changes = plan.changes.map((c) => {
@@ -489,8 +532,9 @@
       const lost = c.to === 'BN' && banked?.actual > 0 && (worthy(o) || scoreTier(banked.actual) === 'green') ? banked : null;
       return {
         ...c,
-        // Any finished game a benched starter could still lock, worth it or not.
-        drops: c.to === 'BN' && banked?.actual > 0 ? banked : null,
+        // Any finished game a benched starter could (or may) still lock, worth it or not.
+        drops: c.to === 'BN' && (banked ?? o.maybe)?.actual > 0 ? banked ?? o.maybe : null,
+        dropsUnsure: !banked && Boolean(o.maybe),
         perGame,
         gamesLeft,
         today: o.left.find((d) => d.date === date)?.proj ?? null,
@@ -663,7 +707,7 @@
     ranks, rankShift, shiftTint,
     weekDays, gamesByTeam, pointsByGame, playerDays, lockInDefault, ownedPicks, spotRefs, swapTargets, applyMove, describeMove,
     taxiEligible, taxiOpen, reserveEligible,
-    lockedGameId, lockState, scoreTier, openValue, bestLineup, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
+    lockedGameId, lockState, startedAt, seeLineup, scoreTier, openValue, bestLineup, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
   };
 })();

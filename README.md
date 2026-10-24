@@ -11,7 +11,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 ## Features
 
 **NBA**
-- Team tab: roster, weekly game strips that show what's locked, still lockable or past locking (lock right from the cell), projections, lineup swaps, taxi and IR moves, draft picks.
+- Team tab: roster, weekly game strips that show what's locked, still lockable (only games the player started) or past locking (lock right from the cell), projections, lineup swaps, taxi and IR moves, draft picks.
 - Matchup tab: both lineups slot by slot, win probability, Lock-In status.
 - Optimize lineup: recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.
@@ -39,7 +39,7 @@ Everything runs locally in your browser.
 There is no server: the extension only talks to Sleeper, the same way Sleeper's own site does.
 It calls `api.sleeper.app` and `sleeper.com` for league data, and loads player headshots, team logos and avatars from Sleeper's image CDN (`sleepercdn.com`).
 No data is sent to the author or any third party, and we never see your data or your Sleeper login.
-The only things it stores are cached copies of Sleeper's public player lists and which team you picked per league, both in your browser's extension storage.
+The only things it stores are cached copies of Sleeper's public player lists, which team you picked per league, and your own lineups as it reads them (to know who started which game for Lock-In), all in your browser's extension storage.
 
 ## Install
 

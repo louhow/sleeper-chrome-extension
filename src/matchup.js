@@ -56,21 +56,24 @@
     for (const id of l.starters) {
       if (!id || id === '0') continue;
       const days = playerDays(l.week, s.players[id]?.team, id);
-      states[id] = { days, ...lockState(days, l.locks[id], s.now) };
+      states[id] = { days, ...lockState(days, l.locks[id], s.now, l.started ? (game) => l.started(id, game) : null) };
     }
     const all = Object.values(states);
-    const counted = all.reduce((sum, st) => sum + (st.points ?? 0), 0);
+    // Sleeper's running total: each starter's locked game, else their latest finished one.
+    const live = all.reduce((sum, st) => sum + st.livePoints, 0);
     const projected = all.reduce((sum, st) => sum + (st.counted ? st.points : lockInDefault(st.days) ?? 0), 0);
     // Sleeper's totals use the league's scoring; what-if scoring keeps the ones added up here.
     const server = whatIfOn(s) ? null : l.leg ?? l.matchup;
-    const points = !server ? counted
-      : l.leg ? l.leg.custom_points ?? l.leg.points ?? counted
-      : l.matchup?.custom_points ?? l.matchup?.points ?? counted;
+    // The public matchup is cached for minutes, so with the (fresh) leg the total
+    // is added up from its lineup instead; Sleeper's leg points (and custom points) still win.
+    const points = !server ? live
+      : l.leg ? l.leg.custom_points ?? l.leg.points ?? live
+      : l.matchup?.custom_points ?? l.matchup?.points ?? live;
     return {
       l,
       states,
       points: points ?? 0,
-      anyPoints: all.some((st) => st.counted) || Boolean(server && (l.leg?.points ?? l.matchup?.points)),
+      anyPoints: all.some((st) => st.locked || st.games.some((d) => d.game.status === 'complete')) || Boolean(server && (l.leg ? l.leg.points : l.matchup?.points)),
       proj: (server && l.leg?.proj_points) ?? projected,
       yetToPlay: all.filter((st) => st.yetToPlay).length,
     };
@@ -113,7 +116,7 @@
     const p = s.players[id] || { name: `Player #${id}`, positions: [] };
     const st = sd.states[id] ?? (() => {
       const days = playerDays(sd.l.week, p.team, id);
-      return { days, ...lockState(days, sd.l.locks[id], s.now) };
+      return { days, ...lockState(days, sd.l.locks[id], s.now, sd.l.started ? (game) => sd.l.started(id, game) : null) };
     })();
     const cur = st.current;
     const curDone = cur?.game.status === 'complete';
@@ -122,7 +125,7 @@
     // Mirrored on the opponent's side, so the logos sit toward the middle.
     const who = `<span>${positions(p)} <span class="team">• ${esc(p.team || 'FA')}</span></span>`;
     const games = `<span class="mp-games">${st.games.map((d) => gameChip(d, st)).join('')}</span>`;
-    const confirming = starter && s.lockConfirm === ref && !st.locked && sd.l.lockable && st.lockable;
+    const confirming = starter && s.lockConfirm === ref && !st.locked && sd.l.lockable && (st.lockable || st.unsure);
     const result = `<div class="mp-game">
         ${cur ? `<b>${cur.home ? 'vs' : '@'} ${esc(cur.opponent)}</b>
           <span class="sub">${esc(status(cur))}</span>` : '<span class="sub">No games</span>'}
@@ -149,10 +152,12 @@
   function lockControl(s, sd, st, ref) {
     if (st.locked) return '<span class="lk locked" title="Locked in" aria-label="Locked in">🔒</span>';
     if (!sd.l.lockable) return '';
-    if (!st.lockable) {
+    if (st.benched) return '<button class="lk" disabled title="Their last game was played on your bench, so it can\'t be locked in">LOCK</button>';
+    if (!st.lockable && !st.unsure) {
       return '<button class="lk" disabled title="Opens once a game ends, until the player\'s next game starts">LOCK</button>';
     }
-    return `<button class="lk open" data-lock="${esc(ref)}" ${s.saving ? 'disabled' : ''} title="Lock in ${esc(status(st.current))}">LOCK</button>`;
+    const title = st.unsure ? `Lock in ${status(st.current)}, only if they were starting at tip-off (the extension didn't see your lineup then)` : `Lock in ${status(st.current)}`;
+    return `<button class="lk open${st.unsure ? ' maybe' : ''}" data-lock="${esc(ref)}" ${s.saving ? 'disabled' : ''} title="${esc(title)}">LOCK</button>`;
   }
 
   function lockConfirm(s, st, ref) {

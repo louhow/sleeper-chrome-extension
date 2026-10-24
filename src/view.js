@@ -64,6 +64,7 @@
       locks: l.locks,
       // Your own lineup's lockable games can be locked from their cell.
       lockRoster: l.lockable ? l.roster.roster_id : null,
+      started: l.started,
       editable: editable && !s.saving,
       selecting: Boolean(editable && s.swap),
       targets,
@@ -129,12 +130,16 @@
     const owner = s.usersById?.[roster.owner_id];
     const image = avatar(s, roster);
     // Sleeper's totals use the league's scoring, so under what-if scoring they're added up here from Lock-In rules.
-    const states = whatIfOn(s) && week ? starters.filter((id) => id && id !== '0')
+    // The public matchup is cached for minutes, so with the (fresh) leg, or under what-if
+    // scoring, the total is added up here as Sleeper does: each starter's locked game,
+    // else their latest finished one. Sleeper's own leg points (and a commissioner's custom points) still win.
+    const states = (whatIfOn(s) || leg) && week ? starters.filter((id) => id && id !== '0')
       .map((id) => lockState(playerDays(week, s.players[id]?.team, id), l.locks[id], s.now)) : null;
-    const proj = states ? states.reduce((sum, st) => sum + (st.counted ? st.points : lockInDefault(st.games) ?? 0), 0)
+    const proj = whatIfOn(s) && states ? states.reduce((sum, st) => sum + (st.counted ? st.points : lockInDefault(st.games) ?? 0), 0)
       : leg?.proj_points ?? (week && starters.reduce((sum, id) => sum + (lockInDefault(playerDays(week, s.players[id]?.team, id)) ?? 0), 0));
-    const points = states ? states.reduce((sum, st) => sum + (st.points ?? 0), 0)
-      : leg?.custom_points ?? leg?.points ?? matchup?.custom_points ?? matchup?.points;
+    const live = states?.reduce((sum, st) => sum + st.livePoints, 0);
+    const points = whatIfOn(s) ? live
+      : leg ? leg.custom_points ?? leg.points ?? live : matchup?.custom_points ?? matchup?.points;
     const opp = matchup?.matchup_id != null &&
       week.matchups.find((m) => m.matchup_id === matchup.matchup_id && m.roster_id !== roster.roster_id);
     const oppRoster = opp && s.rosters.find((r) => r.roster_id === opp.roster_id);
@@ -163,7 +168,7 @@
   }
 
   function playerCard(ctx, slot, id, spot) {
-    const { s, week, points, locks, editable, movable, lockRoster } = ctx;
+    const { s, week, points, locks, editable, movable, lockRoster, started } = ctx;
     const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
     const cls = cardClass(ctx, spot);
     if (!id || id === '0') {
@@ -173,9 +178,12 @@
     const locked = lockedGameId(locks[id]);
     const days = playerDays(week, p.team, id).map((d) => ({ ...d, locked: locked != null && String(d.game?.id) === String(locked) }));
     const lockedDay = days.find((d) => d.locked);
-    const st = lockState(days, locks[id], s.now);
-    // Only a starter's finished game can be locked in.
-    const lockable = !['BN', 'TX', 'IR'].includes(slot) && st.lockable ? st.current : null;
+    const st = lockState(days, locks[id], s.now, started ? (game) => started(id, game) : null);
+    // Only a starter's finished game can be locked in, and only one they started.
+    const starting = !['BN', 'TX', 'IR'].includes(slot);
+    const lastDone = st.games.filter((d) => d.game.status === 'complete').at(-1);
+    const state = st.lockable ? 'lockable' : st.unsure ? 'maybe' : st.benched ? 'benched' : null;
+    const mark = (d) => (starting && d === lastDone ? state : null);
     const research = week.research[id];
     const pct = (n) => (n == null ? '–' : `${Math.ceil(n)}%`);
     return `<article class="card${cls}">
@@ -185,7 +193,10 @@
         <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${positions(p)}<span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</div>
         <div class="line2" title="Started and rostered in leagues like this one"><b>${pct(research?.started)}</b> Start<span class="bar">|</span><b>${pct(research?.owned)}</b> Rostered</div>
       </div>
-      <div class="days">${days.map((d) => dayCell(d, s, d === lockable, d === lockable && lockRoster != null ? `${lockRoster}:${id}` : null)).join('')}</div>
+      <div class="days">${days.map((d) => {
+        const m = mark(d);
+        return dayCell(d, s, m, (m === 'lockable' || m === 'maybe') && lockRoster != null ? `${lockRoster}:${id}` : null);
+      }).join('')}</div>
       <div class="week-pts${lockedDay ? ' locked' : ''}">
         <b>${lockedDay ? lockIcon() : ''}${f2(points ? points[id] : st.points)}</b>
         <span>${lockedDay ? `lock ${f2(lockedDay.actual ?? lockedDay.proj)}` : `proj ${f2(lockInDefault(days))}`}</span>
@@ -196,23 +207,29 @@
   // One day of a player's week: opponent, points (projected until played) and
   // tip-off, styled by where the game stands. A game locked in is filled; a
   // finished one that can still be locked is outlined bright, with an open
-  // lock; finished games past locking recede; live and today's games stand out
-  // from the rest of the week. With `lockRef` (your own lineup), the lockable
-  // cell is a button: hovering it asks "Lock?", and clicking it asks to
-  // confirm in the cell, since a lock is final.
-  function dayCell(d, s, lockable, lockRef = null) {
+  // lock; one that may be lockable (unknown whether they started it) is
+  // outlined dashed; finished games past locking, or played on the bench,
+  // recede; live and today's games stand out from the rest of the week. With
+  // `lockRef` (your own lineup), a lockable cell is a button: hovering it asks
+  // "Lock?", and clicking it asks to confirm in the cell, since a lock is final.
+  // `mark`: 'lockable', 'maybe' or 'benched' for the finished game in question.
+  function dayCell(d, s, mark, lockRef = null) {
+    const lockable = mark === 'lockable' || mark === 'maybe';
     if (!d.game) return `<div class="day${d.date === s.today ? ' today' : ''}"><div class="cell"></div></div>`;
     const done = d.game.status === 'complete';
     const live = !done && (d.game.status === 'in_game' || (d.game.start != null && d.game.start <= s.now));
-    const kind = d.locked ? 'locked' : lockable ? 'lockable' : done ? 'past' : live ? 'live' : d.date === s.today ? 'today' : 'future';
+    const kind = d.locked ? 'locked' : mark === 'lockable' ? 'lockable' : mark === 'maybe' ? 'lockable maybe'
+      : done ? 'past' : live ? 'live' : d.date === s.today ? 'today' : 'future';
     const value = done || d.actual != null ? d.actual : d.proj;
     const time = done ? 'Final' : live ? 'Live' : d.game.start ? gameTime(d.game.start) : '';
-    const note = { locked: 'locked in', lockable: 'can still be locked in', past: 'too late to lock in' }[kind];
+    const note = mark === 'benched' ? 'played on your bench, so it can\'t be locked in'
+      : mark === 'maybe' ? 'can be locked in only if they were starting at tip-off (the extension didn\'t see your lineup then)'
+      : { locked: 'locked in', lockable: 'can still be locked in', past: 'too late to lock in' }[kind];
     const title = `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}${time ? `, ${time}` : ''}${note ? `, ${note}` : ''}`;
     const icon = d.locked || lockable ? lockIcon(!d.locked) : '';
     const shown = value == null ? '–' : f2(value);
     if (lockRef && s.lockConfirm === lockRef) {
-      return `<div class="day game lockable confirming" title="${esc(`Lock in ${shown}? Locking is final.`)}">
+      return `<div class="day game ${kind} confirming" title="${esc(mark === 'maybe' ? `Lock in ${shown}? Only if they were starting at tip-off. Locking is final.` : `Lock in ${shown}? Locking is final.`)}">
       <div class="cell">
         <span class="ask"><span>Lock</span><span>${esc(shown)}?</span></span>
         <span class="yes-no"><button class="yes" data-lock-confirm="${esc(lockRef)}" ${s.saving ? 'disabled' : ''}>Yes</button><button class="no" data-lock-cancel ${s.saving ? 'disabled' : ''}>No</button></span>

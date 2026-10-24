@@ -616,6 +616,12 @@ button.slot:hover {
   color: var(--accent);
   font-weight: 700;
 }
+/* Maybe lockable: it's unknown whether they started it. Dashed, no fill. */
+.day.lockable.maybe .cell {
+  border-style: dashed;
+  background: none;
+  box-shadow: none;
+}
 /* Locked in: filled. */
 .day.locked .cell {
   border-color: var(--warn);
@@ -1127,6 +1133,10 @@ button.lk {
 button.lk.open {
   background: rgba(0, 206, 184, 0.16);
   color: var(--accent);
+}
+button.lk.open.maybe {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 button.lk.open:hover:not(:disabled) {
   background: rgba(0, 206, 184, 0.28);

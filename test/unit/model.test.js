@@ -421,6 +421,38 @@ test('best lineup: a lock shuts the slot to the bench too, so a bench player who
   assert.deepEqual(plain(model.bestLineup(c, OPT_NOW).locks.map((k) => [k.id, k.openBy])), [['tre', null]]);
 });
 
+test('lineup history: who was starting at a time, from the lineups seen', () => {
+  let h = model.seeLineup([], ['a', 'b'], 100);
+  h = model.seeLineup(h, ['a', 'b'], 200);
+  h = model.seeLineup(h, ['c', 'b'], 300);
+  h = model.seeLineup(h, ['c', 'b'], 400);
+  assert.deepEqual(plain(h), [{ from: 100, to: 200, starters: ['a', 'b'] }, { from: 300, to: 400, starters: ['c', 'b'] }]);
+  assert.deepEqual(plain(model.seeLineup(h, ['x'], 350)), plain(h), 'an older read changes nothing');
+  assert.equal(model.startedAt(h, 'a', 150), true, 'inside a span');
+  assert.equal(model.startedAt(h, 'c', 150), false);
+  assert.equal(model.startedAt(h, 'b', 250), true, 'between spans that agree');
+  assert.equal(model.startedAt(h, 'a', 250), null, 'between spans that disagree: a change happened, but when?');
+  assert.equal(model.startedAt(h, 'a', 50), null, 'before anything was seen');
+  assert.equal(model.startedAt([], 'a', 150), null);
+});
+
+test('best lineup: a game played on the bench can\'t be locked after moving in, and an unseen one is only a maybe', () => {
+  // dillon moved in after his finished game; it scored well over what's left, but he was on the bench for it.
+  const games = {
+    dillon: [['d1', '2026-10-20', 'complete', 10, 30], ['d2', '2026-10-22', 'pre_game', 10]],
+    rui: [['r1', '2026-10-23', 'pre_game', 5]],
+  };
+  const l = optimizerLineup(['F'], ['dillon'], ['rui'], { dillon: ['SF'], rui: ['SF'] }, games);
+  const benched = model.bestLineup({ ...l, started: () => false }, OPT_NOW);
+  assert.deepEqual(plain(benched.locks), []);
+  assert.deepEqual(plain(benched.maybe), []);
+  const unseen = model.bestLineup({ ...l, started: () => null }, OPT_NOW);
+  assert.deepEqual(plain(unseen.locks), [], 'never recommended without knowing');
+  assert.deepEqual(plain(unseen.maybe.map((k) => [k.id, k.actual])), [['dillon', 30]]);
+  const seen = model.bestLineup({ ...l, started: () => true }, OPT_NOW);
+  assert.deepEqual(plain(seen.locks.map((k) => k.id)), ['dillon']);
+});
+
 test('best lineup: a player being locked keeps their slot, and the lineup works around them', () => {
   // Without the lock, kj would slide to UTIL to make room for the pure SF at F.
   const l = optimizerLineup(['F', 'UTIL'], ['kj', 'pg'], ['sf'], { kj: ['SF', 'PF'], pg: ['PG'], sf: ['SF'] }, {
