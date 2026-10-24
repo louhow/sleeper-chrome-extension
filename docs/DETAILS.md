@@ -43,8 +43,10 @@ The projection follows Lock-In rules: an unlocked player scores their final game
 The Team tab's **Optimize lineup** button (your own team, a week you can still edit) proposes the best starting lineup and the finished games worth locking in, and shows all of it in a dialog before anything saves.
 Nothing is written until you apply a row or press Apply all; Cancel, ✕, the backdrop or Esc leave the rest as it was.
 
-- Rows: one per starting slot, in your lineup's order, so changes read against the lineup you know.
-  - A change shows who goes out ("To bench" or "To SF") faded, over who comes in ("From bench · Sun vs MEM 9:00pm"), with an Apply button.
+- Rows: one per starting slot, in your lineup's order, so changes read against the lineup you know. They're compact so a full lineup fits on screen without scrolling.
+  - A change shows who goes out, faded, beside who comes in, with an Apply button.
+    The player going out says where and why ("To bench · no game Sat · 31.91/g") and, when they have a finished game that could still be locked, the score they drop ("Drops lock-in 16.50 Wed vs GSW").
+    The one coming in says where from and their next game ("From bench · Sat @ CHI 7:00pm").
   - A finished game worth locking shows its score, the open value and when the window closes, with a Lock button.
   - A slot that stays is dimmed and says why: "No change", "Locked" (with the locked score), "Playing" or "Empty".
 - Applying one row saves just that slot and keeps the dialog open on the plan from the new lineup, with a note saying what saved.
@@ -66,7 +68,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - Slots no one can fill that day go to the players with the most projected points per game left this week.
 - Lineup: tries every way to fit the movable players into the starting slots and keeps the highest total, so scarce slots go to the players who can only fill them. Ties keep the most players where they are, then put players in their most specific slot.
 - Locked-in players and players in a game right now stay put.
-- Losses: benching a starter whose finished game was worth locking (or green) gives that score up (bench players can't lock in). The row turns yellow ("Can't lock 12.42 · Tue vs OKC") with a yellow note at the top; Apply still works.
+- Losses: benching a starter whose finished game was worth locking (or green) gives that score up (bench players can't lock in). The row turns yellow ("Drops lock-in 12.42 Tue vs OKC") with a yellow note at the top; Apply still works.
 - Green scores (24+): giving one up turns the row red, explains it at the top, and keeps that row's Apply and Apply all ("Apply all and lose N pts") disabled until you tick "Bench … anyway".
 - Scores in the dialog are colored by tier, like the game log.
 - Every apply works the plan out again first; if a game tipped off meanwhile and the plan changed, it shows the new plan instead of saving.

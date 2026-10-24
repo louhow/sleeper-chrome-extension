@@ -473,6 +473,8 @@
       const lost = c.to === 'BN' && banked?.actual > 0 && (worthy(o) || scoreTier(banked.actual) === 'green') ? banked : null;
       return {
         ...c,
+        // Any finished game a benched starter could still lock, worth it or not.
+        drops: c.to === 'BN' && banked?.actual > 0 ? banked : null,
         perGame,
         gamesLeft,
         today: o.left.find((d) => d.date === date)?.proj ?? null,

@@ -1216,7 +1216,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const slots = league.roster_positions.filter((p) => p !== 'BN');
   assert.deepEqual(await page.locator(dialog('.os-row .os-slot')).allTextContents(), slots);
   const nowIn = await page.locator(dialog('.os-row')).evaluateAll((rows) =>
-    rows.map((r) => r.querySelector('.os-line:not(.in) [data-player]')?.dataset.player ?? '0'));
+    rows.map((r) => r.querySelector('.os-p:not(.in) [data-player]')?.dataset.player ?? '0'));
   assert.deepEqual(nowIn, leg.starters, 'the current lineup, slot by slot');
   // Slots that stay say so, with no button.
   const same = page.locator(dialog('.os-row.same'));
@@ -1225,37 +1225,39 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.match(await same.first().locator('.os-status').textContent(), /^(No change|Locked|Playing|Empty)$/);
   // A small lockable score given up is a soft warning: yellow, and Apply still works.
   const victimRow = page.locator(dialog('.os-row.swap.warning')).filter({ hasText: players[victim].full_name });
-  assert.match(await victimRow.textContent(), /Can't lock 3\.00 · \w{3} (vs|@) \w+/);
+  assert.match(await victimRow.locator('.sub.drops.warn').textContent(), /^Drops lock-in 3\.00 \w{3} (vs|@) \w+$/, 'what benching gives up');
   assert.equal(await victimRow.locator('.score.red').textContent(), '3.00', 'the score shows in its tier color');
   assert.match(await page.locator(dialog('.warn-banner')).textContent(), new RegExp(`${players[victim].full_name} 3\\.00.* finished games? you could still lock in`));
   assert.equal(await page.locator(dialog('.lose-banner')).count(), 0, 'no hard stop for a red score');
   assert.equal(await page.locator(dialog('[data-action="apply-lineup"]')).isDisabled(), false);
   // The must-start comes in, on the same row as whoever goes out of that slot.
-  const starRow = page.locator(dialog('.os-row.swap')).filter({ has: page.locator(`.os-line.in [data-player="${star}"]`) });
+  const starRow = page.locator(dialog('.os-row.swap')).filter({ has: page.locator(`.os-p.in [data-player="${star}"]`) });
   assert.equal(await starRow.count(), 1, 'the must-start comes in');
-  assert.match(await starRow.locator('.os-line.out').innerText(), /^Empty$|\nTo (bench|\w+)$/, 'whoever it replaces goes somewhere, or the slot was empty');
-  assert.match(await starRow.locator('.os-line.in .sub').first().textContent(), /^From bench · /);
+  assert.match(await starRow.locator('.os-p.out').innerText(), /^Empty$|\nTo (bench|\w+) · (no game|\w{3} \d+\.\d\d)/, 'whoever it replaces goes somewhere, or the slot was empty');
+  assert.match(await starRow.locator('.os-p.in .sub').first().textContent(), /^From bench · /);
   // The big finished game is recommended for locking, with what keeping it open would bring.
   const lockRow = page.locator(dialog('.os-row.lock'));
   assert.equal(await lockRow.count(), 1, 'one game worth locking');
-  assert.equal(await lockRow.locator('.os-line [data-player]').first().getAttribute('data-player'), locker);
-  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
+  assert.equal(await lockRow.locator('.os-p [data-player]').first().getAttribute('data-player'), locker);
+  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d · lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
   assert.ok(Number(await lockRow.locator('.score.green').textContent()) >= 70, 'the score, in its tier color');
   assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < 20, 'keeping it open is worth far less');
   assert.equal(await lockRow.locator('[data-op-lock-row]').textContent(), 'Lock');
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
   assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply all');
+  // Every slot fits on screen, with no scrolling.
+  assert.ok(await page.locator(dialog('.dialog-body')).evaluate((el) => el.scrollHeight <= el.clientHeight), 'no scroll');
   await page.screenshot({ path: `${OUT}optimize-dialog.png` });
   // Kept open, it stays listed and the plan goes on without it.
   await lockRow.locator('[data-op-keep]').click();
   await page.locator(dialog('.os-row.lock.off')).waitFor();
-  assert.match(await page.locator(dialog('.os-row.lock')).innerText(), /Keeping open · Lock instead/);
+  assert.match(await page.locator(dialog('.os-row.lock')).innerText(), /keeping open · Lock instead/);
   assert.equal(await applyButton.textContent(), 'Apply all');
   await page.locator(dialog('[data-op-relock]')).click();
   await page.locator(dialog('.os-row.lock:not(.off)')).waitFor();
 
   // A player's card opens over the dialog; closing it comes back to the dialog.
-  await page.locator(dialog(`.os-line button.name[data-player="${star}"]`)).click();
+  await page.locator(dialog(`.os-p button.name[data-player="${star}"]`)).click();
   await page.locator(dialog('h2.pc-name')).filter({ hasText: players[star].full_name }).waitFor({ timeout: 30000 });
   assert.equal(await page.locator(dialog('.os-row')).first().isVisible(), true, 'the dialog stays underneath');
   await page.screenshot({ path: `${OUT}optimize-card.png` });
@@ -1313,7 +1315,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await page.locator(dialog('.lose-banner')).waitFor();
   assert.match(await page.locator(dialog('.lose-banner')).textContent(), new RegExp(players[victim].full_name));
   // Big games earn scoring bonuses too, so the score is at least what was set.
-  const given = Number((await page.locator(dialog('.os-row.losing')).filter({ hasText: players[victim].full_name }).textContent()).match(/Can't lock (\d+\.\d\d)/)[1]);
+  const given = Number((await page.locator(dialog('.os-row.losing')).filter({ hasText: players[victim].full_name }).textContent()).match(/Drops lock-in (\d+\.\d\d)/)[1]);
   assert.ok(given >= 24, `a green score (${given})`);
   const apply = page.locator(dialog('[data-action="apply-lineup"]'));
   assert.match(await apply.textContent(), /^Lock in 1 game and apply all, losing \d+\.\d\d pts$/);

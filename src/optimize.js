@@ -44,8 +44,8 @@
     const on = locks.filter((k) => k.on);
     const actionable = plan.changes.length > 0 || on.length > 0;
     const rows = plan.slots.length ? `
-        <div class="os-head"><span>Slot</span><span class="os-lines"><span class="os-player">Player</span>
-          <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span><span class="dp-avg" title="Projected points per game left this week">Pts/G</span></span><span></span></div>
+        <div class="os-head"><span>Slot</span><span>Starting now</span><span></span><span>Change to</span>
+          <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span><span class="dp-avg" title="Projected points per game left this week">Pts/G</span><span></span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
     // What the last row saved, until the next save.
     const done = m.done ? `<p class="op-done" role="status">${esc(m.done)}</p>` : '';
@@ -86,8 +86,8 @@
   }
 
   // One starting slot, in lineup order: who's there now and, when the plan
-  // changes it, who comes in. Each change applies on its own (with any slot
-  // it's tied to); a slot that stays as it is says so.
+  // changes it, who comes in, side by side. Each change applies on its own
+  // (with any slot it's tied to); a slot that stays as it is says so.
   function slotRow(s, m, plan, slot, i, blocked) {
     const cur = plan.current[i];
     const next = plan.starters[i];
@@ -98,12 +98,18 @@
       const risky = blocked && plan.changes.some((c) => c.goodScore && !starters.includes(c.id));
       const others = slots.filter((k) => k !== i).map((k) => plan.slots[k]);
       const busy = m.busy === `row:${i}`;
+      const drops = change?.drops;
+      const tone = change?.goodScore ? 'lose' : change?.lost ? 'warn' : '';
+      const outToday = plan.info[cur]?.today;
+      const outWhy = !real(cur) ? '' : ` · ${outToday == null ? `no game ${esc(day(plan))}` : `${esc(day(plan))} ${f2(outToday)}`} · ${f2(plan.info[cur]?.perGame ?? 0)}/g`;
+      const outSub = `<span class="sub move">${moveText(plan, cur, 'out')}<span class="why">${outWhy}</span></span>${drops
+        ? `<span class="sub drops ${tone}">Drops lock-in ${score(drops.actual)} ${esc(gameText(drops))}</span>` : ''}`;
       return `<div class="os-row swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
         <span class="os-slot">${slotBadge(slot)}</span>
-        <span class="os-lines">
-          ${line(s, plan, cur, 'out', moveText(s, plan, cur, 'out'), change?.lost)}
-          ${line(s, plan, next, 'in', moveText(s, plan, next, 'in'))}
-        </span>
+        ${player(s, cur, 'out', outSub)}
+        <span class="os-arrow" aria-label="replaced by">→</span>
+        ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>`)}
+        ${numbers(plan, next)}
         <span class="os-act">
           <button class="os-apply" data-op-row="${i}" ${m.saving || risky ? 'disabled' : ''}
             ${risky ? 'title="Tick the box above to confirm giving up that score"' : others.length ? `title="Also changes ${esc(others.join(', '))}"` : ''}>${busy ? 'Saving…' : 'Apply'}</button>
@@ -120,11 +126,12 @@
       : info.fixed === 'live' ? 'Playing'
       : 'No change';
     const sub = info.fixed === 'locked' ? `${score(info.locked.actual ?? 0)} ${esc(gameText(info.locked))}`
-      : notYet ? `${score(notYet.actual)} ${esc(gameText(notYet.game))} · open ${f2(notYet.open)}`
+      : notYet ? `${score(notYet.actual)} ${esc(gameText(notYet.game))} · open ${f2(notYet.open)} · ${esc(upcoming(s, cur))}`
       : esc(upcoming(s, cur));
     return `<div class="os-row same${info.fixed === 'locked' ? ' locked' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>
-      <span class="os-lines">${line(s, plan, cur, 'keep', sub)}</span>
+      ${player(s, cur, 'keep', `<span class="sub">${sub}</span>`)}
+      ${numbers(plan, cur)}
       <span class="os-act"><span class="os-status">${status}</span></span>
     </div>`;
   }
@@ -134,44 +141,47 @@
   function lockRow(s, m, plan, slot, k) {
     const until = k.until ? ` until ${new Date(k.until).toLocaleDateString(undefined, { weekday: 'short' })} ${gameTime(k.until)}` : '';
     const busy = m.busy === `lock:${k.id}`;
-    const sub = `${score(k.actual)} ${esc(gameText(k.game))} · open ${f2(k.open)}
-      <span class="os-sub2">${k.on ? `Lockable${esc(until)} · <button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open</button>`
-        : `Keeping open · <button class="os-link" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`}</span>`;
+    const toggle = k.on
+      ? `<button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open</button>`
+      : `<button class="os-link" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
+    const sub = `<span class="sub">${score(k.actual)} ${esc(gameText(k.game))} · open ${f2(k.open)} · ${k.on ? `lockable${esc(until)}` : 'keeping open'} · ${toggle}</span>`;
     return `<div class="os-row lock${k.on ? '' : ' off'}">
       <span class="os-slot">${slotBadge(slot)}</span>
-      <span class="os-lines">${line(s, plan, k.id, 'keep', sub)}</span>
+      ${player(s, k.id, 'keep', sub)}
+      ${numbers(plan, k.id)}
       <span class="os-act">${k.on
         ? `<button class="os-apply lock" data-op-lock-row="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>${busy ? 'Saving…' : `${lockIcon()}Lock`}</button>`
         : '<span class="os-status">Open</span>'}</span>
     </div>`;
   }
 
-  // One player in a slot row: headshot, name, a sub line, and what they're projected to score.
-  function line(s, plan, id, kind, sub, lost) {
-    if (!real(id)) {
-      return `<span class="os-line ${kind} empty"><span class="headshot blank"></span><span class="dp-info"><span class="dp-name">Empty</span></span><span class="dp-pts"></span><span class="dp-avg"></span></span>`;
-    }
+  // One player in a slot row: headshot, name and the sub lines given.
+  function player(s, id, kind, sub) {
+    if (!real(id)) return `<span class="os-p ${kind} empty"><span class="headshot blank"></span><span class="dp-info"><span class="dp-name">Empty</span></span></span>`;
     const p = s.players[id] || { name: `Player #${id}`, positions: [] };
-    const info = plan.info[id] || {};
-    const move = kind === 'keep' ? '' : ' move';
-    const note = lost ? `<span class="sub ${scoreTier(lost.actual) === 'green' ? 'lose' : 'warn'}">Can't lock ${score(lost.actual)} · ${esc(gameText(lost))}</span>` : '';
-    return `<span class="os-line ${kind}">
+    return `<span class="os-p ${kind}">
       <img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}">
       <span class="dp-info">
         <span class="dp-name"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button> ${positions(p)} <span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</span>
-        <span class="sub${move}">${sub}</span>${note}
+        ${sub}
       </span>
-      ${info.fixed === 'locked' ? '<span class="dp-pts">–</span><span class="dp-avg" title="Locked in, so later games don\'t count">–</span>'
-        : `<span class="dp-pts">${pts(info.today)}</span><span class="dp-avg" title="${esc(games(info.gamesLeft ?? 0))} left">${f2(info.perGame ?? 0)}</span>`}
     </span>`;
   }
 
+  // What the player in the slot is projected to score: that day, and per game left.
+  function numbers(plan, id) {
+    const info = (real(id) && plan.info[id]) || {};
+    if (!real(id)) return '<span class="dp-pts"></span><span class="dp-avg"></span>';
+    if (info.fixed === 'locked') return '<span class="dp-pts">–</span><span class="dp-avg" title="Locked in, so later games don\'t count">–</span>';
+    return `<span class="dp-pts">${pts(info.today)}</span><span class="dp-avg" title="${esc(games(info.gamesLeft ?? 0))} left">${f2(info.perGame ?? 0)}</span>`;
+  }
+
   // Where a player in a changed slot goes to, or comes from.
-  function moveText(s, plan, id, kind) {
+  function moveText(plan, id, kind) {
     if (!real(id)) return '';
     const k = (kind === 'out' ? plan.starters : plan.current).indexOf(id);
     const where = k < 0 ? 'bench' : plan.slots[k];
-    return kind === 'out' ? `To ${esc(where)}` : `From ${esc(where)} · ${esc(upcoming(s, id))}`;
+    return `${kind === 'out' ? 'To' : 'From'} ${esc(where)}`;
   }
 
   // The player's next game this week, e.g. "Fri vs BOS 7:00pm".
