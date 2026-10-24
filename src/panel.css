@@ -1735,7 +1735,7 @@ button.optimize:hover:not(:disabled) {
 .os-head,
 .os-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 14px minmax(0, 1fr) 44px 40px 72px;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 44px 40px 72px;
   align-items: center;
   column-gap: 10px;
 }
@@ -1754,7 +1754,7 @@ button.optimize:hover:not(:disabled) {
 /* A slot that stays: one player across both player columns. */
 .os-row.same > .os-p,
 .os-row.lock > .os-p {
-  grid-column: 2 / 5;
+  grid-column: 2 / 4;
 }
 .os-row .slot {
   width: 40px;
@@ -1784,18 +1784,21 @@ button.optimize:hover:not(:disabled) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.os-arrow {
-  color: var(--muted);
-  font-size: 13px;
-  text-align: center;
-}
 .os-row .dp-pts {
   font-weight: 700;
 }
 .os-row .dp-avg {
   color: var(--muted);
 }
-/* A change: who goes out (faded), beside who comes in. */
+/* A change: who comes in first, then who they replace (faded, past a divider). */
+.os-p.in .dp-name button.name {
+  color: #8ec3ff;
+}
+.os-p.out {
+  align-self: stretch;
+  padding-left: 10px;
+  border-left: 1px solid rgba(89, 167, 255, 0.3);
+}
 .os-row.swap {
   border-color: rgba(89, 167, 255, 0.45);
   background: rgba(89, 167, 255, 0.06);

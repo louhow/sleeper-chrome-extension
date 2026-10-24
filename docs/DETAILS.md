@@ -44,7 +44,7 @@ The Team tab's **Optimize lineup** button (your own team, a week you can still e
 Nothing is written until you apply a row or press Apply all; Cancel, ✕, the backdrop or Esc leave the rest as it was.
 
 - Rows: one per starting slot, in your lineup's order, so changes read against the lineup you know. They're compact so a full lineup fits on screen without scrolling.
-  - A change shows who goes out, faded, beside who comes in, with an Apply button.
+  - A change leads with who comes in (name in blue), so the Starting column reads as the new lineup top to bottom; who they replace sits beside them in the Replaces column, faded, with an Apply button.
     The player going out says where and why ("To bench · no game Sat · 31.91/g") and, when they have a finished game that could still be locked, the score they drop ("Drops lock-in 16.50 Wed vs GSW").
     The one coming in says where from and their next game ("From bench · Sat @ CHI 7:00pm").
   - A finished game worth locking shows its score, the open value and when the window closes, with a Lock button.

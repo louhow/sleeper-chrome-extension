@@ -44,7 +44,7 @@
     const on = locks.filter((k) => k.on);
     const actionable = plan.changes.length > 0 || on.length > 0;
     const rows = plan.slots.length ? `
-        <div class="os-head"><span>Slot</span><span>Starting now</span><span></span><span>Change to</span>
+        <div class="os-head"><span>Slot</span><span>Starting</span><span>Replaces</span>
           <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span><span class="dp-avg" title="Projected points per game left this week">Pts/G</span><span></span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
     // What the last row saved, until the next save.
@@ -85,8 +85,9 @@
     </div>`;
   }
 
-  // One starting slot, in lineup order: who's there now and, when the plan
-  // changes it, who comes in, side by side. Each change applies on its own
+  // One starting slot, in lineup order: who starts there. When the plan
+  // changes it, who comes in leads (so the column reads as the new lineup)
+  // and who they replace sits beside them, faded. Each change applies on its own
   // (with any slot it's tied to); a slot that stays as it is says so.
   function slotRow(s, m, plan, slot, i, blocked) {
     const cur = plan.current[i];
@@ -106,9 +107,8 @@
         ? `<span class="sub drops ${tone}">Drops lock-in ${score(drops.actual)} ${esc(gameText(drops))}</span>` : ''}`;
       return `<div class="os-row swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
         <span class="os-slot">${slotBadge(slot)}</span>
-        ${player(s, cur, 'out', outSub)}
-        <span class="os-arrow" aria-label="replaced by">→</span>
         ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>`)}
+        ${player(s, cur, 'out', outSub)}
         ${numbers(plan, next)}
         <span class="os-act">
           <button class="os-apply" data-op-row="${i}" ${m.saving || risky ? 'disabled' : ''}
