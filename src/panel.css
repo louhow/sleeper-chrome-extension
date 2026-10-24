@@ -1620,7 +1620,8 @@ button.optimize:hover:not(:disabled) {
   font-weight: 700;
   vertical-align: baseline;
 }
-.op-row img.headshot[data-player] {
+.op-row img.headshot[data-player],
+.os-line img.headshot[data-player] {
   cursor: pointer;
 }
 .lose-banner {
@@ -1650,11 +1651,6 @@ button.optimize:hover:not(:disabled) {
 }
 .warn-banner b {
   color: var(--text);
-}
-.op-row.warning {
-  border: 1px solid rgba(248, 210, 75, 0.4);
-  border-radius: 10px;
-  background: rgba(248, 210, 75, 0.04);
 }
 .sub.warn {
   overflow: hidden;
@@ -1700,11 +1696,6 @@ button.optimize:hover:not(:disabled) {
   border: 1px solid transparent;
   border-bottom-color: var(--line);
 }
-.op-row.losing {
-  border: 1px solid rgba(255, 91, 110, 0.5);
-  border-radius: 10px;
-  background: rgba(255, 91, 110, 0.06);
-}
 .op-row .headshot {
   width: 30px;
   height: 30px;
@@ -1737,50 +1728,169 @@ button.optimize:hover:not(:disabled) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.op-lock-head {
-  color: var(--accent);
+/* NBA Optimize lineup: one row per starting slot, in lineup order. A change
+   shows who goes out over who comes in; a slot that stays is dimmed. */
+.os-head,
+.os-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 76px;
+  align-items: center;
+  column-gap: 10px;
 }
-.op-row.op-lock {
-  border: 1px solid rgba(0, 206, 184, 0.45);
-  border-radius: 10px;
-  background: rgba(0, 206, 184, 0.06);
+.os-lines {
+  display: grid;
+  row-gap: 8px;
+  min-width: 0;
+}
+.os-head .os-lines,
+.os-line {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 46px 40px;
+  align-items: center;
+  column-gap: 10px;
+}
+.os-head {
+  padding: 12px 12px 6px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.os-head .os-player {
+  grid-column: 1 / 3;
+}
+.os-row {
   margin-bottom: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
-.op-row.op-lock.off {
+.os-row .slot {
+  width: 44px;
+  height: 30px;
+  font-size: 12px;
+}
+.os-line .headshot {
+  width: 30px;
+  height: 30px;
+}
+.os-line .headshot.blank {
+  display: block;
+}
+.os-line .dp-pts {
+  font-weight: 700;
+}
+.os-line .dp-avg {
+  color: var(--muted);
+}
+/* A change: who goes out (faded), then who comes in. */
+.os-row.swap {
+  border-color: rgba(89, 167, 255, 0.45);
+  background: rgba(89, 167, 255, 0.06);
+}
+.os-row.swap.warning {
+  border-color: rgba(248, 210, 75, 0.45);
+  background: rgba(248, 210, 75, 0.05);
+}
+.os-row.swap.losing {
+  border-color: rgba(255, 91, 110, 0.5);
+  background: rgba(255, 91, 110, 0.06);
+}
+.os-line.out > :not(.dp-info),
+.os-line.out .dp-name {
+  opacity: 0.5;
+}
+.os-line.out .sub.move {
+  color: var(--danger);
+  font-weight: 700;
+}
+.os-line.in .sub.move {
+  color: #8ec3ff;
+}
+.os-line.empty .dp-name {
+  color: var(--muted);
+  font-style: italic;
+}
+/* A finished game worth locking in. */
+.os-row.lock {
+  border-color: rgba(0, 206, 184, 0.45);
+  background: rgba(0, 206, 184, 0.06);
+}
+.os-row.lock.off {
   border-color: var(--line);
   background: none;
 }
-.op-row.op-lock.off .dp-pts,
-.op-row.op-lock.off .dp-avg {
-  opacity: 0.6;
+.os-sub2 {
+  display: block;
 }
-.op-lock-pick {
+.os-link {
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.os-link:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+/* No action: the slot stays as it is. */
+.os-row.same .os-lines,
+.os-row.same .slot {
+  opacity: 0.5;
+}
+.os-row.same.locked .os-lines,
+.os-row.same.locked .slot {
+  opacity: 0.7;
+}
+.os-act {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  text-align: center;
 }
-.op-lock-pick input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-.lock-tag {
+.os-apply {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  color: var(--accent);
+  padding: 7px 0;
+  background: #5ac8b4;
+  color: #fff;
   font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+button.os-apply:hover:not(:disabled) {
+  background: #4bb6a3;
+}
+.os-with {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+.os-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 800;
-  white-space: nowrap;
+  text-transform: uppercase;
 }
-.op-lock.off .lock-tag {
-  color: var(--muted);
+.os-row.locked .os-status {
+  color: var(--warn);
 }
-.op-lock .dp-avg {
-  color: var(--muted);
+.op-done {
+  margin: 0 0 10px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(0, 206, 184, 0.12);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
 }
 .op-fixed {
   margin: 12px 4px 0;

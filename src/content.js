@@ -132,7 +132,7 @@
       claims: null, // the logged-in owner's pending waiver claims
       cards: {}, // player card data by player id, kept for the session
       // { kind: 'bid', playerId, status, bid, drops, errors, saving } | { kind: 'claims', errors, saving } | { kind: 'player', playerId, season }
-      // | { kind: 'optimize', plan, noLock, ack, errors, saving } (noLock: locks the owner unticked); a player card can open over it (`back`).
+      // | { kind: 'optimize', plan, noLock, ack, errors, saving, busy } (noLock: locks kept open; busy: 'all', 'row:<slot>' or 'lock:<player>' while it saves; done: what the last row saved); a player card can open over it (`back`).
       modal: null,
       // What-if scoring: values that differ from the league's, whether they're in use, and the editor's state.
       // `drafts` holds text being typed that isn't a number yet.
@@ -714,21 +714,24 @@
     }
 
     // Runs a dialog's save; errors stay in the dialog, success closes it (or keeps the claims list open).
-    async function modalSave(work, okText) {
+    // `stay(m, okText)`: keeps the dialog open after a save and updates it (and says what saved).
+    async function modalSave(work, okText, stay) {
       const m = state.modal;
       if (!m || m.saving) return;
       m.saving = true;
       m.errors = [];
+      m.done = null;
       schedule();
       try {
         await work();
-        if (state.modal === m) state.modal = m.kind === 'claims' ? { ...m, saving: false } : null;
-        flash(okText);
+        if (state.modal === m) state.modal = stay ? (stay(m, okText), m) : m.kind === 'claims' ? { ...m, saving: false } : null;
+        if (!stay) flash(okText);
       } catch (err) {
         console.error('[sleeper-nba-panel] save failed', err);
         m.errors = [String(err.message || err)];
       } finally {
         m.saving = false;
+        m.busy = null;
         schedule();
       }
     }
@@ -889,11 +892,11 @@
       state.swap = null;
       state.lockConfirm = null;
       state.notice = null;
-      state.modal = { kind: 'optimize', plan: model.bestLineup(lineup, Date.now()), noLock: [], ack: false, errors: [], saving: false };
+      state.modal = { kind: 'optimize', plan: model.bestLineup(lineup, Date.now()), noLock: [], ack: false, errors: [], saving: false, busy: null, done: null };
       schedule();
     }
 
-    // Ticking or unticking a lock plans the lineup again around it.
+    // Keeping a lock open, or taking it back, plans the lineup again around it.
     function toggleLock(playerId, on) {
       const m = state.modal;
       const lineup = ui.lineup(state);
@@ -904,41 +907,87 @@
       schedule();
     }
 
-    // Saves the proposed lineup and locks in one write (locks are final).
-    // Games can tip off while the dialog is open, so the plan is worked out
-    // again first; if it changed, the dialog shows the new one instead of
-    // saving something unseen.
-    function applyOptimize() {
+    // The optimize dialog's plan, worked out again right before a save. Games
+    // can tip off while the dialog is open; if the plan changed, the dialog
+    // shows the new one instead of saving something unseen. Null when it can't save.
+    function freshPlan() {
       const m = state.modal;
       const lineup = ui.lineup(state);
-      if (m?.kind !== 'optimize' || m.saving || !lineup?.editable) return;
+      if (m?.kind !== 'optimize' || m.saving || !lineup?.editable) return null;
       // The plan was made with the league's scoring; what-if numbers would change it.
       if (ui.whatIfOn(state)) {
         m.errors = ['Switch what-if scoring off to apply. Optimize picks the lineup with your league\'s scoring.'];
-        return schedule();
+        schedule();
+        return null;
       }
       const plan = model.bestLineup(lineup, Date.now(), { noLock: m.noLock });
       if (JSON.stringify(plan.starters) !== JSON.stringify(m.plan.starters) ||
+        JSON.stringify(plan.current) !== JSON.stringify(m.plan.current) ||
         JSON.stringify(plan.changes) !== JSON.stringify(m.plan.changes) ||
         JSON.stringify(plan.locks) !== JSON.stringify(m.plan.locks)) {
         m.plan = plan;
         m.ack = false;
         m.errors = ['Games have tipped off since this opened. Review the updated changes.'];
-        return schedule();
+        schedule();
+        return null;
       }
+      return { m, lineup, plan };
+    }
+
+    // After one row saves, the dialog stays open on the plan from the new lineup.
+    function replan(m, okText) {
+      m.plan = model.bestLineup(ui.lineup(state), Date.now(), { noLock: m.noLock });
+      m.ack = false;
+      m.done = okText;
+    }
+
+    const shortOf = (id) => ui.shortName(state.players[id] || { name: `Player #${id}` });
+    // Names a few moves; past that, just the count, so the notice stays one line.
+    const movedText = (changes) => (changes.length > 3 ? `${changes.length} lineup changes` : changes
+      .map(({ id, to }) => `${shortOf(id)} to ${to === 'BN' ? 'bench' : to}`)
+      .join(', '));
+
+    // Saves the proposed lineup and locks in one write (locks are final).
+    function applyOptimize() {
+      const fresh = freshPlan();
+      if (!fresh) return;
+      const { m, lineup, plan } = fresh;
       // Giving up a score that beat its projection takes the tick box.
       if (plan.changes.some((c) => c.goodScore) && !m.ack) return;
-      // Names a few moves; past that, just the count, so the notice stays one line.
-      const short = (id) => ui.shortName(state.players[id] || { name: `Player #${id}` });
-      const moved = plan.changes.length > 3 ? `${plan.changes.length} lineup changes` : plan.changes
-        .map(({ id, to }) => `${short(id)} to ${to === 'BN' ? 'bench' : to}`)
-        .join(', ');
+      const moved = movedText(plan.changes);
       const locks = lineup.lockable ? plan.locks.filter((k) => k.on) : [];
+      m.busy = 'all';
       if (!locks.length) return plan.changes.length ? modalSave(() => saveStarters(plan.starters), `Saved: ${moved}`) : undefined;
-      const lockedText = `Locked ${locks.map((k) => `${short(k.id)} ${k.actual.toFixed(2)}`).join(', ')}`;
+      const lockedText = `Locked ${locks.map((k) => `${shortOf(k.id)} ${k.actual.toFixed(2)}`).join(', ')}`;
       const startersGames = { ...lineup.locks, ...Object.fromEntries(locks.map((k) => [k.id, k.game.game.id])) };
       return modalSave(() => saveLeg('lock_in', lineup.roster.roster_id, plan.starters, startersGames),
         plan.changes.length ? `${lockedText} · Saved: ${moved}` : lockedText);
+    }
+
+    // Applies one slot's change (and any slot tied to it); the dialog stays open.
+    function applyOptimizeRow(i) {
+      const fresh = freshPlan();
+      if (!fresh) return;
+      const { m, plan } = fresh;
+      const { starters, slots } = model.applySlot(plan.current, plan.starters, i);
+      if (!slots.length) return;
+      if (plan.changes.some((c) => c.goodScore && !starters.includes(c.id)) && !m.ack) return;
+      const ids = new Set(slots.flatMap((k) => [plan.current[k], plan.starters[k]]));
+      const changes = plan.changes.filter((c) => ids.has(c.id));
+      m.busy = `row:${i}`;
+      return modalSave(() => saveStarters(starters), `Saved: ${movedText(changes)}`, replan);
+    }
+
+    // Locks one recommended game now, on the lineup as it stands; the dialog stays open.
+    function lockOptimizeRow(id) {
+      const fresh = freshPlan();
+      if (!fresh) return;
+      const { m, lineup, plan } = fresh;
+      const k = plan.locks.find((x) => x.id === id && x.on);
+      if (!k || !lineup.lockable) return;
+      m.busy = `lock:${id}`;
+      return modalSave(() => saveLeg('lock_in', lineup.roster.roster_id, lineup.starters, { ...lineup.locks, [id]: k.game.game.id }),
+        `Locked ${shortOf(id)} ${k.actual.toFixed(2)}`, replan);
     }
 
     function pickSpot(ref) {
@@ -1060,10 +1109,15 @@
       if (action === 'close-modal') closeModal();
       if (action === 'submit-claim') submitClaim();
       if (action === 'apply-lineup') applyOptimize();
+      const row = e.target.closest('[data-op-row]');
+      if (row) return applyOptimizeRow(Number(row.dataset.opRow));
+      const lockRow = e.target.closest('[data-op-lock-row]');
+      if (lockRow) return lockOptimizeRow(lockRow.dataset.opLockRow);
+      const keep = e.target.closest('[data-op-keep], [data-op-relock]');
+      if (keep) return toggleLock(keep.dataset.opKeep ?? keep.dataset.opRelock, keep.dataset.opRelock != null);
       if (action === 'whatif-off') setWhatIf({ on: false });
     });
     layerRoot.addEventListener('change', (e) => {
-      if (e.target.matches('[data-op-lock]')) return toggleLock(e.target.dataset.opLock, e.target.checked);
       if (!e.target.matches('[data-op-ack]') || state.modal?.kind !== 'optimize') return;
       state.modal.ack = e.target.checked;
       schedule();

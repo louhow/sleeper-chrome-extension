@@ -313,6 +313,7 @@
       open: openValue(left.map((d) => Math.max(0, d.proj ?? 0))),
       value: Math.max(perGame, banked?.actual ?? 0),
       fixed: st.locked ? 'locked' : st.games.some((d) => gameLive(d.game, now)) ? 'live' : null,
+      locked: st.locked,
     };
   }
 
@@ -464,7 +465,7 @@
     });
     // Starters whose finished game can still be locked, but isn't worth it yet.
     plan.notYet = l.starters.filter((id) => look[id]?.banked?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
-      .map((id) => ({ id, actual: look[id].banked.actual, open: look[id].open }));
+      .map((id) => ({ id, actual: look[id].banked.actual, open: look[id].open, game: look[id].banked }));
     plan.changes = plan.changes.map((c) => {
       const o = look[c.id];
       const { perGame, gamesLeft, banked } = o;
@@ -480,7 +481,33 @@
         goodScore: Boolean(lost) && scoreTier(lost.actual) === 'green',
       };
     });
+    // The lineup the plan starts from, slot by slot, and what each player in it is worth.
+    plan.current = [...l.starters];
+    plan.slots = [...l.slots];
+    plan.info = Object.fromEntries(Object.entries(look).map(([id, o]) => [id, {
+      today: o.left.find((d) => d.date === date)?.proj ?? null,
+      perGame: o.perGame,
+      gamesLeft: o.gamesLeft,
+      fixed: o.fixed,
+      locked: o.locked,
+    }]));
     return plan;
+  }
+
+  // One slot of a planned lineup, applied on its own. A move can tie slots
+  // together (the player coming in left another slot, or the one going out
+  // takes another), so every slot tied to `i` changes with it; the rest stay put.
+  // Returns the new starters and the slots that change.
+  function applySlot(current, planned, i) {
+    const real = (id) => id && id !== '0';
+    const group = new Set([i]);
+    for (const k of group) {
+      for (const j of [real(planned[k]) ? current.indexOf(planned[k]) : -1, real(current[k]) ? planned.indexOf(current[k]) : -1]) {
+        if (j >= 0) group.add(j);
+      }
+    }
+    const slots = [...group].filter((k) => current[k] !== planned[k]).sort((a, b) => a - b);
+    return { starters: current.map((id, k) => (group.has(k) ? planned[k] : id)), slots };
   }
 
   // NFL injury statuses that mean a player won't play this week.
@@ -618,7 +645,7 @@
     ranks, rankShift, shiftTint,
     weekDays, gamesByTeam, pointsByGame, playerDays, lockInDefault, ownedPicks, spotRefs, swapTargets, applyMove, describeMove,
     taxiEligible, taxiOpen, reserveEligible,
-    lockedGameId, lockState, scoreTier, openValue, bestLineup, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
+    lockedGameId, lockState, scoreTier, openValue, bestLineup, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
   };
 })();

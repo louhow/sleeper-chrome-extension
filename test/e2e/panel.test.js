@@ -1204,7 +1204,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
 
   const before = sleeper.mutations.length;
   await page.locator(panel('button.optimize')).click();
-  await page.locator(dialog('.op-row')).first().waitFor();
+  await page.locator(dialog('.os-row')).first().waitFor();
   assert.match(await page.locator(dialog('.op-sum')).textContent(), /(\w{3}) projection\s*Starters playing \1\s*\d+\.\d\d\s*→\s*\d+\.\d\d\s*\+\d+\.\d\d/);
   // The tooltip shows on hover, inside the dialog.
   assert.equal(await page.locator(dialog('.how-tip')).isVisible(), false);
@@ -1212,45 +1212,92 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.match(await page.locator(dialog('.how-tip')).innerText(), /^How it picks:\nStarts your best projected players/);
   await page.screenshot({ path: `${OUT}optimize-how.png` });
   await page.mouse.move(0, 0);
+  // One row per starting slot, in lineup order, each showing who's there now.
+  const slots = league.roster_positions.filter((p) => p !== 'BN');
+  assert.deepEqual(await page.locator(dialog('.os-row .os-slot')).allTextContents(), slots);
+  const nowIn = await page.locator(dialog('.os-row')).evaluateAll((rows) =>
+    rows.map((r) => r.querySelector('.os-line:not(.in) [data-player]')?.dataset.player ?? '0'));
+  assert.deepEqual(nowIn, leg.starters, 'the current lineup, slot by slot');
+  // Slots that stay say so, with no button.
+  const same = page.locator(dialog('.os-row.same'));
+  assert.ok(await same.count() > 0, 'some slots stay');
+  assert.equal(await same.locator('button.os-apply').count(), 0);
+  assert.match(await same.first().locator('.os-status').textContent(), /^(No change|Locked|Playing|Empty)$/);
   // A small lockable score given up is a soft warning: yellow, and Apply still works.
-  const victimRow = page.locator(dialog('.op-row.warning')).filter({ hasText: players[victim].full_name });
+  const victimRow = page.locator(dialog('.os-row.swap.warning')).filter({ hasText: players[victim].full_name });
   assert.match(await victimRow.textContent(), /Can't lock 3\.00 · \w{3} (vs|@) \w+/);
   assert.equal(await victimRow.locator('.score.red').textContent(), '3.00', 'the score shows in its tier color');
   assert.match(await page.locator(dialog('.warn-banner')).textContent(), new RegExp(`${players[victim].full_name} 3\\.00.* finished games? you could still lock in`));
   assert.equal(await page.locator(dialog('.lose-banner')).count(), 0, 'no hard stop for a red score');
   assert.equal(await page.locator(dialog('[data-action="apply-lineup"]')).isDisabled(), false);
-  assert.equal(await page.locator(dialog('.op-row')).filter({ hasText: players[star].full_name }).count(), 1, 'the must-start comes in');
-  // The big finished game is recommended for locking, ticked, with what keeping it open would bring.
-  const lockRow = page.locator(dialog('.op-row.op-lock'));
+  // The must-start comes in, on the same row as whoever goes out of that slot.
+  const starRow = page.locator(dialog('.os-row.swap')).filter({ has: page.locator(`.os-line.in [data-player="${star}"]`) });
+  assert.equal(await starRow.count(), 1, 'the must-start comes in');
+  assert.match(await starRow.locator('.os-line.out').innerText(), /^Empty$|\nTo (bench|\w+)$/, 'whoever it replaces goes somewhere, or the slot was empty');
+  assert.match(await starRow.locator('.os-line.in .sub').first().textContent(), /^From bench · /);
+  // The big finished game is recommended for locking, with what keeping it open would bring.
+  const lockRow = page.locator(dialog('.os-row.lock'));
   assert.equal(await lockRow.count(), 1, 'one game worth locking');
-  assert.match(await lockRow.innerText(), new RegExp(`^Lock\\s+${players[locker].full_name}[\\s\\S]*\\w{3} (vs|@) \\w+ · until \\w{3} \\d{1,2}:\\d\\d(am|pm)`));
+  assert.equal(await lockRow.locator('.os-line [data-player]').first().getAttribute('data-player'), locker);
+  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
   assert.ok(Number(await lockRow.locator('.score.green').textContent()) >= 70, 'the score, in its tier color');
-  assert.ok(Number(await lockRow.locator('.dp-avg').textContent()) < 20, 'keeping it open is worth far less');
-  assert.equal(await lockRow.locator('[data-op-lock]').isChecked(), true);
+  assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < 20, 'keeping it open is worth far less');
+  assert.equal(await lockRow.locator('[data-op-lock-row]').textContent(), 'Lock');
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
-  assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply');
+  assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply all');
   await page.screenshot({ path: `${OUT}optimize-dialog.png` });
-  // Unticked, it stays listed and the plan goes on without it.
-  await lockRow.locator('[data-op-lock]').uncheck();
-  await page.locator(dialog('.op-row.op-lock.off')).waitFor();
-  assert.match(await page.locator(dialog('.op-row.op-lock')).textContent(), /Keep open/);
-  assert.equal(await applyButton.textContent(), 'Apply changes');
-  await page.locator(dialog('[data-op-lock]')).check();
-  await page.locator(dialog('.op-row.op-lock:not(.off)')).waitFor();
+  // Kept open, it stays listed and the plan goes on without it.
+  await lockRow.locator('[data-op-keep]').click();
+  await page.locator(dialog('.os-row.lock.off')).waitFor();
+  assert.match(await page.locator(dialog('.os-row.lock')).innerText(), /Keeping open · Lock instead/);
+  assert.equal(await applyButton.textContent(), 'Apply all');
+  await page.locator(dialog('[data-op-relock]')).click();
+  await page.locator(dialog('.os-row.lock:not(.off)')).waitFor();
 
   // A player's card opens over the dialog; closing it comes back to the dialog.
-  await page.locator(dialog(`.op-row button.name[data-player="${star}"]`)).click();
+  await page.locator(dialog(`.os-line button.name[data-player="${star}"]`)).click();
   await page.locator(dialog('h2.pc-name')).filter({ hasText: players[star].full_name }).waitFor({ timeout: 30000 });
-  assert.equal(await page.locator(dialog('.op-row')).first().isVisible(), true, 'the dialog stays underneath');
+  assert.equal(await page.locator(dialog('.os-row')).first().isVisible(), true, 'the dialog stays underneath');
   await page.screenshot({ path: `${OUT}optimize-card.png` });
   await page.keyboard.press('Escape');
   await page.locator(dialog('.pc')).waitFor({ state: 'detached' });
-  await page.locator(dialog('.op-row')).first().waitFor();
+  await page.locator(dialog('.os-row')).first().waitFor();
 
   // Dismissing changes nothing.
   await page.locator(dialog('.op-foot button[data-action="close-modal"]')).click();
   await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
   assert.equal(sleeper.mutations.length, before, 'nothing saved on cancel');
+
+  // One row applies on its own; the dialog stays open on what's left.
+  const lineupBefore = [...leg.starters];
+  await page.locator(panel('button.optimize')).click();
+  await starRow.locator('button.os-apply').click();
+  await starRow.waitFor({ state: 'detached' });
+  assert.equal(sleeper.mutations.length, before + 1, 'one save');
+  assert.match(sleeper.mutations.at(-1).query, /mutation update_matchup_leg/);
+  assert.equal(sleeper.mutations.at(-1).variables.starters_games, undefined, 'no lock with it');
+  const rowSaved = JSON.parse(sleeper.mutations.at(-1).query.match(/starters: (\[[^\]]*\])/)[1]);
+  const moved = rowSaved.map((id, i) => i).filter((i) => rowSaved[i] !== lineupBefore[i]);
+  assert.ok(moved.length >= 1 && rowSaved.includes(star), `the star comes in (slots ${moved})`);
+  assert.equal(await page.locator(dialog('.os-row.same')).filter({ has: page.locator(`[data-player="${star}"]`) }).count(), 1, 'their slot now stays');
+  assert.equal(await page.locator(dialog('.os-row.lock')).count(), 1, 'the lock is still offered');
+  assert.match(await page.locator(dialog('.op-done')).textContent(), /^Saved: .*to (bench|\w+)/, 'says what saved, in the dialog');
+  await page.screenshot({ path: `${OUT}optimize-row-applied.png` });
+  // A lock applies on its own too, keeping the lineup as it stands.
+  await page.locator(dialog('[data-op-lock-row]')).click();
+  await page.locator(dialog('.os-row.lock')).waitFor({ state: 'detached' });
+  const lockSave = sleeper.mutations.at(-1);
+  assert.match(lockSave.query, /mutation update_matchup_leg/);
+  assert.deepEqual(Object.keys(JSON.parse(lockSave.variables.starters_games)).filter((id) => !(id in existing)), [locker]);
+  assert.deepEqual(JSON.parse(lockSave.query.match(/starters: (\[[^\]]*\])/)[1]), rowSaved, 'the lineup as it stands');
+  assert.match(await page.locator(dialog('.op-done')).textContent(), /^Locked .+ \d+\.\d\d$/);
+  assert.match(await page.locator(dialog('.os-row.same.locked')).filter({ has: page.locator(`[data-player="${locker}"]`) }).textContent(), /Locked\s*$/);
+  await page.keyboard.press('Escape');
+  await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
+  // Back to the starting lineup for the rest of the test.
+  leg.starters = lineupBefore;
+  leg.starters_games = { ...existing };
+  const beforeGreen = sleeper.mutations.length;
 
   // Now the UTIL starter's finished game was green (24+) and every bench player is a must-start,
   // the star most of all, so ties among the bench can't leave them out.
@@ -1266,17 +1313,17 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await page.locator(dialog('.lose-banner')).waitFor();
   assert.match(await page.locator(dialog('.lose-banner')).textContent(), new RegExp(players[victim].full_name));
   // Big games earn scoring bonuses too, so the score is at least what was set.
-  const given = Number((await page.locator(dialog('.op-row.losing')).filter({ hasText: players[victim].full_name }).textContent()).match(/Can't lock (\d+\.\d\d)/)[1]);
+  const given = Number((await page.locator(dialog('.os-row.losing')).filter({ hasText: players[victim].full_name }).textContent()).match(/Can't lock (\d+\.\d\d)/)[1]);
   assert.ok(given >= 24, `a green score (${given})`);
   const apply = page.locator(dialog('[data-action="apply-lineup"]'));
-  assert.match(await apply.textContent(), /^Lock in 1 game and apply, losing \d+\.\d\d pts$/);
+  assert.match(await apply.textContent(), /^Lock in 1 game and apply all, losing \d+\.\d\d pts$/);
   assert.equal(await apply.isDisabled(), true, 'giving up a green score needs the tick box');
   await page.screenshot({ path: `${OUT}optimize-green.png` });
   await page.locator(dialog('[data-op-ack]')).check();
   await apply.click();
   await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
   await page.locator(panel('.notice.ok')).waitFor();
-  const saved = sleeper.mutations.slice(before);
+  const saved = sleeper.mutations.slice(beforeGreen);
   assert.equal(saved.length, 1, 'the lineup and the lock in one save');
   assert.match(saved[0].query, /mutation update_matchup_leg/);
   const locks = JSON.parse(saved[0].variables.starters_games);
