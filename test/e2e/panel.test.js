@@ -274,6 +274,42 @@ const NFL_PLAYERS = {
   qbB: ['Beta QB', 'QB', 'LAR', 18, 'Questionable'], wrC: ['Gamma WR', 'WR', 'GB', 14],
   teOut: ['Hurt TE', 'TE', 'NYG', 20, 'Out'], rbBye: ['Bye RB', 'RB', 'CHI', null],
 };
+// Sleeper's own NFL League tab, reduced to its matchup cards (inspected
+// 2026-10-25): each row's markup as Sleeper draws it, with the live numbers it
+// works out; React-style props give the roster ids and, up the tree, the rosters
+// and your user id. Clicking a card's header opens it (recorded in __nflOpened).
+const NFL_LEAGUE_URL = `https://sleeper.com/leagues/${NFL_LEAGUE}/league`;
+const nflLeagueTab = () => {
+  const side = (t, flip) => `<div class="user${flip ? ' reverse' : ''}"><div class="matchup-owner-item"><div class="owner-container">
+    <div class="row space-between"><div class="row"><div class="avatar-container"><div class="avatar" style="background-image: url(&quot;https://sleepercdn.com/avatars/thumbs/${t.av}&quot;)"></div></div>
+    <div class="meta"><div class="team-name">@${t.owner}</div><div class="name">${t.team}</div></div></div>
+    <div class="roster-score-and-projection-matchup"><div class="score">${t.score}</div></div></div>
+    <div class="win-bar"><div style="height: 4px; width: ${t.win}%;"></div></div></div>
+    <div class="bottom-row space-between"><div class="row"><div class="win-percentage-number">${t.win}%</div><div class="description">${t.record}</div></div>
+    <div class="roster-score-and-projection-matchup"><div class="projections">${t.proj}</div></div></div></div></div>`;
+  const pairs = [
+    [{ r: 3, owner: 'someone', team: 'Moore\'s Law', score: '20.12', win: 31, record: '5-7', proj: '100.65', av: 'a3' }, { r: 4, owner: 'kjenn', team: 'KyKy', score: '-', win: 69, record: '7-5', proj: '110.04', av: 'a4' }],
+    [{ r: 1, owner: 'louhow', team: 'Lou Point Conversion', score: '19.40', win: 90, record: '8-4', proj: '122.23', av: 'a1' }, { r: 2, owner: 'kalviar', team: 'Tank you, Jeremiah', score: '6.60', win: 10, record: '3-9', proj: '71.77', av: 'a2' }],
+  ];
+  return `<!doctype html><title>Sleeper</title>
+<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .league-tab-container { position: absolute; left: 264px; top: 100px; width: 750px; } .league-matchup-row-item { padding: 8px; border: 1px solid #456; margin: 4px 0; }</style>
+<div class="league-tab-container"><div class="row"><div class="title">Matchups</div></div><div class="panel-row"><div class="league-matchups">
+${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchup-header"><div class="matchup-row">${side(a)}<div class="vs-label"><div class="label">VS</div></div>${side(b, true)}</div></div></div>`).join('')}
+</div><div class="league-tab-standings">Standings</div></div></div>
+<script>
+  window.__nflOpened = [];
+  const league = { rosters: [1, 2, 3, 4].map((r) => ({ roster_id: r, owner_id: 'u' + r })), userId: 'u1' };
+  const pairs = ${JSON.stringify(pairs.map(([a, b]) => [a.r, b.r]))};
+  document.querySelectorAll('.league-matchup-row-item').forEach((row, i) => {
+    row.__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: { rosterId1: pairs[i][0], rosterId2: pairs[i][1] }, return: { memoizedProps: league } } };
+    const header = row.querySelector('.matchup-header');
+    const open = () => window.__nflOpened.push(i);
+    header.__reactInternalInstance$test = { memoizedProps: { onClick: open } };
+    header.addEventListener('click', open);
+  });
+</script>`;
+};
+
 const nflTeamTab = () => `<!doctype html><title>Sleeper</title>
 <style>
   body { margin: 0; background: rgb(16, 33, 49); font-family: Lato, Arial, sans-serif; color: #fff; }
@@ -2064,6 +2100,41 @@ test('players tab: a team picker beside the search, and rostered players show th
   await picker.locator('.snp-team-menu button', { hasText: 'All teams' }).click();
   await page.waitForFunction(() => document.querySelectorAll('.player-list-item').length === 4);
   await forgetPlayersView();
+  documentBody = LOGGED_OUT;
+});
+
+test('NFL league tab: the week\'s matchups as the NBA League tab draws them, with Sleeper\'s own live numbers', async () => {
+  documentBody = nflLeagueTab();
+  await page.goto(NFL_LEAGUE_URL);
+  const cards = page.locator('#sleeper-nfl-league .lg-match');
+  await cards.first().waitFor({ timeout: 30000 });
+  assert.equal(await cards.count(), 2);
+  assert.equal(await page.locator('.league-matchup-row-item').first().isVisible(), false, 'Sleeper\'s own cards stay, hidden');
+  assert.equal(await page.locator('.league-tab-standings').isVisible(), true, 'the rest of the tab stays');
+  // Yours first, framed; each side as Sleeper shows it: owner, team, score, win chance and bar, record, projection.
+  const first = cards.first();
+  assert.match(await first.getAttribute('class'), /\bown\b/);
+  assert.match(await first.innerText(), /^@louhow\s+Lou Point Conversion\s+19\.40\s+90% WIN\s+8-4\s+122\.23\s+VS\s+@kalviar\s+Tank you, Jeremiah\s+6\.60\s+10% WIN\s+3-9\s+71\.77$/);
+  assert.equal(await first.locator('.mu-team.mine .mu-bar span').evaluate((el) => el.style.width), '90%');
+  // Sleeper's avatar; one the CDN doesn't have (as here) draws as the plain circle, never a broken image.
+  await page.waitForFunction(() => !document.querySelector('#sleeper-nfl-league').shadowRoot.querySelector('img.avatar'));
+  assert.equal(await first.locator('div.avatar').count(), 2);
+  const read = await page.evaluate(() => {
+    let out = null;
+    const take = (e) => { out = JSON.parse(e.detail); };
+    document.addEventListener('snp:nfl-league', take);
+    document.dispatchEvent(new CustomEvent('snp:nfl-league-request'));
+    document.removeEventListener('snp:nfl-league', take);
+    return out.cards[1].sides.map((t) => t.avatar);
+  });
+  assert.deepEqual(read, ['https://sleepercdn.com/avatars/thumbs/a1', 'https://sleepercdn.com/avatars/thumbs/a2'], 'read off Sleeper\'s card');
+  await page.screenshot({ path: `${OUT}nfl-league.png` });
+  // Sleeper's numbers move during games; ours follow.
+  await page.evaluate(() => { document.querySelectorAll('.league-matchup-row-item')[1].querySelector('.score').textContent = '25.90'; });
+  await first.locator('.mu-team.mine .mu-pts').filter({ hasText: '25.90' }).waitFor();
+  // A card opens that matchup the way Sleeper's own card does.
+  await cards.nth(1).click();
+  assert.deepEqual(await page.evaluate(() => window.__nflOpened), [0], 'the other matchup is Sleeper\'s first card');
   documentBody = LOGGED_OUT;
 });
 

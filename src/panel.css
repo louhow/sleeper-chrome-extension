@@ -1130,6 +1130,10 @@ span.team-link:hover {
 .app.league {
   padding: 0 24px;
 }
+/* NFL: inside Sleeper's own (already padded) matchups list. */
+.app.league.nfl-league {
+  padding: 0;
+}
 .lg-head {
   display: flex;
   align-items: center;

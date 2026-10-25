@@ -23,6 +23,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 
 **NFL**
 - Optimize lineup button on Sleeper's own Team tab, slot by slot like the NBA one; apply one row or all of them.
+- League tab matchups drawn like the NBA ones, with Sleeper's own live numbers.
 
 **Premier League (EPL)**
 - Match, Team, Players and League tabs in place of Sleeper's "not supported on web yet" page.

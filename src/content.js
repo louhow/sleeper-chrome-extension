@@ -1607,9 +1607,87 @@
       save(f.m, f.l, starters, `Saved: ${movedText(f.l, f.next.plan.changes.filter((c) => ids.has(c.id)))}`, `row:${i}`, true);
     }
 
+    // League tab: the extension's matchup cards over Sleeper's (hidden, still
+    // updating; read again whenever they change).
+    const leagueHost = document.createElement('div');
+    leagueHost.id = 'sleeper-nfl-league';
+    leagueHost.className = 'on-league';
+    const leagueShadow = leagueHost.attachShadow({ mode: 'open' });
+    leagueShadow.innerHTML = '<style></style><div class="root"></div>';
+    const leagueRoot = leagueShadow.querySelector('.root');
+    stylesheet.then((css) => {
+      leagueShadow.querySelector('style').textContent = css;
+    });
+    const hideRows = Object.assign(document.createElement('style'), {
+      textContent: '.league-matchups.snp-nfl-ours > .league-matchup-row-item { display: none !important; }',
+    });
+    let leagueFrame = 0;
+    const leagueWatch = new MutationObserver(() => {
+      leagueFrame ||= requestAnimationFrame(() => {
+        leagueFrame = 0;
+        renderLeague();
+      });
+    });
+    let watchedList = null;
+    function leagueCards() {
+      let cards = [];
+      const take = (e) => {
+        cards = JSON.parse(e.detail).cards;
+      };
+      document.addEventListener('snp:nfl-league', take);
+      document.dispatchEvent(new CustomEvent('snp:nfl-league-request'));
+      document.removeEventListener('snp:nfl-league', take);
+      return cards;
+    }
+    function renderLeague() {
+      if (destroyed) return;
+      const html = nfl.league(leagueCards(), failedAvatars);
+      if (leagueRoot.innerHTML !== html) leagueRoot.innerHTML = html;
+    }
+    function attachLeague() {
+      const list = state.page === 'league' ? document.querySelector('.league-matchups') : null;
+      if (!list) {
+        leagueHost.remove();
+        watchedList?.classList.remove('snp-nfl-ours');
+        leagueWatch.disconnect();
+        watchedList = null;
+        return;
+      }
+      if (!hideRows.isConnected) (document.head || document.documentElement).append(hideRows);
+      if (watchedList !== list) {
+        watchedList?.classList.remove('snp-nfl-ours');
+        leagueWatch.disconnect();
+        watchedList = list;
+        leagueWatch.observe(list, { childList: true, subtree: true, characterData: true, attributes: true });
+      }
+      renderLeague();
+      // Only once ours has cards, so Sleeper's never vanish for nothing.
+      const ready = Boolean(leagueRoot.querySelector('.lg-match'));
+      list.classList.toggle('snp-nfl-ours', ready);
+      if (ready && list.firstElementChild !== leagueHost) list.prepend(leagueHost);
+    }
+    leagueRoot.addEventListener('click', (e) => {
+      const card = e.target.closest('[data-nfl-matchup]');
+      if (card) document.dispatchEvent(new CustomEvent('snp:nfl-league-open', { detail: JSON.stringify({ index: Number(card.dataset.nflMatchup) }) }));
+    });
+    // Avatars the CDN doesn't have draw as the plain circle from then on (image errors don't bubble).
+    const failedAvatars = new Set();
+    leagueRoot.addEventListener('error', (e) => {
+      if (e.target.tagName !== 'IMG' || failedAvatars.has(e.target.src)) return;
+      failedAvatars.add(e.target.src);
+      renderLeague();
+    }, true);
+    leagueRoot.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest?.('[data-nfl-matchup]')) {
+        e.preventDefault();
+        e.target.closest('[data-nfl-matchup]').click();
+      }
+    });
+
     // Sleeper re-renders its header now and then, so this runs on every page change.
     function attach() {
       if (destroyed) return;
+      attachLeague();
       const actions = state.page === 'team' ? document.querySelector('.user-tab-menu .actions') : null;
       const button = document.getElementById(BUTTON_ID);
       if (!actions || !lineup(false)?.editable) return button?.remove();
@@ -1657,6 +1735,10 @@
 
     function destroy() {
       destroyed = true;
+      leagueWatch.disconnect();
+      leagueHost.remove();
+      hideRows.remove();
+      watchedList?.classList.remove('snp-nfl-ours');
       document.removeEventListener('click', onClick);
       document.removeEventListener('keydown', onKey);
       document.getElementById(BUTTON_ID)?.remove();

@@ -137,10 +137,46 @@
     </span>`;
   }
 
+  // League tab: the week's matchups as the NBA League tab draws them, with
+  // Sleeper's own numbers (read from its cards, which stay hidden). Yours first.
+  // `failed`: avatar URLs that didn't load, drawn as the plain circle.
+  function league(cards, failed = new Set()) {
+    if (!cards.length) return '';
+    const order = cards.map((c, i) => ({ ...c, i })).sort((a, b) => b.own - a.own || a.i - b.i);
+    return `<div class="app league nfl-league"><div class="lg-list">${order.map((c) => {
+      const [a, b] = c.sides;
+      const label = `Open ${a?.team || 'matchup'}${b ? ` vs ${b.team}` : ''}`;
+      return `<div class="lg-match mu-head${c.own ? ' own' : ''}" role="button" tabindex="0" data-nfl-matchup="${c.i}" aria-label="${esc(label)}">
+        ${a ? side(a, 'mine', failed) : ''}
+        <span class="vs">VS</span>
+        ${b ? side(b, 'theirs', failed) : '<div class="mu-team theirs bye"><span class="sub">No opponent this week</span></div>'}
+      </div>`;
+    }).join('')}</div></div>`;
+  }
+
+  function side(t, cls, failed) {
+    const pct = parseFloat(t.win);
+    const trend = Number.isNaN(pct) ? '' : pct >= 50 ? 'up' : 'down';
+    return `<div class="mu-team ${cls}">
+      ${t.avatar && !failed.has(t.avatar) ? `<img class="avatar" src="${esc(t.avatar)}" alt="">` : '<div class="avatar"></div>'}
+      <div class="mu-who">
+        <div class="sub">@${esc(t.owner || 'unknown')}</div>
+        <div class="team-name">${esc(t.team)}</div>
+      </div>
+      <div class="mu-pts">${esc(t.score || '–')}</div>
+      <div class="mu-bar"><span class="${trend}" style="width:${Math.max(0, Math.min(100, t.bar))}%"></span></div>
+      <div class="mu-meta">
+        ${t.win ? `<b class="${trend}">${esc(t.win)} WIN</b>` : ''}
+        <span>${esc(t.record)}</span>
+        <span class="proj">${esc(t.proj)}</span>
+      </div>
+    </div>`;
+  }
+
   // The OPTIMIZE button, built from the classes of Sleeper's own WAIVER and TRADE buttons so it matches them.
   const BUTTON = `<div class="btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M7 4v16"/><path d="M3 8l4-4 4 4"/><path d="M17 20V4"/><path d="M13 16l4 4 4-4"/>
     </svg></div><div class="btn-text">OPTIMIZE</div>`;
 
-  return { render, slotBadge, BUTTON, HOW };
+  return { render, league, slotBadge, BUTTON, HOW };
 })();

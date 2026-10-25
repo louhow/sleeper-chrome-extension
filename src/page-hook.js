@@ -1027,6 +1027,43 @@
   });
 
   // Saves a lineup through Sleeper's own actions, so its screen updates as if you'd made the swaps.
+  // NFL League tab: Sleeper's own matchup cards, read as they show (so the
+  // extension's cards carry Sleeper's exact live numbers), and which is yours.
+  // Sleeper keeps drawing (and updating) them; the extension hides them and
+  // shows its own, and a click on one of ours clicks Sleeper's.
+  const NFL_ROW = '.league-matchups .league-matchup-row-item';
+  const text = (el, sel) => el?.querySelector(sel)?.textContent.trim() ?? '';
+  document.addEventListener('snp:nfl-league-request', () => {
+    const rows = [...document.querySelectorAll(NFL_ROW)];
+    const league = rows[0] && props(rows[0], (x) => Array.isArray(x.rosters) && 'userId' in x);
+    const mine = league?.rosters.find((r) => r.owner_id === league.userId || (r.co_owners || []).includes(league.userId))?.roster_id;
+    const cards = rows.map((row) => {
+      const ids = props(row, (x) => 'rosterId1' in x && 'rosterId2' in x) || props(row, (x) => 'rosterId1' in x) || {};
+      const sides = [...row.querySelectorAll('.matchup-row > .user')].map((user) => {
+        const avatar = user.querySelector('.avatar');
+        const image = avatar && getComputedStyle(avatar).backgroundImage.match(/^url\("?(.*?)"?\)$/)?.[1];
+        return {
+          avatar: image || null,
+          owner: text(user, '.meta .team-name').replace(/^@/, ''),
+          team: text(user, '.meta .name'),
+          score: text(user, '.score'),
+          win: text(user, '.win-percentage-number'),
+          record: text(user, '.description'),
+          proj: text(user, '.projections'),
+          bar: parseFloat(user.querySelector('.win-bar > div')?.style.width) || 0,
+        };
+      });
+      return { own: mine != null && (ids.rosterId1 === mine || ids.rosterId2 === mine), sides };
+    });
+    send('snp:nfl-league', { cards });
+  });
+  document.addEventListener('snp:nfl-league-open', (e) => {
+    const row = document.querySelectorAll(NFL_ROW)[JSON.parse(e.detail).index];
+    // Sleeper's click handler sits on an element inside the card.
+    const target = row && [row, ...row.querySelectorAll('*')].find((el) => typeof props(el, () => true)?.onClick === 'function');
+    target?.click();
+  });
+
   document.addEventListener('snp:nfl-lineup-save', async (e) => {
     const { leagueId, rosterId, round, starters } = JSON.parse(e.detail);
     try {
