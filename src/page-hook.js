@@ -27,9 +27,51 @@
 
   const props = (el, match) => fiber(el, match)?.memoizedProps ?? null;
 
-  function send(type, detail) {
-    document.dispatchEvent(new CustomEvent(type, { detail: JSON.stringify(detail) }));
-  }
+  // The page's half of its messages with the extension, the same protocol as
+  // src/bridge.js has (that's where it's written down): CustomEvents on
+  // `document` with JSON in `detail`. ask(name, detail) sends `<name>-request`
+  // and gets the reply the extension sends back before dispatchEvent returns;
+  // answer(name, fn) replies there and then; answerLater(name, fn) replies when
+  // fn's Promise settles, echoing the request's `id`; tell and on are one-way.
+  const bridge = (() => {
+    const tell = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail: detail === undefined ? null : JSON.stringify(detail) }));
+    function on(name, fn) {
+      const listener = (e) => fn(e.detail == null ? null : JSON.parse(e.detail));
+      document.addEventListener(name, listener);
+      return () => document.removeEventListener(name, listener);
+    }
+    function ask(name, detail) {
+      let reply = null;
+      const off = on(name, (x) => {
+        reply = x;
+      });
+      tell(`${name}-request`, detail);
+      off();
+      return reply;
+    }
+    const answer = (name, fn) => on(`${name}-request`, (detail) => tell(name, fn(detail)));
+    const answerLater = (name, fn) => on(`${name}-request`, async (detail) => tell(name, { ...(await fn(detail)), id: detail?.id ?? null }));
+    return { tell, on, ask, answer, answerLater };
+  })();
+
+  // The page's storage, which can be switched off: reads give null and writes
+  // do nothing then (leagues open where Sleeper sends them, views aren't remembered).
+  const safeStore = {
+    get(key) {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    },
+    set(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        // Storage off.
+      }
+    },
+  };
 
   addEventListener('click', (e) => {
     const league = document.documentElement.dataset.snpNbaLeague;
@@ -45,9 +87,9 @@
     e.stopImmediatePropagation();
     if (action) {
       const status = p.waiverStatus?.status || (action.classList.contains('waiver') ? 'waiver' : 'free_agent');
-      send('snp:player-action', { playerId: String(p.playerId), status, clearTime: p.waiverStatus?.clearTime ?? null });
+      bridge.tell('snp:player-action', { playerId: String(p.playerId), status });
     } else {
-      send('snp:player-card', { playerId: String(p.playerId || p.player.player_id) });
+      bridge.tell('snp:player-card', { playerId: String(p.playerId || p.player.player_id) });
     }
   }, true);
 
@@ -59,17 +101,12 @@
   const LEAGUE_PAGE = /^\/leagues\/(\d+)\/([a-z]+)(?:\/|$)/;
   const pageKey = (id) => `snp:league-page:${id}`;
   let seenPath = '';
-  setInterval(() => {
+  function rememberPage() {
     if (location.pathname === seenPath) return;
     seenPath = location.pathname;
     const [, id, page] = seenPath.match(LEAGUE_PAGE) ?? [];
-    if (!id) return;
-    try {
-      localStorage.setItem(pageKey(id), page);
-    } catch {
-      // Storage off: leagues open where Sleeper sends them.
-    }
-  }, 500);
+    if (id) safeStore.set(pageKey(id), page);
+  }
   addEventListener('click', (e) => {
     if (!(e.target instanceof Element)) return;
     const link = e.target.closest(NAV_LEAGUE);
@@ -77,12 +114,7 @@
     const nav = item && props(link, (x) => x.router?.push);
     if (!item || !nav) return;
     const id = item.league.league_id;
-    let page = null;
-    try {
-      page = localStorage.getItem(pageKey(id));
-    } catch {
-      page = null;
-    }
+    let page = safeStore.get(pageKey(id));
     if (!page && item.league.sport === 'nba' && /^\/leagues\/\d+\/matchup(\/|$)/.test(location.pathname)) page = 'matchup';
     if (!page || location.pathname.startsWith(`/leagues/${id}/${page}`)) return;
     e.preventDefault();
@@ -131,88 +163,50 @@
   const RECENT_KEY = 'Last 5';
   let weekPick = 'avg';
   let shooting = false;
-  const schedules = {}; // `${season}|${week}` -> { days, teams: { [team]: day states }, teamOf: { [player id]: team } }
-  const pickedGames = {}; // `${season}|${week}|${mode}` -> { [player id]: that game's stats, or (played) games played }
-  // { leagueId, enabled, changed } from the extension; it does the scoring itself.
+  // The league whose Players tab the extension has data for ('snp:players-ready', NBA or NFL).
+  let readyLeague = null;
+  // { leagueId, enabled, changed } from the extension (NBA); it does the scoring itself.
   // Not enabled (no ?snp-admin=1), the columns stay out.
   let admin = null;
   let adminVersion = 0;
   let tints = {};
   let places = {}; // player id -> [FPTS place, adminFPTS place] in the list on screen
 
-  document.addEventListener('snp:admin-scoring', (e) => {
-    admin = JSON.parse(e.detail);
+  bridge.on('snp:players-ready', ({ leagueId }) => {
+    readyLeague = leagueId;
+    patchPlayers();
+  });
+  bridge.on('snp:admin-scoring', (x) => {
+    admin = x;
     adminVersion++;
     patchPlayers();
   });
+  // A week the extension was loading is in.
+  bridge.on('snp:week-games-ready', () => patchPlayers());
 
-  // From the extension, which answers before dispatchEvent returns: per player,
-  // the points the changed settings add, and for the players in view, their rank shift and its color.
-  function adminScores(stats, view, base) {
-    let out = { points: {}, shifts: {}, tints: {}, places: {} };
-    const take = (e) => {
-      out = JSON.parse(e.detail);
-    };
-    document.addEventListener('snp:admin-scores', take);
-    send('snp:admin-score-request', { stats, view, base });
-    document.removeEventListener('snp:admin-scores', take);
-    return out;
-  }
-
-  // Each player's best or worst game of a week, or games played, from the
-  // extension (which answers before dispatchEvent returns). Null while the week
-  // loads; the extension sends 'snp:week-games-ready' once it has.
-  function weekGames(season, week, mode) {
-    const key = `${season}|${week}|${mode}`;
-    if (pickedGames[key]) return pickedGames[key];
-    let games = null;
-    const take = (e) => {
-      games = JSON.parse(e.detail);
-    };
-    document.addEventListener('snp:week-games', take);
-    send('snp:week-games-request', { season, week, mode });
-    document.removeEventListener('snp:week-games', take);
-    if (games) pickedGames[key] = games;
-    return games;
-  }
-  document.addEventListener('snp:week-games-ready', () => patchPlayers());
-
-  // A week's schedule from the extension, as weekGames. Kept for a minute, as
-  // games finish while the page is open.
-  function weekSchedule(season, week) {
-    const key = `${season}|${week}`;
-    const hit = schedules[key];
-    if (hit && Date.now() - hit.at < 60e3) return hit.value;
-    let value = null;
-    const take = (e) => {
-      value = JSON.parse(e.detail);
-    };
-    document.addEventListener('snp:week-schedule', take);
-    send('snp:week-schedule-request', { season, week });
-    document.removeEventListener('snp:week-schedule', take);
-    // Not kept until the points are in, so they show as soon as they load.
-    if (value?.pointsReady) schedules[key] = { at: Date.now(), value };
+  // Asks the extension (see bridge), keeping a reply that `isDone` for `ttl`;
+  // until one is, the last kept reply stands in. Null while the data loads.
+  const asked = {};
+  function cachedAsk(name, detail, isDone, ttl) {
+    const key = `${name}|${JSON.stringify(detail)}`;
+    const hit = asked[key];
+    if (hit && Date.now() - hit.at < ttl) return hit.value;
+    const value = bridge.ask(name, detail);
+    if (value && isDone(value)) asked[key] = { at: Date.now(), value };
     return value ?? hit?.value ?? null;
   }
 
-  // NFL: each player's scores over the last five weeks played, from the
-  // extension, as weekGames. Kept for a minute while a week is on (the
-  // extension keeps finished weeks), and not until it's all in.
-  const recents = {};
-  function recentWeeks(season, week) {
-    const key = `${season}|${week}`;
-    const hit = recents[key];
-    if (hit && Date.now() - hit.at < 60e3) return hit.value;
-    let value = null;
-    const take = (e) => {
-      value = JSON.parse(e.detail);
-    };
-    document.addEventListener('snp:recent-weeks', take);
-    send('snp:recent-weeks-request', { season, week });
-    document.removeEventListener('snp:recent-weeks', take);
-    if (value?.ready) recents[key] = { at: Date.now(), value };
-    return value ?? hit?.value ?? null;
-  }
+  // Per player, the points the changed settings add, and for the players in
+  // view, their rank shift, its color and both places.
+  const adminScores = (stats, view, base) => bridge.ask('snp:admin-scores', { stats, view, base }) || { points: {}, shifts: {}, tints: {}, places: {} };
+  // Each player's best or worst game of a week, or games played; kept for the page.
+  const weekGames = (season, week, mode) => cachedAsk('snp:week-games', { season, week, mode }, () => true, Infinity);
+  // A week's schedule, kept for a minute as games finish while the page is
+  // open, and not until the points are in, so they show as soon as they load.
+  const weekSchedule = (season, week) => cachedAsk('snp:week-schedule', { season, week }, (x) => x.pointsReady, 60e3);
+  // NFL: each player's scores over the last five weeks played. Kept for a
+  // minute while a week is on (the extension keeps finished weeks), and not until it's all in.
+  const recentWeeks = (season, week) => cachedAsk('snp:recent-weeks', { season, week }, (x) => x.ready, 60e3);
 
   // What you last had on (Projection or Stats, the season and week, Avg / Best
   // / Worst, Shooting), per league, in the page's storage. A week that was the
@@ -220,7 +214,7 @@
   const viewKey = (leagueId) => `snp:players-view:${leagueId}`;
   function savedView(leagueId) {
     try {
-      return JSON.parse(localStorage.getItem(viewKey(leagueId))) || null;
+      return JSON.parse(safeStore.get(viewKey(leagueId))) || null;
     } catch {
       return null;
     }
@@ -236,11 +230,7 @@
     const text = JSON.stringify(view);
     if (panel.snpSaved === text) return;
     panel.snpSaved = text;
-    try {
-      localStorage.setItem(viewKey(leagueId), text);
-    } catch {
-      // Storage off: the view just isn't remembered.
-    }
+    safeStore.set(viewKey(leagueId), text);
   }
 
   // Sleeper's table, on a league the extension has loaded (NBA or NFL).
@@ -248,7 +238,7 @@
     const league = document.documentElement.dataset.snpPlayersLeague;
     const el = document.querySelector(PLAYERS_PANEL);
     const panel = el && fiber(el, (x) => x.scoringSettings && (x.sport === 'nba' || x.sport === 'nfl') && 'leagueId' in x)?.stateNode;
-    const ours = Boolean(panel?.state && admin && league && admin.leagueId === league && String(panel.props.leagueId) === league);
+    const ours = Boolean(panel?.state && league && readyLeague === league && String(panel.props.leagueId) === league);
     return ours ? panel : null;
   }
 
@@ -318,7 +308,7 @@
     const panel = playersPanel();
     // NFL gets the team picker, team lines and the Last 5 column; the rest is NBA's.
     const nfl = panel?.props.sport === 'nfl';
-    const adminOn = Boolean(panel && admin.enabled && !nfl);
+    const adminOn = Boolean(panel && admin?.enabled && admin.leagueId === readyLeague && !nfl);
     document.documentElement.toggleAttribute('data-snp-admin-changed', Boolean(adminOn && admin.changed));
     document.documentElement.toggleAttribute('data-snp-admin-col', Boolean(panel?.state.statKeys?.includes(ADMIN_KEY)));
     sizeColumns(panel);
@@ -369,34 +359,7 @@
     const key = [mode, loaded, gpOn, left, recent?.sig ?? '', adminOn ? adminVersion : 'off', [...view].sort().join(',')].join('|');
     const update = {};
     if (source && (panel.snpSourceSeen !== source || panel.snpKey !== key)) {
-      // That game alone, as one game played, so Sleeper's per-game numbers are its own.
-      let stats = picked ? Object.fromEntries(Object.entries(source).map(([id, s]) =>
-        [id, picked[id] ? { ...picked[id], fpts_proj: s?.fpts_proj, [GAME]: 1 } : s])) : source;
-      // GP shows "-" until the week's games load.
-      if (gpOn) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
-        [id, s && played ? { ...s, [GP_KEY]: played[id] ?? 0 } : s]));
-      // Points per game over the last five weeks, to sort by.
-      if (recent) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
-        [id, s ? { ...s, [RECENT_KEY]: recent.avg[id] ?? 0 } : s]));
-      // Games still to play this week, to sort by.
-      if (schedule) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
-        [id, s ? { ...s, [WEEK_KEY]: (schedule.teams[schedule.teamOf[id]] || []).filter((d) => d === 'left').length } : s]));
-      if (adminOn) {
-        const scores = admin.changed ? adminScores(stats, view, base) : { points: {}, shifts: {}, tints: {}, places: {} };
-        const inView = new Set(view);
-        // New objects per player, so Sleeper's rows see the change and re-render.
-        stats = Object.fromEntries(Object.entries(stats).map(([id, s]) => {
-          if (s?.[base] == null) return [id, s];
-          // Per game, so it sorts by the number on screen: Sleeper shows every stat
-          // per game (a season's stats are totals) but sorts on the stored value.
-          const games = s.gp > 0 ? s.gp : 1;
-          const out = { ...s, [ADMIN_KEY]: (s[base] + (scores.points[id] ?? 0)) / games };
-          if (inView.has(id)) out[DELTA_KEY] = DELTA_OFFSET + (scores.shifts[id] ?? 0);
-          return [id, out];
-        }));
-        tints = scores.tints;
-        places = scores.places;
-      }
+      const stats = buildStatsMap(source, { picked, played: gpOn && played, recent, schedule, adminOn, view, base });
       if (stats !== map) update.playerStatsMap = stats;
       panel.snpSourceSeen = source;
       panel.snpKey = key;
@@ -417,26 +380,73 @@
     watchRows();
     decorateRows();
     alignSections(panel);
-    // Shown once it's all in: the view restored and loaded, our columns on and
-    // sized, and the week's data the columns need.
-    const settled = !panel.state.loading && !panel.snpWant && Boolean(keys) && keys.join() === (panel.state.statKeys || []).join() &&
+    if (isSettled(panel, keys, { shownWeek, nfl, schedule, gpOn, played, mode, picked, recent })) reveal();
+  }
+
+  // The stats map Sleeper renders, from its own (`source`), in one pass: a
+  // picked game (Best or Worst) in place of the week, as one game played, so
+  // Sleeper's per-game numbers are its own; GP (games played, once the week's
+  // games load: until then it shows "-"); Last 5's points per game and the week's games still
+  // to play, to sort by; and adminFPTS and adminDelta. New objects per player,
+  // so Sleeper's rows see the change and re-render.
+  function buildStatsMap(source, { picked, played, recent, schedule, adminOn, view, base }) {
+    if (!picked && !played && !recent && !schedule && !adminOn) return source;
+    const out = Object.fromEntries(Object.entries(source).map(([id, s0]) => {
+      const s = picked?.[id] ? { ...picked[id], fpts_proj: s0?.fpts_proj, [GAME]: 1 } : s0 && { ...s0 };
+      if (!s) return [id, s];
+      if (played) s[GP_KEY] = played[id] ?? 0;
+      if (recent) s[RECENT_KEY] = recent.avg[id] ?? 0;
+      if (schedule) s[WEEK_KEY] = (schedule.teams[schedule.teamOf[id]] || []).filter((d) => d === 'left').length;
+      return [id, s];
+    }));
+    if (!adminOn) return out;
+    // Scored on the numbers shown (a picked game's, say).
+    const scores = admin.changed ? adminScores(out, view, base) : null;
+    const inView = new Set(view);
+    for (const [id, s] of Object.entries(out)) {
+      if (s?.[base] == null) continue;
+      // Per game, so it sorts by the number on screen: Sleeper shows every stat
+      // per game (a season's stats are totals) but sorts on the stored value.
+      s[ADMIN_KEY] = (s[base] + (scores?.points[id] ?? 0)) / (s.gp > 0 ? s.gp : 1);
+      if (inView.has(id)) s[DELTA_KEY] = DELTA_OFFSET + (scores?.shifts[id] ?? 0);
+    }
+    tints = scores?.tints || {};
+    places = scores?.places || {};
+    return out;
+  }
+
+  // Whether the table can show: the view restored and loaded, our columns on
+  // and sized, and the week's data the columns need.
+  function isSettled(panel, keys, { shownWeek, nfl, schedule, gpOn, played, mode, picked, recent }) {
+    return !panel.state.loading && !panel.snpWant && Boolean(keys) && keys.join() === (panel.state.statKeys || []).join() &&
       (!shownWeek || nfl || schedule) && (!gpOn || played) && (mode === 'avg' || picked) && (!nfl || recent?.ready);
-    if (settled) reveal();
+  }
+
+  // A control of ours in Sleeper's table (`cls`), kept in `parent`: made with
+  // `create` the first time, and again if React re-rendering `parent` dropped
+  // it; `place` puts it there (default: at the end) and `placed` says whether
+  // it still is. Without a parent, it's removed. Returns it, or null.
+  function ensureControl(parent, cls, create, { place = (el) => parent.append(el), placed = (el) => el.parentElement === parent } = {}) {
+    let el = document.querySelector(`${PLAYERS_PANEL} .${cls}`);
+    if (!parent) {
+      el?.remove();
+      return null;
+    }
+    if (!el || !placed(el)) {
+      el?.remove();
+      el = create();
+      el.classList.add(cls);
+      place(el);
+    }
+    return el;
   }
 
   // The Avg / Best / Worst switch, in the empty corner of the table's header
   // above the player names, while a week is picked in Stats.
   function weekSwitch(week) {
-    const header = document.querySelector(`${PLAYERS_PANEL} .table-header`);
-    let el = document.querySelector(`${PLAYERS_PANEL} .snp-week-pick`);
-    if (!week || !header) {
-      el?.remove();
-      return;
-    }
-    if (!el || el.parentElement !== header) {
-      el?.remove();
-      el = document.createElement('div');
-      el.className = 'snp-week-pick';
+    const header = week ? document.querySelector(`${PLAYERS_PANEL} .table-header`) : null;
+    const el = ensureControl(header, 'snp-week-pick', () => {
+      const el = document.createElement('div');
       el.setAttribute('role', 'radiogroup');
       el.setAttribute('aria-label', 'Week stats');
       el.innerHTML = PICKS.map(([mode, label, title]) =>
@@ -448,8 +458,9 @@
         weekPick = button.dataset.snpPick;
         patchPlayers();
       });
-      header.append(el);
-    }
+      return el;
+    });
+    if (!el) return;
     centerOnLabels(header, el);
     for (const button of el.children) {
       const on = button.dataset.snpPick === weekPick;
@@ -490,9 +501,8 @@
   function teamPicker(panel) {
     const top = document.querySelector(`${PLAYERS_PANEL} .header-top`);
     const search = top?.querySelector(':scope > .player-search-wrapper');
-    let el = document.querySelector(`${PLAYERS_PANEL} .snp-team-pick`);
     if (!search) {
-      el?.remove();
+      ensureControl(null, 'snp-team-pick');
       return;
     }
     // Ticking Free agents hides every rostered player: the team pick goes with it.
@@ -503,10 +513,8 @@
     const teams = leagueTeams(panel);
     const picked = pickedTeam(panel);
     const sig = `${picked}|${teams.map((t) => t.id).join()}`;
-    if (!el || el.previousElementSibling !== search) {
-      el?.remove();
-      el = document.createElement('div');
-      el.className = 'snp-team-pick';
+    const el = ensureControl(top, 'snp-team-pick', () => {
+      const el = document.createElement('div');
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const item = e.target.closest('[data-snp-team]');
@@ -523,8 +531,8 @@
       el.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') el.classList.remove('open');
       });
-      search.after(el);
-    }
+      return el;
+    }, { place: (el) => search.after(el), placed: (el) => el.previousElementSibling === search });
     if (el.dataset.sig === sig) return;
     el.dataset.sig = sig;
     const current = teams.find((t) => t.id === picked);
@@ -580,25 +588,19 @@
   // shows the shot-volume columns there (it doesn't take room in Sleeper's
   // filter row, which would wrap).
   function shotToggle(on) {
-    const header = document.querySelector(`${PLAYERS_PANEL} .table-header`);
-    let el = document.querySelector(`${PLAYERS_PANEL} .snp-shot-toggle`);
-    document.documentElement.toggleAttribute('data-snp-shot-toggle', Boolean(on && header));
-    if (!on || !header) {
-      el?.remove();
-      return;
-    }
-    if (!el || el.parentElement !== header) {
-      el?.remove();
-      el = document.createElement('button');
+    const header = on ? document.querySelector(`${PLAYERS_PANEL} .table-header`) : null;
+    document.documentElement.toggleAttribute('data-snp-shot-toggle', Boolean(header));
+    const el = ensureControl(header, 'snp-shot-toggle', () => {
+      const el = document.createElement('button');
       el.type = 'button';
-      el.className = 'snp-shot-toggle';
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         shooting = !shooting;
         patchPlayers();
       });
-      header.append(el);
-    }
+      return el;
+    });
+    if (!el) return;
     const text = shooting ? '−' : '+';
     if (el.textContent !== text) el.textContent = text;
     const title = `${shooting ? 'Hide' : 'Show'} shooting: FGM, FGA, 3PA, FTM, FTA (they don't score, but show who shoots)`;
@@ -625,14 +627,8 @@
   // tab); hovering a mark says the game and its score or tip-off.
   function weekStrip(cell, schedule, team, id) {
     const states = schedule?.teams[team];
-    if (!cell.hasAttribute('data-snp-cell')) cell.setAttribute('data-snp-cell', '');
     cell.querySelector(':scope > .snp-value')?.remove();
-    let el = cell.querySelector(':scope > .snp-week');
-    if (!el) {
-      el = document.createElement('span');
-      el.className = 'snp-week';
-      cell.append(el);
-    }
+    const el = overlay(cell, 'snp-week');
     const games = schedule?.games?.[team] || [];
     const scores = schedule?.points?.[id] || {};
     const sig = states ? `${team}|${states.join()}|${JSON.stringify(games.map((g) => g && scores[g.id]))}` : '';
@@ -668,14 +664,8 @@
   // when they didn't play), faint for a bye, red for a game on now, light gray
   // for one still to come. Hovering one says the week, opponent and score.
   function recentStrip(cell, recent, id, panel) {
-    if (!cell.hasAttribute('data-snp-cell')) cell.setAttribute('data-snp-cell', '');
     cell.querySelector(':scope > .snp-value')?.remove();
-    let el = cell.querySelector(':scope > .snp-week');
-    if (!el) {
-      el = document.createElement('span');
-      el.className = 'snp-week snp-recent';
-      cell.append(el);
-    }
+    const el = overlay(cell, 'snp-week', 'snp-week snp-recent');
     const team = listPlayers().find((p) => String(p.player_id) === id)?.team || recent?.teamOf?.[id] || null;
     const scores = recent?.points[id] || {};
     const sig = recent ? `${recent.sig}|${team}|${JSON.stringify(scores)}` : '';
@@ -737,13 +727,14 @@
     else if (tip?.style.display === 'block') tip.style.display = 'none';
   });
 
-  // A span of ours over a cell whose own text (Sleeper's, hidden) can't say what we mean.
-  function overlay(cell, cls) {
+  // A span of ours over a cell whose own text (Sleeper's, hidden) can't say
+  // what we mean: the cell's `.<cls>`, made with `className` the first time.
+  function overlay(cell, cls, className = cls) {
     if (!cell.hasAttribute('data-snp-cell')) cell.setAttribute('data-snp-cell', '');
     let el = cell.querySelector(`:scope > .${cls}`);
     if (!el) {
       el = document.createElement('span');
-      el.className = cls;
+      el.className = className;
       cell.append(el);
     }
     return el;
@@ -822,7 +813,7 @@
       const badge = overlay(cell, 'snp-delta');
       if (badge.textContent !== text) badge.textContent = text;
       const [was, now] = places[id] || [];
-      const where = was && admin.changed ? `#${was}→#${now}` : '';
+      const where = was && admin?.changed ? `#${was}→#${now}` : '';
       const line = overlay(cell, 'snp-places');
       if (line.textContent !== where) {
         line.textContent = where;
@@ -904,7 +895,10 @@
   addEventListener('popstate', routeChanged);
   routeChanged();
 
+  // One poll for what Sleeper changes without telling: the path (for the tab
+  // to reopen a league on) and the Players table.
   setInterval(() => {
+    rememberPage();
     checkPending();
     if (document.documentElement.dataset.snpPlayersLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
   }, 500);
@@ -1126,8 +1120,9 @@
     const el = document.querySelector(TEAM);
     return el && fiber(el, (x) => x.updateMatchupLeg && x.playersMap && x.league);
   };
-  // Sleeper's _updateRoster saves to the roster before the season and to the week's matchup leg during it.
-  const inSeason = (league) => !['pre_draft', 'drafting', 'complete'].includes(league.status);
+  // Whether a lineup saves to the week's matchup leg, else to the roster, as
+  // Sleeper's _updateRoster decides (the extension's model.lineupOnLeg is the same rule).
+  const lineupOnLeg = (league) => !['pre_draft', 'drafting', 'complete'].includes(league?.status);
 
   // The lineup as the extension needs it, or null when this isn't an NFL Team tab.
   // Without `full`, only whether it can be edited (checked on every page change, so kept cheap).
@@ -1180,11 +1175,7 @@
     };
   }
 
-  // Answered synchronously, so the extension has the lineup as soon as dispatchEvent returns.
-  document.addEventListener('snp:nfl-lineup-request', (e) => {
-    const { leagueId, full } = JSON.parse(e.detail);
-    send('snp:nfl-lineup', nflLineup(leagueId, full));
-  });
+  bridge.answer('snp:nfl-lineup', ({ leagueId, full }) => nflLineup(leagueId, full));
 
   // Sleeper's own player card, for any player, from the extension's NFL Team
   // and Matchup tabs. Sleeper builds the card and hands it to openModal in its
@@ -1215,8 +1206,7 @@
     const owner = row && props(row, (x) => typeof x.openModal === 'function' && x.playersMap);
     return click && owner ? catchCard(owner, () => click({ stopPropagation() {}, preventDefault() {} })) : null;
   }
-  document.addEventListener('snp:nfl-player-card', (e) => {
-    const { playerId, player: basics } = JSON.parse(e.detail);
+  bridge.on('snp:nfl-player-card', ({ playerId, player: basics }) => {
     const caught = sleeperCard();
     // Sleeper's own record of the player when it has one; Sleeper's card fetches the rest either way.
     const player = caught && (caught.playersMap[playerId] || basics);
@@ -1225,14 +1215,13 @@
     open({ ...card, key: null, props: { ...card.props, playerIds: [playerId], selectedPlayerId: playerId, playersMap: { ...caught.playersMap, [playerId]: player } } });
   });
 
-  // Saves a lineup through Sleeper's own actions, so its screen updates as if you'd made the swaps.
   // NFL League tab: Sleeper's own matchup cards, read as they show (so the
   // extension's cards carry Sleeper's exact live numbers), and which is yours.
   // Sleeper keeps drawing (and updating) them; the extension hides them and
   // shows its own, and a click on one of ours clicks Sleeper's.
   const NFL_ROW = '.league-matchups .league-matchup-row-item';
   const text = (el, sel) => el?.querySelector(sel)?.textContent.trim() ?? '';
-  document.addEventListener('snp:nfl-league-request', () => {
+  bridge.answer('snp:nfl-league', () => {
     const rows = [...document.querySelectorAll(NFL_ROW)];
     const league = rows[0] && props(rows[0], (x) => Array.isArray(x.rosters) && 'userId' in x);
     const mine = league?.rosters.find((r) => r.owner_id === league.userId || (r.co_owners || []).includes(league.userId))?.roster_id;
@@ -1254,31 +1243,31 @@
       });
       return { own: mine != null && (ids.rosterId1 === mine || ids.rosterId2 === mine), sides };
     });
-    send('snp:nfl-league', { cards });
+    return { cards };
   });
-  document.addEventListener('snp:nfl-league-open', (e) => {
-    const row = document.querySelectorAll(NFL_ROW)[JSON.parse(e.detail).index];
+  bridge.on('snp:nfl-league-open', ({ index }) => {
+    const row = document.querySelectorAll(NFL_ROW)[index];
     // Sleeper's click handler sits on an element inside the card.
     const target = row && [row, ...row.querySelectorAll('*')].find((el) => typeof props(el, () => true)?.onClick === 'function');
     target?.click();
   });
 
-  document.addEventListener('snp:nfl-lineup-save', async (e) => {
-    const { leagueId, rosterId, round, starters } = JSON.parse(e.detail);
+  // Saves a lineup through Sleeper's own actions, so its screen updates as if you'd made the swaps.
+  bridge.answerLater('snp:nfl-lineup-save', async ({ leagueId, rosterId, round, starters }) => {
     try {
       const p = teamFiber()?.memoizedProps;
       const rid = p && (p.roster?.roster_id ?? p.rosterId);
       if (!p || String(p.leagueId) !== leagueId || rid !== rosterId || p.round !== round) {
         throw new Error('The Team tab changed; open Optimize again');
       }
-      const res = inSeason(p.league)
+      const res = lineupOnLeg(p.league)
         ? await p.updateMatchupLeg(leagueId, rid, round, round, starters)
         : await p.rosterUpdateStarters(leagueId, rid, starters);
       const error = res?.errors?.[0];
       if (error) throw new Error(typeof error === 'string' ? error : error.message || 'Sleeper refused the lineup');
-      send('snp:nfl-lineup-saved', { ok: true });
+      return { ok: true };
     } catch (err) {
-      send('snp:nfl-lineup-saved', { ok: false, error: String(err.message || err) });
+      return { ok: false, error: String(err.message || err) };
     }
   });
 })();

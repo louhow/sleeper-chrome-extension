@@ -13,12 +13,25 @@
     return Array.from({ length: 7 }, (_, i) => isoDay(monday + i * DAY_MS));
   }
 
+  // A side's team in a GraphQL `scores` row's metadata ('home_team' or
+  // 'away_team'): NFL names it plainly, NBA nests it.
+  const sideTeam = (metadata, side) => (typeof metadata?.[side] === 'string' ? metadata[side] : metadata?.[side]?.team);
+
+  // Where a game stands: 'done', 'live' (on now, or past its start time while
+  // Sleeper still says it's to come) or 'left' (still to play); '' for no game.
+  // `game`: { status, start }.
+  function gameState(game, now) {
+    if (!game) return '';
+    if (game.status === 'complete') return 'done';
+    return game.status === 'in_game' || (game.status === 'pre_game' && game.start != null && game.start <= now) ? 'live' : 'left';
+  }
+
   // GraphQL `scores` rows -> { [team]: { [date]: game } }
   function gamesByTeam(scores) {
     const out = {};
     for (const s of scores) {
-      const home = s.metadata?.home_team?.team;
-      const away = s.metadata?.away_team?.team;
+      const home = sideTeam(s.metadata, 'home_team');
+      const away = sideTeam(s.metadata, 'away_team');
       const game = { id: s.game_id, date: s.date, start: s.start_time, status: s.status, home, away };
       for (const team of [home, away]) if (team) (out[team] ||= {})[s.date] = game;
     }
@@ -277,6 +290,17 @@
     };
   }
 
+  // Whether a starter's game can be locked now, from the Team tab or Optimize:
+  // their lockState, plus `error` saying why not (null when it can, or may:
+  // a game whose start the extension didn't see is still offered).
+  //   l: a lineup (week, locks, started); team: the player's NBA team.
+  function lockCheck(l, id, team, now) {
+    const st = lockState(playerDays(l.week, team, id), l.locks[id], now, l.started ? (game) => l.started(id, game) : null);
+    const error = (st.lockable || st.unsure) && st.current ? null
+      : st.benched ? 'That game was played on your bench, so it can\'t be locked' : 'That game can no longer be locked';
+    return { ...st, error };
+  }
+
   // Sleeper won't move a player once their game has tipped off, so any lineup
   // seen in this long after tip-off (a game runs longer) is the one they tipped off in.
   const FROZEN_MS = 2 * 3600e3;
@@ -352,8 +376,10 @@
     if (!range || points == null) return '';
     return points >= range[1] ? 'green' : points >= range[0] ? 'yellow' : 'red';
   }
+  // Whether an NBA stat line has time on court (a game sat out comes back with no stats).
+  const onCourt = (stats) => stats?.sp > 0 || stats?.min > 0;
   // Whether a stat line is a game played (NFL: games played; NBA: time on court).
-  const playedGame = (stats) => stats?.gp > 0 || stats?.sp > 0 || stats?.min > 0;
+  const playedGame = (stats) => stats?.gp > 0 || onCourt(stats);
   // The starters' games in a week's stat rows, scored, for scoreTiers.
   // `starters`: player ids; `positionOf(id, row)`: the position to group by.
   function tierSamples(rows, starters, settings, score, positionOf) {
@@ -365,6 +391,139 @@
     return out;
   }
 
+  // The NBA Players tab's week view, from the week's per-game stat rows:
+  // games played per player ('played'), or each player's best or worst game
+  // ('best', 'worst') by `settings` (as Sleeper's FPTS is), as one game played.
+  function weekPicks(rows, mode, settings, score) {
+    const better = mode === 'worst' ? (a, b) => a < b : (a, b) => a > b;
+    const best = {};
+    const played = {};
+    for (const { player_id: id, stats } of rows) {
+      if (!onCourt(stats)) continue;
+      played[id] = (played[id] || 0) + 1;
+      const fpts = score(settings, stats);
+      if (!best[id] || better(fpts, best[id].fpts)) best[id] = { ...stats, gp: 1, fpts };
+    }
+    return mode === 'played' ? played : best;
+  }
+
+  // The NBA Players tab's week strip, per team and day of `days`: where each
+  // game stands (gameState), the game (id, opponent, home, tip-off), and each
+  // player's points and score tier per game played (`rows`, the week's per-game
+  // stat rows, or null while they load).
+  //   byTeam: gamesByTeam; teams: player id -> NBA team.
+  function weekStrip({ days, byTeam, rows, teams, settings, tiers, now }, score) {
+    const points = {};
+    for (const { player_id: id, game_id: game, stats } of rows || []) {
+      if (!onCourt(stats)) continue;
+      const fpts = score(settings, stats);
+      // With its color, as the Team tab and game log show it.
+      (points[id] ||= {})[game] = { fpts, tier: scoreTier(fpts, tiers) };
+    }
+    const byDay = (fn) => Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => fn(games[d], team))]));
+    return {
+      days, teamOf: teams, points, pointsReady: Boolean(rows), tiers,
+      teams: byDay((g) => gameState(g, now)),
+      games: byDay((g, team) => (g ? { id: g.id, home: g.home === team, opponent: g.home === team ? g.away : g.home, start: g.start } : null)),
+    };
+  }
+
+  // An NFL week's games from GraphQL `scores` rows: each team's game (both
+  // sides share one), with the score, the game clock ("Q3 4:12", "Half",
+  // "OT 2:00"), the share of the game left and who has the ball in the red
+  // zone; and the week's game days, in order.
+  function nflGames(scores) {
+    const games = {};
+    const days = new Set();
+    for (const g of scores) {
+      const m = g.metadata || {};
+      const home = sideTeam(m, 'home_team');
+      const away = sideTeam(m, 'away_team');
+      if (!home || !away) continue;
+      if (m.day || m.date_time) days.add(String(m.day || m.date_time).slice(0, 10));
+      const q = Number(m.quarter_num) || 0;
+      const [mm, ss] = String(m.time_remaining || '15:00').split(':').map(Number);
+      const elapsed = q ? Math.min(60, (q - 1) * 15 + (15 - (mm || 0) - (ss || 0) / 60)) : 0;
+      const clock = !q ? 'Live' : m.quarter === 'Half' || m.quarter === 'half' ? 'Half' : q > 4 ? `OT ${m.time_remaining || ''}`.trim() : `Q${q} ${m.time_remaining || ''}`.trim();
+      // The team with the ball inside the 20, as Sleeper's RZ mark shows it.
+      const redZone = m.red_zone && m.possession ? m.possession : null;
+      const game = { id: g.game_id, start: g.start_time, status: g.status, home, away, homeScore: m.home_score, awayScore: m.away_score, clock, left: Math.max(0, 1 - elapsed / 60), redZone };
+      games[home] = game;
+      games[away] = game;
+    }
+    return { games, days: [...days].sort() };
+  }
+
+  // An NFL week's players from its projection and stat rows, scored with
+  // `settings`: each player's team, projected and actual points and stat line
+  // (games played only), and their basics (name, position, team, injury) as
+  // the rows carry them, the first row seen for each.
+  function nflWeekPoints(projRows, statRows, settings, score) {
+    const players = {};
+    const teamOf = {};
+    const proj = {};
+    const actual = {};
+    const stats = {};
+    for (const row of [...projRows, ...statRows]) {
+      const id = String(row.player_id);
+      const pl = row.player;
+      if (pl && !players[id]) {
+        players[id] = {
+          name: `${pl.first_name || ''} ${pl.last_name || ''}`.trim() || id,
+          first: pl.first_name, last: pl.last_name, position: pl.position,
+          positions: pl.fantasy_positions || [pl.position], team: pl.team, injury: pl.injury_status || null,
+        };
+      }
+      if (row.team) teamOf[id] = row.team;
+    }
+    for (const row of projRows) proj[row.player_id] = score(settings, row.stats || {});
+    for (const row of statRows) {
+      if (!playedGame(row.stats)) continue;
+      actual[row.player_id] = score(settings, row.stats);
+      stats[row.player_id] = row.stats;
+    }
+    return { players, teamOf, proj, actual, stats };
+  }
+
+  // The NFL Players tab's Last 5 column: each player's score per week of
+  // `weeks` (`rows`, each week's stat rows, in the same order), colored by
+  // position, and points per game over them. For the week on now (`current`,
+  // when it's the last of `weeks`), where each team's game stands and its
+  // kickoff, from that week's GraphQL `scores` rows (`games`). `sig` changes
+  // whenever any of it does.
+  function recentWeeks({ season, weeks, rows, games, current, settings, tiers, now }, score) {
+    const points = {};
+    const teamOf = {};
+    rows.forEach((list, i) => {
+      for (const { player_id: id, stats, team, opponent, player } of list) {
+        if (!playedGame(stats)) continue;
+        const fpts = score(settings, stats);
+        const position = player?.fantasy_positions?.[0] || player?.position;
+        (points[id] ||= {})[weeks[i]] = { fpts, tier: scoreTier(fpts, tiers, position), team, opponent };
+        teamOf[id] = team;
+      }
+    });
+    const avg = Object.fromEntries(Object.entries(points).map(([id, byWeek]) => {
+      const list = Object.values(byWeek);
+      return [id, list.reduce((sum, x) => sum + x.fpts, 0) / list.length];
+    }));
+    const status = {};
+    const kickoff = {};
+    if (weeks.at(-1) === current) {
+      for (const g of games) {
+        const state = gameState({ status: g.status, start: g.start_time }, now);
+        for (const side of ['home_team', 'away_team']) {
+          const team = sideTeam(g.metadata, side);
+          if (!team) continue;
+          (status[current] ||= {})[team] = state;
+          if (g.start_time != null) kickoff[team] = g.start_time;
+        }
+      }
+    }
+    return { weeks, current, points, avg, teamOf, status, kickoff, tiers, ready: true,
+      sig: `${season}|${weeks.join(',')}|${rows.map((r) => r.length).join(',')}|${JSON.stringify(status)}` };
+  }
+
   // Lineup optimizer. Under Lock-In a lineup can change every day, so it picks
   // for the next day of games: a starter with no game that day can sit and come
   // back later, while whoever plays gets a shot at a score worth locking. A
@@ -373,8 +532,7 @@
   // worth that score, which benching them gives up, and it's recommended for
   // locking when the lineup keeps them. The rest of the week (projected points
   // per game left) breaks ties. Locked players and players in a game right now stay put.
-  const gameLive = (game, now) => game.status === 'in_game' ||
-    (game.status === 'pre_game' && game.start != null && game.start <= now);
+  const gameLive = (game, now) => gameState(game, now) === 'live';
 
   // How far a game's fantasy points stray from the projection, as a share of
   // it (a standard deviation): NBA game logs run about a third either way.
@@ -771,11 +929,75 @@
     return `rgba(${shift > 0 ? SHIFT_UP : SHIFT_DOWN}, ${(0.2 + 0.7 * strength).toFixed(2)})`;
   }
 
+  // The Players tab's adminFPTS and adminDelta: for each player, the points
+  // the what-if `overrides` add to Sleeper's FPTS (scoring just the
+  // differences from `league`), and for the players in `view`, how many places
+  // that moves them, its color and both places. Ranked per game, as the table
+  // shows every stat (a season's stats are totals).
+  //   stats: player id -> Sleeper's stat line; base: the FPTS key shown.
+  function adminDeltas({ overrides, league, stats, view, base }, score) {
+    const delta = Object.fromEntries(Object.entries(overrides).map(([key, value]) => [key, value - (league[key] ?? 0)]));
+    const points = Object.fromEntries(Object.entries(stats).map(([id, s]) => [id, s ? score(delta, s) : 0]));
+    const ids = view.filter((id) => stats[id]?.[base] != null);
+    const games = (id) => (stats[id].gp > 0 ? stats[id].gp : 1);
+    const before = (id) => stats[id][base] / games(id);
+    const after = (id) => (stats[id][base] + points[id]) / games(id);
+    const shifts = rankShift(ids, before, after);
+    const biggest = Math.max(0, ...Object.values(shifts).map(Math.abs));
+    const tints = Object.fromEntries(ids.map((id) => [id, shiftTint(shifts[id], biggest)]));
+    const [was, now] = [ranks(ids, before), ranks(ids, after)];
+    const places = Object.fromEntries(ids.map((id) => [id, [was[id], now[id]]]));
+    return { points, shifts, tints, places };
+  }
+
+  // The season ends when the league's playoff bracket does. Round count comes
+  // from the bracket itself; playoff_round_type sets weeks per round
+  // (0: one week each, 1: two-week final, 2: two weeks each).
+  function lastWeek(league, bracket) {
+    const { playoff_week_start: start, playoff_round_type: roundType } = league.settings || {};
+    const rounds = Math.max(0, ...bracket.map((m) => m.r));
+    // Without a bracket there's nothing to bound by, so don't invent a limit.
+    if (!start || !rounds) return Infinity;
+    const weeks = roundType === 2 ? rounds * 2 : roundType === 1 ? rounds + 1 : rounds;
+    return start + weeks - 1;
+  }
+
+  // Sleeper only allows trading picks this many seasons ahead; it isn't exposed per league.
+  const PICK_SEASONS = 3;
+  // Future picks start this season if its draft hasn't happened yet, else next season.
+  function pickSeasons(league, drafts, count = PICK_SEASONS) {
+    const season = Number(league.season);
+    const done = drafts.some((d) => d.season === league.season && d.status === 'complete');
+    const first = done ? season + 1 : season;
+    return Array.from({ length: count }, (_, i) => String(first + i));
+  }
+
+  // Whether a week's lineup saves to its matchup leg (else to the roster), as
+  // Sleeper's web Team component (_updateRoster) decides: the leg once the
+  // draft is done, until the league is complete.
+  const lineupOnLeg = (league) => !['pre_draft', 'drafting', 'complete'].includes(league?.status);
+
+  // Whether two optimize plans (bestLineup) propose the same thing.
+  const samePlan = (a, b) => ['starters', 'current', 'changes', 'locks'].every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
+
+  // Arrow keys through the teams: `order` lists groups of rosters (one team
+  // each, or a matchup's pair), and the step goes from the group holding
+  // `rosterId` to the next one (or the one before), stopping at the ends.
+  // That group's first roster id, or null.
+  function nextTeam(order, rosterId, step) {
+    const at = order.findIndex((group) => group.some((r) => r?.roster_id === rosterId));
+    const next = at < 0 ? null : order[at + step];
+    return next?.[0]?.roster_id ?? null;
+  }
+
   return {
-    ranks, rankShift, shiftTint,
-    weekDays, gamesByTeam, pointsByGame, playerDays, lockInDefault, ownedPicks, spotRefs, swapTargets, applyMove, describeMove,
+    ranks, rankShift, shiftTint, adminDeltas,
+    weekDays, sideTeam, gameState, gamesByTeam, pointsByGame, playerDays, lockInDefault, ownedPicks, pickSeasons, PICK_SEASONS, lastWeek,
+    spotRefs, swapTargets, applyMove, describeMove, lineupOnLeg, nextTeam,
     taxiEligible, taxiOpen, reserveEligible,
-    lockedGameId, lockState, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, playedGame, TIER_MIN_GAMES, openValue, bestLineup, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
+    lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
+    weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
+    openValue, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
   };
 })();

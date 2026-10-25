@@ -27,6 +27,17 @@
         "src/nflpanel.js",
         "src/card.js",
         "src/whatif.js",
+        "src/bridge.js",
+        "src/shared.js",
+        "src/loaders.js",
+        "src/nbaplayers.js",
+        "src/nbacard.js",
+        "src/nbaclaims.js",
+        "src/nbaoptimize.js",
+        "src/nflplayers.js",
+        "src/nflleague.js",
+        "src/nfldialog.js",
+        "src/nflteam.js",
         "src/content.js"
       ],
       "run_at": "document_start"

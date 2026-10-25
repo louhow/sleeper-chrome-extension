@@ -213,7 +213,7 @@ Sleeper shows every stat per game but stores (and sorts) season stats as totals,
 How it hooks in: `src/page-hook.js` adds `adminFPTS` and `adminDelta` to the stat keys and per-player stats of Sleeper's own table component, so Sleeper renders and sorts them.
 Sleeper's rows only fit 9 stat columns at 60px, so with these two every column narrows to 54px, the name area keeps Sleeper's 118px (rows with an owner line would otherwise be wider), and the headers wrap onto two lines, keeping each value under its header.
 Sleeper prints every stat with one decimal, so adminDelta's cell gets a badge on top; the list on screen is read from Sleeper's list component (`players`).
-The value is Sleeper's FPTS plus the changed settings scored on their own (`snp:admin-score-request`, answered by the extension), so it never drifts from Sleeper's number; the rank shifts come back with it (`model.rankShift`).
+The value is Sleeper's FPTS plus the changed settings scored on their own (`snp:admin-scores`, answered by the extension), so it never drifts from Sleeper's number; the rank shifts come back with it (`model.adminDeltas`, through `model.rankShift`).
 
 ### NFL: Team and Matchup tabs
 
@@ -224,7 +224,8 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
 - Team: the team card (avatar, record, opponent, points, live projection, week picker), then starters slot by slot, bench (by position), IR and taxi.
   Points read – until a starter's game kicks off, as on NBA; IR and taxi keep a row per league slot, open ones included, so the page holds its shape.
   Each row: slot, headshot, name, position and team, injury, start and rostered %; the game (opponent, kickoff, or the clock and score while it's on, or the final), the stat line; points, in their [score color](#score-colors) once the game is over, and the projection.
-- Any team from the picker (A to Z, with avatars); the arrow keys go through them and stop at the ends.
+- Any team from the picker (A to Z, with avatars), remembered for next time; the arrow keys go through them (just for now, as on NBA) and stop at the ends. The picker's menu closes on a click anywhere else.
+- Sleeper's own tab is hidden as soon as the league is known to be NFL, and ours stays blank until its first load is in, as on the NBA tabs, so nothing shifts.
 - Your own lineup, for the week Sleeper's Team tab shows: tap a slot badge, then one of the highlighted players. Players whose game has kicked off stay put, as Sleeper locks them. Saves go through Sleeper's own Team component (`updateMatchupLeg`), as Optimize's do.
 - Optimize lineup sits in the toolbar, as on the NBA Team tab, and opens the same dialog.
 - A player's name or headshot (Team and Matchup tabs) opens Sleeper's own player card, the one its Players tab shows.
@@ -267,9 +268,26 @@ It opens the same dialog as the NBA version, with no warnings to tick through: o
 - Lineup: the same solver as NBA, with Sleeper's NFL slot rules (FLEX takes RB/WR/TE, WRRB_FLEX RB/WR, REC_FLEX WR/TE, SUPER_FLEX QB/RB/WR/TE, IDP_FLEX DL/LB/DB, every other slot its own position). Ties keep the most players where they are.
 - Players whose team has kicked off stay put, as Sleeper locks them.
 - Questionable and Doubtful players can start; when one moves into the lineup their row is flagged ("Questionable: check the news") with a note at the top.
-- Every apply works the plan out again first, then saves through Sleeper's own Team component (`updateMatchupLeg` in season, `roster_update_starters` before it, as its `_updateRoster` does), so Sleeper's screen updates as if you'd made the swaps.
+- Every apply works the plan out again first, then saves through Sleeper's own Team component (`updateMatchupLeg` once the draft is done until the league is complete, `roster_update_starters` otherwise, as its `_updateRoster` does: `model.lineupOnLeg`, which the NBA saves follow too), so Sleeper's screen updates as if you'd made the swaps.
+- A player's name or headshot in the dialog opens Sleeper's own player card, as on the compact tabs.
+- The save notice shows in the compact tab when it's on screen, else under the dialog's layer; never both.
 
-How it hooks in: `src/page-hook.js` reads the lineup from Sleeper's Team component props (slots and starters as shown, roster, players, `hasTeamPlayedMap`) and each row's projection (`proj` stats and `scoringSettings`), and answers the extension's `snp:nfl-lineup-request` synchronously.
+How it hooks in: `src/page-hook.js` reads the lineup from Sleeper's Team component props (slots and starters as shown, roster, players, `hasTeamPlayedMap`) and each row's projection (`proj` stats and `scoringSettings`), and answers the extension's `snp:nfl-lineup` ask synchronously.
+
+### How the extension and page-hook talk
+
+`src/page-hook.js` runs in the page's own world (only there can it read React props); the rest runs in the extension's.
+They share only the DOM, so every message is a `CustomEvent` on `document`, named `snp:*`, with JSON in `detail`.
+Both sides use the same small helper (`src/bridge.js`, and its twin at the top of `page-hook.js`):
+
+| Helper | How | Used for |
+| --- | --- | --- |
+| `ask` / `answer` | `<name>-request`, answered with `<name>` before `dispatchEvent` returns | `snp:nfl-lineup`, `snp:nfl-league`, `snp:week-games`, `snp:week-schedule`, `snp:recent-weeks`, `snp:admin-scores` |
+| `call` / `answerLater` | the request carries an `id` the answer echoes, so concurrent calls never take each other's answer | `snp:nfl-lineup-save` |
+| `tell` / `on` | one-way | `snp:player-action`, `snp:player-card`, `snp:nfl-player-card`, `snp:nfl-league-open`, `snp:admin-scoring`, `snp:players-ready`, `snp:week-games-ready` |
+
+`snp:players-ready` says the extension has a league's Players-tab data (NBA or NFL); page-hook adds no columns before it.
+`snp:week-games-ready` says a week the extension was loading is in, so page-hook asks again.
 
 ### Waivers
 
