@@ -31,7 +31,7 @@ const TEAM_TAB = `<!doctype html><title>Sleeper</title>
   .footer { position: absolute; bottom: 0; left: 0; right: 0; height: 95px; text-align: center; }
 </style>
 <template id="app"><div class="center-panel"><div class="league-panel"><div class="league-panel-tabs-wrapper"><div class="postdraft-panel">
-  <div class="center-tab-selector"><div>MATCHUP</div><div class="selected">TEAM</div><div>LEAGUE</div><div>PLAYERS</div></div>
+  <div class="center-tab-selector"><div class="item-tab">MATCHUP</div><div class="item-tab selected">TEAM</div><div class="item-tab">LEAGUE</div><div class="item-tab">PLAYERS</div></div>
   <div><div class="empty-panel-container"><p>Team panel not yet available for NBA fantasy.</p><p>Please use the Sleeper mobile app</p><div class="footer">Responsible Play</div></div></div>
 </div></div></div></div></template>
 <script>
@@ -49,11 +49,13 @@ const LEAGUE_TAB = TEAM_TAB.replace('<template id="app">', `<template id="league
     const onLeague = /\\/league$/.test(location.pathname);
     document.body.append(document.getElementById(onLeague ? 'league' : 'app').content.cloneNode(true));
   }, 150);
+  // Sleeper's tabs route: Matchup and Team show the placeholder the panel fills, League its own content.
   document.addEventListener('click', (e) => {
     const tab = e.target.closest('.item-tab');
-    if (!tab || tab.textContent !== 'MATCHUP') return;
-    history.pushState({}, '', location.pathname.replace(/league$/, 'matchup'));
-    document.querySelector('.center-panel').replaceWith(document.getElementById('app').content.cloneNode(true));
+    const page = tab && { MATCHUP: 'matchup', TEAM: 'team', LEAGUE: 'league' }[tab.textContent];
+    if (!page) return;
+    history.pushState({}, '', location.pathname.replace(/[a-z]+$/, page));
+    document.querySelector('.center-panel').replaceWith(document.getElementById(page === 'league' ? 'league' : 'app').content.cloneNode(true));
   });`);
 const FAKE_TOKEN = 'e2e-fake-session-token';
 const LOGGED_IN = TEAM_TAB.replace('<title>Sleeper</title>', `<title>Sleeper</title><script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>`);
@@ -619,15 +621,25 @@ test('shows starters with a full week of days and real projections', async () =>
   await page.screenshot({ path: `${OUT}team-bottom.png` });
 });
 
-test('team picker switches roster and persists across reloads', async () => {
-  const select = page.locator(panel('select'));
-  const values = await select.locator('option').evaluateAll((os) => os.map((o) => o.value));
+test('team picker: every team A to Z with its avatar, switches roster and persists across reloads', async () => {
+  const button = page.locator(panel('.team-pick .tp-button'));
+  const names = await page.locator(panel('.tp-menu [data-pick-roster] b')).allTextContents();
+  assert.ok(names.length > 1);
+  assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b)), 'alphabetical');
+  assert.equal(await page.locator(panel('.tp-menu')).isVisible(), false);
+  await button.click();
+  await page.locator(panel('.tp-menu')).waitFor();
+  await page.screenshot({ path: `${OUT}team-picker.png` });
+  const ids = await page.locator(panel('.tp-menu [data-pick-roster]')).evaluateAll((els) => els.map((el) => el.dataset.pickRoster));
+  const current = await button.getAttribute('data-roster');
+  const other = ids.find((id) => id !== current);
   const before = await page.locator(panel('.team-name')).textContent();
-  await select.selectOption(values[1]);
+  await page.locator(panel(`.tp-menu [data-pick-roster="${other}"]`)).click();
   await page.waitForFunction((b) => document.querySelector('#sleeper-nba-panel').shadowRoot.querySelector('.team-name').textContent !== b, before);
+  await page.locator(panel('.tp-menu')).waitFor({ state: 'hidden' });
   await page.reload();
   await page.locator(panel('.card .days')).first().waitFor();
-  assert.equal(await page.locator(panel('select')).inputValue(), values[1]);
+  assert.equal(await page.locator(panel('.team-pick .tp-button')).getAttribute('data-roster'), other);
 });
 
 test('week navigation loads the next week', async () => {
@@ -682,7 +694,7 @@ test('logged in: swaps a bench player into the lineup', async () => {
   const myRoster = rosters.find((r) => r.owner_id === mine.user_id);
 
   await page.goto(TEAM_URL);
-  await page.locator(panel('select')).selectOption(String(myRoster.roster_id));
+  await pickRoster(myRoster.roster_id);
   await page.locator(panel('button.slot')).first().waitFor({ timeout: 30000 });
   assert.match(await shadowText('.rhead:first-of-type .hint'), /Tap a position to update your lineup/);
   assert.match(await shadowText('.team-card'), /proj 157\.23/, 'uses the server projection from matchup_legs');
@@ -775,8 +787,8 @@ test('matchup: locks in a finished game for your starter', async () => {
   const myRoster = rosters.find((r) => r.owner_id === sleeper.me);
 
   await page.goto(MATCHUP_URL);
-  await seenThroughTipOff('select');
-  await page.locator(panel('select')).selectOption(String(myRoster.roster_id));
+  await seenThroughTipOff('.tp-button');
+  await pickRoster(myRoster.roster_id);
   const open = page.locator(panel('.mp.mine button.lk.open:not(.maybe)'));
   await open.first().waitFor({ timeout: 30000 });
   assert.ok(!(await page.locator(panel('.mp.theirs button.lk')).count()), "no lock buttons on the opponent's side");
@@ -815,7 +827,7 @@ test('matchup: locks in a finished game for your starter', async () => {
   documentBody = LOGGED_OUT;
 });
 
-test('league tab: every matchup of the week on top of Sleeper\'s own content, opening on the Matchup tab', async () => {
+test('league tab: every matchup of the week on top of Sleeper\'s own content; a matchup opens on the Matchup tab, a team on its Team tab', async () => {
   documentBody = LEAGUE_TAB.replace('<title>Sleeper</title>', `<title>Sleeper</title><script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>`);
   await startMidWeek();
   sleeper.legs = {};
@@ -850,12 +862,31 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content, op
   assert.equal(fit.cards, 7);
   assert.ok(fit.bottom <= fit.room, `all ${fit.cards} fit (${Math.round(fit.bottom)} of ${Math.round(fit.room)}px)`);
   await page.screenshot({ path: `${OUT}league-matchups.png` });
-  // Another matchup opens on the Matchup tab, with that team on the left.
+  // A team's name (or avatar, or owner) opens its Team tab; "My team" comes back.
+  const theirName = (await cards.nth(1).locator('.mu-team.theirs .team-name').textContent()).trim();
+  await cards.nth(1).locator('.mu-team.theirs .team-name .team-link').click();
+  await page.waitForURL(`**/leagues/${LEAGUE}/team`);
+  await page.locator(panel('.team-card .team-name')).filter({ hasText: theirName }).waitFor({ timeout: 30000 });
+  const back = page.locator(panel('.tools .my-team'));
+  assert.equal(await back.innerText(), 'My team');
+  await page.screenshot({ path: `${OUT}team-someone-else.png` });
+  await back.click();
+  await page.locator(panel('.tools .my-team')).waitFor({ state: 'detached' });
+  assert.equal(await page.locator(panel('.team-pick .tp-button')).getAttribute('data-roster'), String(mine.roster_id), 'your own team again');
+  // Anywhere else on a matchup opens it on the Matchup tab, with that team on the left.
+  await page.locator('.item-tab', { hasText: 'LEAGUE' }).click();
+  await cards.first().waitFor({ timeout: 30000 });
   const other = cards.nth(1);
   const name = (await other.locator('.mu-team.mine .team-name').textContent()).trim();
-  await other.click();
+  await other.locator('.mu-pts').first().click();
   await page.waitForURL(`**/leagues/${LEAGUE}/matchup`);
-  await page.locator(panel('.mu-head .mu-team.mine .team-name')).filter({ hasText: name }).waitFor({ timeout: 30000 });
+  const head = (sel) => panel(`.mu-head:not(.lg-match) ${sel}`);
+  await page.locator(head('.mu-team.mine .team-name')).filter({ hasText: name }).waitFor({ timeout: 30000 });
+  // On the Matchup tab too, the opponent's avatar opens their Team tab.
+  const opponent = (await page.locator(head('.mu-team.theirs .team-name')).textContent()).trim();
+  await page.locator(head('.mu-team.theirs .avatar.team-link')).click();
+  await page.waitForURL(`**/leagues/${LEAGUE}/team`);
+  await page.locator(panel('.team-card .team-name')).filter({ hasText: opponent }).waitFor({ timeout: 30000 });
   sleeper.midWeek = false;
   documentBody = LOGGED_OUT;
 });
@@ -917,9 +948,15 @@ async function openMyTeam(url) {
   sleeper.me = users.find((u) => u.display_name === 'louhow').user_id;
   const myRoster = rosters.find((r) => r.owner_id === sleeper.me);
   await page.goto(url);
-  await page.locator(panel('select')).selectOption(String(myRoster.roster_id));
+  await pickRoster(myRoster.roster_id);
   await page.locator(panel('.taxi-head .hint')).waitFor({ timeout: 30000 });
   return myRoster;
+}
+
+// Shows a roster through the panel's team picker.
+async function pickRoster(id) {
+  await page.locator(panel('.team-pick .tp-button')).click();
+  await page.locator(panel(`.tp-menu [data-pick-roster="${id}"]`)).click();
 }
 
 // Clicks bench players until one can trade with a taxi player; returns its id.
@@ -1063,7 +1100,7 @@ test('waivers: the Team tab lists pending claims to rebid or cancel', async () =
   documentBody = LOGGED_IN;
   await page.goto(TEAM_URL);
   const myRoster = sleeper.rosters.find((r) => r.owner_id === sleeper.me);
-  await page.locator(panel('select')).selectOption(String(myRoster.roster_id));
+  await pickRoster(myRoster.roster_id);
   const button = page.locator(panel('button.waivers'));
   await page.waitForFunction(() => /1/.test(document.querySelector('#sleeper-nba-panel')?.shadowRoot.querySelector('button.waivers .count')?.textContent), null, { timeout: 30000 });
   await button.click();
@@ -1138,7 +1175,7 @@ test('IR: Out players move onto IR from the bench or the lineup', async () => {
   sleeper.injured = new Set([benchId, starterId]);
 
   await page.goto(TEAM_URL);
-  await page.locator(panel('select')).selectOption(String(myRoster.roster_id));
+  await pickRoster(myRoster.roster_id);
   await page.locator(panel('[data-action="refresh"]')).click(); // refetch players with the injuries
   await page.locator(panel('.ir-head .hint')).waitFor({ timeout: 30000 });
   assert.match(await shadowText('.ir-head .hint'), /IR, Out, DTD and DNR players can move to IR\./);
@@ -1339,9 +1376,9 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   // Offered on your own team only.
   await page.locator(panel('button.optimize')).waitFor();
   const other = sleeper.rosters.find((r) => r.roster_id !== myRoster.roster_id);
-  await page.locator(panel('select')).selectOption(String(other.roster_id));
+  await pickRoster(other.roster_id);
   await page.locator(panel('button.optimize')).waitFor({ state: 'detached' });
-  await page.locator(panel('select')).selectOption(String(myRoster.roster_id));
+  await pickRoster(myRoster.roster_id);
 
   const before = sleeper.mutations.length;
   await page.locator(panel('button.optimize')).click();

@@ -2,7 +2,7 @@
 (globalThis.SNP ||= {}).view = (() => {
   const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId, scoreTier } = globalThis.SNP.model;
   const { esc, f2, headshot, teamName, avatar, record, injuryTag, positions, gameTime, weekday, lockIcon, slotBadge, weekNav, notice, lineup, taxiRule, reserveRule,
-    whatIfOn, whatIfBanner } = globalThis.SNP.ui;
+    whatIfOn, whatIfBanner, owns } = globalThis.SNP.ui;
   const PREVIEW_CHARS = 20000;
   const PAGES = { team: 'Team', matchup: 'Matchup' };
 
@@ -24,9 +24,7 @@
   function toolbar(s, log) {
     const tab = (id, label) =>
       `<button role="tab" data-tab="${id}" aria-selected="${s.tab === id}" class="${s.tab === id ? 'active' : ''}">${label}</button>`;
-    const options = (s.rosters || [])
-      .map((r) => `<option value="${r.roster_id}" ${r.roster_id === s.rosterId ? 'selected' : ''}>${esc(teamName(s, r))}</option>`)
-      .join('');
+    const picker = s.rosters?.length ? teamPicker(s) : '';
     // Only on the owner's editable Team tab, once the week's games are in.
     const l = s.ready && s.page === 'team' && s.tab === 'page' && !s.error && !s.sessionExpired ? lineup(s) : null;
     const optimize = !(l?.editable && l.week) ? ''
@@ -36,10 +34,34 @@
       <div class="tabs" role="tablist">${tab('page', PAGES[s.page] || 'Team')}${tab('api', `API calls <span class="count">${log.length}</span>`)}</div>
       <div class="tools">
         ${optimize}
-        ${options && !s.sessionExpired ? `<select data-action="roster" aria-label="Team to show">${options}</select>` : ''}
+        ${picker && !s.sessionExpired ? picker : ''}
         <button class="icon" data-action="refresh" title="Refetch everything" aria-label="Refresh">↻</button>
       </div>
     </nav>`;
+  }
+
+  // The team shown: a picker with each team's avatar, name and owner, A to Z,
+  // and, while it's someone else's, a one-click way back to your own.
+  function teamPicker(s) {
+    const pic = (r, cls) => {
+      const url = r && avatar(s, r);
+      return url ? `<img class="${cls}" src="${esc(url)}" alt="">` : `<span class="${cls} blank">${esc(r ? teamName(s, r).slice(0, 1).toUpperCase() : '')}</span>`;
+    };
+    const teams = [...s.rosters].sort((a, b) => teamName(s, a).localeCompare(teamName(s, b)));
+    const current = s.rosters.find((r) => r.roster_id === s.rosterId);
+    const mine = s.rosters.find((r) => owns(s, r));
+    const back = mine && current && mine.roster_id !== current.roster_id
+      ? `<button class="my-team" data-pick-roster="${mine.roster_id}" title="Back to ${esc(teamName(s, mine))}">${pic(mine, 'tp-avatar')}My team</button>` : '';
+    return `${back}<div class="team-pick${s.rosterMenu ? ' open' : ''}">
+      <button class="tp-button" data-action="roster-menu" data-roster="${current?.roster_id ?? ''}" aria-haspopup="listbox" aria-expanded="${Boolean(s.rosterMenu)}" aria-label="Team to show">
+        ${pic(current, 'tp-avatar')}<span class="tp-name">${esc(current ? teamName(s, current) : 'Pick a team')}</span><span class="tp-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="tp-menu" role="listbox">${teams.map((r) => {
+        const owner = s.usersById?.[r.owner_id];
+        return `<button role="option" data-pick-roster="${r.roster_id}" aria-selected="${r.roster_id === s.rosterId}">${pic(r, 'tp-avatar')}
+          <span class="tp-label"><b>${esc(teamName(s, r))}</b><small>@${esc(owner?.display_name || 'unknown')}${mine?.roster_id === r.roster_id ? ' · you' : ''}</small></span></button>`;
+      }).join('')}</div>
+    </div>`;
   }
 
   // In place of the tab while Sleeper rejects the page's login.

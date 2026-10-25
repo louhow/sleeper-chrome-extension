@@ -86,11 +86,13 @@
     const pct = prob == null ? null : Math.round(prob * 100);
     const trend = pct == null ? '' : pct >= 50 ? 'up' : 'down';
     const rank = sd.l.week.ranks?.[roster.roster_id];
+    // The avatar, owner and team name open that team on the Team tab.
+    const link = `data-open-team="${roster.roster_id}" role="link" tabindex="0" title="${esc(`${teamName(s, roster)}'s team`)}"`;
     return `<div class="mu-team ${cls}">
-      ${image ? `<img class="avatar" src="${esc(image)}" alt="">` : '<div class="avatar"></div>'}
+      ${image ? `<img class="avatar team-link" src="${esc(image)}" alt="" ${link}>` : `<div class="avatar team-link" ${link}></div>`}
       <div class="mu-who">
-        <div class="sub">@${esc(owner?.display_name || 'unknown')}</div>
-        <div class="team-name">${esc(teamName(s, roster))}</div>
+        <div class="sub"><span class="team-link" ${link}>@${esc(owner?.display_name || 'unknown')}</span></div>
+        <div class="team-name"><span class="team-link" ${link}>${esc(teamName(s, roster))}</span></div>
       </div>
       <div class="mu-pts">${sd.anyPoints ? f2(sd.points) : '–'}</div>
       <div class="mu-bar"><span class="${trend}" style="width:${pct ?? 0}%"></span></div>
@@ -201,11 +203,12 @@
       const right = b && side(s, b);
       const [p1, p2] = right ? winProbability(left.points, left.proj, right.points, right.proj) : [null, null];
       const label = `Open ${teamName(s, a.roster)}${b ? ` vs ${teamName(s, b.roster)}` : ''} on the Matchup tab`;
-      return `<button type="button" class="lg-match mu-head${a.mine ? ' own' : ''}" data-open-matchup="${a.roster.roster_id}" aria-label="${esc(label)}">
+      // A box that opens the matchup, holding team links (so not a <button>).
+      return `<div class="lg-match mu-head${a.mine ? ' own' : ''}" role="button" tabindex="0" data-open-matchup="${a.roster.roster_id}" aria-label="${esc(label)}">
         ${teamSide(s, left, p1, 'mine')}
         <span class="vs">VS</span>
         ${right ? teamSide(s, right, p2, 'theirs') : '<div class="mu-team theirs bye"><span class="sub">No opponent this week</span></div>'}
-      </button>`;
+      </div>`;
     }).join('')}</div>`;
   }
 

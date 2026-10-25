@@ -1137,6 +1137,31 @@
         `Locked ${shortOf(id)} ${k.actual.toFixed(2)}`, replan);
     }
 
+    // The team shown. Picked from the team picker (or "My team"), it's kept for
+    // next time; followed from a link, it's just for now.
+    function setRoster(rosterId, { remember = false } = {}) {
+      state.rosterMenu = false;
+      if (remember) chrome.storage.local.set({ [`roster:${leagueId}`]: rosterId });
+      if (rosterId === state.rosterId) return schedule();
+      state.rosterId = rosterId;
+      state.swap = null;
+      state.lockConfirm = null;
+      state.notice = null;
+      updatePicks();
+      schedule();
+    }
+
+    // A team on the Team or Matchup tab, through Sleeper's own tab (so its router follows).
+    function openRoster(rosterId, page) {
+      setRoster(rosterId);
+      state.tab = 'page';
+      if (state.page !== page) {
+        const tabs = [...document.querySelectorAll('.center-tab-selector .item-tab')];
+        tabs.find((t) => new RegExp(`^${page}$`, 'i').test(t.textContent.trim()))?.click();
+      }
+      schedule();
+    }
+
     function pickSpot(ref) {
       if (state.saving) return;
       const lineup = ui.lineup(state);
@@ -1159,15 +1184,23 @@
     }
 
     root.addEventListener('click', (e) => {
-      // A League tab matchup opens on the Matchup tab, through Sleeper's own tab (so its router follows).
-      const match = e.target.closest('[data-open-matchup]');
-      if (match) {
-        state.rosterId = Number(match.dataset.openMatchup);
-        state.tab = 'page';
-        const tabs = [...document.querySelectorAll('.center-tab-selector .item-tab')];
-        tabs.find((t) => /^matchup$/i.test(t.textContent.trim()))?.click();
+      // The team picker's menu closes on any click outside it.
+      if (state.rosterMenu && !e.target.closest('.team-pick')) {
+        state.rosterMenu = false;
+        schedule();
+      }
+      const pick = e.target.closest('[data-pick-roster]');
+      if (pick) return setRoster(Number(pick.dataset.pickRoster), { remember: true });
+      if (e.target.closest('[data-action="roster-menu"]')) {
+        state.rosterMenu = !state.rosterMenu;
         return schedule();
       }
+      // A team's avatar, owner or name opens it on the Team tab; the rest of a
+      // League tab matchup opens it on the Matchup tab.
+      const team = e.target.closest('[data-open-team]');
+      if (team) return openRoster(Number(team.dataset.openTeam), 'team');
+      const match = e.target.closest('[data-open-matchup]');
+      if (match) return openRoster(Number(match.dataset.openMatchup), 'matchup');
       const tab = e.target.closest('[data-tab]');
       if (tab) {
         state.tab = tab.dataset.tab;
@@ -1197,15 +1230,13 @@
       if (action === 'optimize') openOptimize();
       if (action === 'whatif-off') setWhatIf({ on: false });
     });
-    root.addEventListener('change', (e) => {
-      if (e.target.dataset.action !== 'roster') return;
-      state.rosterId = Number(e.target.value);
-      state.swap = null;
-      state.lockConfirm = null;
-      state.notice = null;
-      chrome.storage.local.set({ [`roster:${leagueId}`]: state.rosterId });
-      updatePicks();
-      schedule();
+    // Links and the League tab's matchup boxes work from the keyboard too.
+    root.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target.closest?.('[data-open-team], [data-open-matchup]');
+      if (!el) return;
+      e.preventDefault();
+      el.click();
     });
     // <details> toggle doesn't bubble, so listen in the capture phase.
     root.addEventListener('toggle', (e) => {
@@ -1331,6 +1362,10 @@
     });
     // Like a tooltip, the editor closes on a click anywhere else.
     function onOutsideClick(e) {
+      if (state.rosterMenu && !e.composedPath().includes(host)) {
+        state.rosterMenu = false;
+        schedule();
+      }
       if (!state.whatIf.open || e.composedPath().includes(corner)) return;
       state.whatIf.open = false;
       schedule();
@@ -1359,6 +1394,10 @@
         return schedule();
       }
       if (e.key === 'Escape' && state.modal) return closeModal();
+      if (e.key === 'Escape' && state.rosterMenu) {
+        state.rosterMenu = false;
+        return schedule();
+      }
       if (e.key === 'Escape' && (state.swap || state.lockConfirm)) {
         state.swap = null;
         state.lockConfirm = null;

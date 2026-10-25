@@ -97,11 +97,17 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - Team totals are Sleeper's running total, added up from the leg's lineup as on the Team tab.
 - Switching leagues in the sidebar (any sport) opens each league on the tab you were last on in it, where Sleeper would open its League tab; the last tab per league is kept in the page's storage. A league you haven't been on yet opens where Sleeper sends it, except an NBA league from a Matchup tab, which opens on its Matchup tab.
 
+### Team picker
+
+- The toolbar's team picker shows every team with its avatar, name and owner, A to Z (yours marked "you"); the pick is kept for next time.
+- While you're looking at someone else's team, a "My team" button beside it goes back to yours in one click.
+- On the Matchup tab, and on the League tab's matchups, a team's avatar, owner or name opens it on the Team tab (just for now: the picker's choice stays).
+
 ### League
 
 - Above Sleeper's own League tab content (which stays), the week's matchups, every one in the league, yours first and framed: each is the Matchup tab's header for that pair (avatars, scores, win chance, record and rank, starters yet to play, projection), with the same week picker.
 - The cards are a compact take on that header, so a 14-team league's 7 matchups fit in the tab without scrolling.
-- Clicking a matchup opens it on the Matchup tab, that team on the left, through Sleeper's own MATCHUP tab.
+- Clicking a matchup opens it on the Matchup tab, that team on the left, through Sleeper's own MATCHUP tab; clicking a team's avatar, owner or name opens that team on the Team tab.
 
 Win probability is Sleeper's own formula, ported from its web app: each side is a normal distribution centred on its projection, narrowing as the score approaches it.
 Rank comes from `roster_standings`; before any games are played, it falls back to the standings order (record, points, then waiver order), which is what Sleeper shows then.
