@@ -86,15 +86,23 @@
   // Sleeper sorts a missing or 0 value as -1, so shifts are stored offset to stay positive.
   const DELTA_OFFSET = 10000;
   const PLAYERS_PANEL = '.integration-players-panel';
-  // Volume columns by the column they follow; the rest go at the end.
-  const VOLUME_AFTER = { pts: ['fgm', 'fga'], tpm: ['tpa'] };
+  // Shot volume, which doesn't score: at the end of the table in Stats, behind
+  // the "Shooting" checkbox in Sleeper's filter row (off by default).
   const VOLUME = ['fgm', 'fga', 'tpa', 'ftm', 'fta'];
+  // A week's days, a mark each (played, on now, still to play), sorting by games left.
+  const WEEK_KEY = 'Week';
+  // Its column: seven 5px marks and 2px gaps, centered under the "WEEK"
+  // label, as Sleeper centers its numbers under theirs (each cell starts 17px
+  // left of its label).
+  const WEEK_W = 68;
   // Games played in the week (Sleeper's week stats are per game, with no count).
   const GP_KEY = 'GP';
   // Marks a picked game in the stats map, so its cells print as whole numbers.
   const GAME = 'snpGame';
   const PICKS = [['avg', 'Avg', 'Average per game this week'], ['best', 'Best', 'Best game this week'], ['worst', 'Worst', 'Worst game this week']];
   let weekPick = 'avg';
+  let shooting = false;
+  const schedules = {}; // `${season}|${week}` -> { days, teams: { [team]: day states }, teamOf: { [player id]: team } }
   const pickedGames = {}; // `${season}|${week}|${mode}` -> { [player id]: that game's stats, or (played) games played }
   // { leagueId, enabled, changed } from the extension; it does the scoring itself.
   // Not enabled (no ?snp-admin=1), the columns stay out.
@@ -140,6 +148,52 @@
   }
   document.addEventListener('snp:week-games-ready', () => patchPlayers());
 
+  // A week's schedule from the extension, as weekGames. Kept for a minute, as
+  // games finish while the page is open.
+  function weekSchedule(season, week) {
+    const key = `${season}|${week}`;
+    const hit = schedules[key];
+    if (hit && Date.now() - hit.at < 60e3) return hit.value;
+    let value = null;
+    const take = (e) => {
+      value = JSON.parse(e.detail);
+    };
+    document.addEventListener('snp:week-schedule', take);
+    send('snp:week-schedule-request', { season, week });
+    document.removeEventListener('snp:week-schedule', take);
+    if (value) schedules[key] = { at: Date.now(), value };
+    return value ?? hit?.value ?? null;
+  }
+
+  // What you last had on (Projection or Stats, the season and week, Avg / Best
+  // / Worst, Shooting), per league, in the page's storage. A week that was the
+  // current one comes back as the current one, so a new week opens on it.
+  const viewKey = (leagueId) => `snp:players-view:${leagueId}`;
+  function savedView(leagueId) {
+    try {
+      return JSON.parse(localStorage.getItem(viewKey(leagueId))) || null;
+    } catch {
+      return null;
+    }
+  }
+  function saveView(panel) {
+    const { leagueId, leg } = panel.props;
+    const { statType, statInterval, season } = panel.state;
+    // Until the view being restored is on, what shows is Sleeper's default, not yours.
+    const want = panel.snpWant;
+    if (want && Date.now() < want.until && !(statType === want.statType && String(statInterval) === String(want.statInterval))) return;
+    panel.snpWant = null;
+    const view = { statType, season, interval: statInterval, current: leg > 0 && String(statInterval) === String(leg), pick: weekPick, shooting };
+    const text = JSON.stringify(view);
+    if (panel.snpSaved === text) return;
+    panel.snpSaved = text;
+    try {
+      localStorage.setItem(viewKey(leagueId), text);
+    } catch {
+      // Storage off: the view just isn't remembered.
+    }
+  }
+
   function playersPanel() {
     const league = document.documentElement.dataset.snpNbaLeague;
     const el = document.querySelector(PLAYERS_PANEL);
@@ -149,28 +203,38 @@
   }
 
   // Sleeper's columns with ours worked in: the admin pair right after FPTS (when on),
-  // then GP (a week's Avg), and the volume columns (in Stats) after the stat
-  // they go with. Switching to Projection, or admin tools off (?snp-admin=0),
-  // takes them back out. Null until Sleeper has settled which FPTS it shows.
-  function columns(keys, base, other, { adminOn, volumeOn, gpOn }) {
+  // then GP (a week's Avg), the week's games (a week picked), Sleeper's own,
+  // and the shot-volume columns at the end (Stats, Shooting on). Switching
+  // away takes them back out. Null until Sleeper has settled which FPTS it shows.
+  function columns(keys, base, other, { adminOn, volumeOn, gpOn, weekOn }) {
     if (keys[0] !== base || keys.includes(other)) return null;
-    const theirs = keys.filter((k) => k !== ADMIN_KEY && k !== DELTA_KEY && k !== GP_KEY && !VOLUME.includes(k));
-    const out = volumeOn ? theirs.flatMap((k) => [k, ...(VOLUME_AFTER[k] || [])]) : theirs;
-    if (volumeOn) out.push(...VOLUME.filter((k) => !out.includes(k)));
+    const out = keys.filter((k) => k !== ADMIN_KEY && k !== DELTA_KEY && k !== GP_KEY && k !== WEEK_KEY && !VOLUME.includes(k));
+    if (volumeOn) out.push(...VOLUME);
+    if (weekOn) out.splice(1, 0, WEEK_KEY);
     if (gpOn) out.splice(1, 0, GP_KEY);
     if (adminOn) out.splice(1, 0, ADMIN_KEY, DELTA_KEY);
     return out;
   }
 
-  // Once per league, after Sleeper's first load: Projection for the current
-  // week (Sleeper's leg), through the state and fetch its own week dropdown uses.
-  function openOnThisWeek(panel) {
+  // Once per league, after Sleeper's first load: the view you last had on
+  // (see savedView), else Projection for the current week (Sleeper's leg),
+  // through the state and fetch Sleeper's own dropdowns use.
+  function openOnLastView(panel) {
     const { leagueId, leg } = panel.props;
     if (panel.snpOpenedFor === leagueId || panel.state.loading) return;
     panel.snpOpenedFor = leagueId;
-    const { statType, statInterval } = panel.state;
-    if (!(leg > 0) || (statType === 'proj' && String(statInterval) === String(leg))) return;
-    panel.setState({ statType: 'proj', statInterval: +leg, leg: +leg }, () => panel._fetchData?.(panel.props, panel.state));
+    const saved = savedView(leagueId);
+    weekPick = PICKS.some(([mode]) => mode === saved?.pick) ? saved.pick : 'avg';
+    shooting = Boolean(saved?.shooting);
+    const want = saved && (saved.statType === 'proj' || saved.statType === 'stat')
+      ? { statType: saved.statType, season: saved.current ? panel.state.season : String(saved.season || panel.state.season),
+        statInterval: saved.current && leg > 0 ? +leg : saved.interval === 'season' ? 'season' : +saved.interval }
+      : leg > 0 ? { statType: 'proj', season: panel.state.season, statInterval: +leg } : null;
+    if (!want || want.statInterval !== 'season' && !(want.statInterval > 0)) return;
+    const { statType, statInterval, season } = panel.state;
+    if (statType === want.statType && String(statInterval) === String(want.statInterval) && String(season) === String(want.season)) return;
+    panel.snpWant = { ...want, until: Date.now() + 5000 };
+    panel.setState({ ...want, leg: +want.statInterval }, () => panel._fetchData?.(panel.props, panel.state));
   }
 
   // Sleeper's week dropdown keeps the value it was created with, as a string,
@@ -186,11 +250,11 @@
   }
 
   // The players the list shows right now (after Sleeper's position, search and owned filters).
-  function playersInView() {
+  function listPlayers() {
     const grid = document.querySelector(`${PLAYERS_PANEL} .ReactVirtualized__Grid`);
-    const list = grid && fiber(grid, (x) => Array.isArray(x.players) && x.playerStatsMap)?.memoizedProps;
-    return (list?.players || []).map((p) => String(p.player_id));
+    return (grid && fiber(grid, (x) => Array.isArray(x.players) && x.playerStatsMap)?.memoizedProps.players) || [];
   }
+  const playersInView = () => listPlayers().map((p) => String(p.player_id));
 
   // The stats map Sleeper renders is rebuilt from its own: the picked games
   // (Best or Worst) first, then adminFPTS = FPTS plus what the changed settings
@@ -215,14 +279,21 @@
       };
       panel.snpHooked = true;
     }
-    openOnThisWeek(panel);
+    openOnLastView(panel);
     weekLabel(panel);
+    if (!panel.state.loading) saveView(panel);
     const { playerStatsMap: map, statKeys = [], statType, statInterval, season } = panel.state;
     const base = statType === 'stat' ? 'fpts' : 'fpts_proj';
     const other = base === 'fpts' ? 'fpts_proj' : 'fpts';
     // A week picked in Stats (rather than the season).
-    const week = statType === 'stat' && statInterval != null && statInterval !== 'season' ? Number(statInterval) : null;
+    const shownWeek = statInterval != null && statInterval !== 'season' && Number(statInterval) > 0 ? Number(statInterval) : null;
+    const week = statType === 'stat' ? shownWeek : null;
     weekSwitch(week);
+    shootingBox(statType === 'stat');
+    const fetched = shownWeek ? weekSchedule(season, shownWeek) : null;
+    // Teams from the extension's players, else from Sleeper's own list.
+    const schedule = fetched && { ...fetched, teamOf: { ...Object.fromEntries(listPlayers().map((p) => [String(p.player_id), p.team])), ...fetched.teamOf } };
+    panel.snpSchedule = schedule;
     const mode = week ? weekPick : 'avg';
     const picked = mode === 'avg' ? null : weekGames(season, week, mode);
     const gpOn = Boolean(week && mode === 'avg');
@@ -233,7 +304,8 @@
     const view = adminOn ? playersInView() : [];
     // Order doesn't matter (sorting by adminDelta reorders it), only who is in view.
     const loaded = picked || played ? `${season}|${week}` : '';
-    const key = [mode, loaded, gpOn, adminOn ? adminVersion : 'off', [...view].sort().join(',')].join('|');
+    const left = schedule ? JSON.stringify(schedule.teams) : '';
+    const key = [mode, loaded, gpOn, left, adminOn ? adminVersion : 'off', [...view].sort().join(',')].join('|');
     const update = {};
     if (source && (panel.snpSourceSeen !== source || panel.snpKey !== key)) {
       // That game alone, as one game played, so Sleeper's per-game numbers are its own.
@@ -242,6 +314,9 @@
       // GP shows "-" until the week's games load.
       if (gpOn) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
         [id, s && played ? { ...s, [GP_KEY]: played[id] ?? 0 } : s]));
+      // Games still to play this week, to sort by.
+      if (schedule) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
+        [id, s ? { ...s, [WEEK_KEY]: (schedule.teams[schedule.teamOf[id]] || []).filter((d) => d === 'left').length } : s]));
       if (adminOn) {
         const scores = admin.changed ? adminScores(stats, view, base) : { points: {}, shifts: {}, tints: {}, places: {} };
         const inView = new Set(view);
@@ -262,7 +337,7 @@
       panel.snpSourceSeen = source;
       panel.snpKey = key;
     }
-    const keys = columns(statKeys, base, other, { adminOn, volumeOn: statType === 'stat', gpOn });
+    const keys = columns(statKeys, base, other, { adminOn, volumeOn: statType === 'stat' && shooting, gpOn, weekOn: Boolean(shownWeek) });
     if (keys && keys.join() !== statKeys.join()) update.statKeys = keys;
     // In Stats, Sleeper keeps sorting by the projection (fpts_proj), which isn't
     // a column there, so the list never follows the numbers shown (and Best or
@@ -305,10 +380,73 @@
       });
       header.append(el);
     }
+    // Centered on the header's labels, wherever Sleeper's layout puts them.
+    const label = header.querySelector('.stat-key-header > .label');
+    if (label) {
+      const top = `${Math.round(label.getBoundingClientRect().top - header.getBoundingClientRect().top + (label.offsetHeight - el.offsetHeight) / 2)}px`;
+      if (el.style.top !== top) el.style.top = top;
+    }
     for (const button of el.children) {
       const on = button.dataset.snpPick === weekPick;
       if (button.getAttribute('aria-checked') !== String(on)) button.setAttribute('aria-checked', String(on));
     }
+  }
+
+  // "Shooting" in Sleeper's filter row, after its own checkboxes and in their
+  // markup, while Stats is on: shows the shot-volume columns at the end.
+  function shootingBox(on) {
+    const row = document.querySelector(`${PLAYERS_PANEL} .filter-row`);
+    let el = document.querySelector(`${PLAYERS_PANEL} .snp-shooting`);
+    if (!on || !row) {
+      el?.remove();
+      return;
+    }
+    if (!el || el.parentElement !== row) {
+      el?.remove();
+      el = document.createElement('div');
+      el.className = 'filter-item snp-shooting';
+      el.setAttribute('role', 'checkbox');
+      el.tabIndex = 0;
+      el.title = 'Shot volume (FGM, FGA, 3PA, FTM, FTA): it doesn\'t score, but shows who shoots';
+      el.innerHTML = '<div class="custom-checkbox-item"><div class="custom-checkbox nba"><span class="checkmark"></span></div></div><div class="filter-label">Shooting</div>';
+      const toggle = (e) => {
+        e.stopPropagation();
+        shooting = !shooting;
+        patchPlayers();
+      };
+      el.addEventListener('click', toggle);
+      el.addEventListener('keydown', (e) => (e.key === ' ' || e.key === 'Enter') && (e.preventDefault(), toggle(e)));
+      const items = row.querySelectorAll(':scope > .filter-item:not(.snp-shooting)');
+      (items[items.length - 1] || row.lastElementChild)?.after(el);
+    }
+    el.querySelector('.custom-checkbox').classList.toggle('checked', shooting);
+    if (el.getAttribute('aria-checked') !== String(shooting)) el.setAttribute('aria-checked', String(shooting));
+  }
+
+  // The week strip for a player's team: one mark a day, Monday to Sunday.
+  const DAY_WORDS = { done: 'played', live: 'on now', left: 'to play' };
+  function weekStrip(cell, schedule, team) {
+    const states = schedule?.teams[team];
+    if (!cell.hasAttribute('data-snp-cell')) cell.setAttribute('data-snp-cell', '');
+    cell.querySelector(':scope > .snp-value')?.remove();
+    let el = cell.querySelector(':scope > .snp-week');
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'snp-week';
+      cell.append(el);
+    }
+    const sig = states ? `${team}|${states.join()}` : '';
+    if (el.dataset.sig === sig) return;
+    el.dataset.sig = sig;
+    if (!states) {
+      el.textContent = '-';
+      el.removeAttribute('title');
+      return;
+    }
+    const left = states.filter((d) => d === 'left').length;
+    const weekday = (date) => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' });
+    el.innerHTML = states.map((d) => `<i class="${d || 'none'}"></i>`).join('');
+    el.title = `${left} game${left === 1 ? '' : 's'} left this week\n${states.map((d, i) => d && `${weekday(schedule.days[i])}: ${DAY_WORDS[d]}`).filter(Boolean).join('\n')}`;
   }
 
   // A span of ours over a cell whose own text (Sleeper's, hidden) can't say what we mean.
@@ -327,6 +465,7 @@
     if (!cell.hasAttribute('data-snp-cell')) return;
     cell.removeAttribute('data-snp-cell');
     cell.querySelector(':scope > .snp-value')?.remove();
+    cell.querySelector(':scope > .snp-week')?.remove();
   }
 
   // A single game's numbers are counts: whole, but for fantasy points that score in halves.
@@ -367,11 +506,17 @@
       const s = map[id];
       keys.forEach((key, i) => {
         if (key === DELTA_KEY || !cells[i]) return;
+        if (key === WEEK_KEY) {
+          const schedule = panel.snpSchedule;
+          weekStrip(cells[i], schedule, schedule?.teamOf[id]);
+          return;
+        }
         const text = cellText(key, s);
         if (text == null) {
           clearOverlay(cells[i]);
           return;
         }
+        cells[i].querySelector(':scope > .snp-week')?.remove();
         const value = overlay(cells[i], 'snp-value');
         if (value.textContent !== text) value.textContent = text;
       });
@@ -442,17 +587,24 @@
   function sizeColumns(panel) {
     const keys = panel?.state.statKeys || [];
     const html = document.documentElement;
-    const fit = keys.length > 9 && headerRoom();
-    const width = fit ? `${Math.min(60, Math.floor(fit.room / keys.length - fit.margins))}px` : '';
+    const week = keys.indexOf(WEEK_KEY);
+    // The week strip takes its own width; the other columns share what's left.
+    const strip = week >= 0 ? WEEK_W : 0;
+    const fit = (keys.length > 9 || strip) && headerRoom();
+    const others = keys.length - (strip ? 1 : 0);
+    const width = fit ? `${Math.min(60, Math.floor((fit.room - (strip ? strip + fit.margins : 0)) / others - fit.margins))}px` : '';
     if (html.style.getPropertyValue('--snp-col') !== width) {
       if (width) html.style.setProperty('--snp-col', width);
       else html.style.removeProperty('--snp-col');
     }
     html.toggleAttribute('data-snp-cols', Boolean(width));
+    const at = (n) => `.stat-key-header > :nth-child(${n} of .label), .player-list-item > :nth-child(${n} of .cell)`;
     const nth = keys.flatMap((k, i) => (VOLUME.includes(k) ? [i + 1] : []));
-    const css = nth.length ? `${PLAYERS_PANEL} :is(${nth.map((n) => `.stat-key-header > :nth-child(${n} of .label), .player-list-item > :nth-child(${n} of .cell)`).join(', ')}) { opacity: 0.5; }` : '';
+    const css = (nth.length ? `${PLAYERS_PANEL} :is(${nth.map(at).join(', ')}) { opacity: 0.5; }` : '') +
+      (strip ? `html[data-snp-cols] ${PLAYERS_PANEL} :is(${at(week + 1)}) { flex-basis: ${WEEK_W}px !important; }` : '');
     if (volumeStyle.textContent !== css) volumeStyle.textContent = css;
   }
+
 
   // The admin headers read as named (not uppercase), on two lines.
   // adminFPTS wears the what-if color once a value differs from the league's.
@@ -477,12 +629,18 @@
     ${PLAYERS_PANEL} .snp-places:empty { display: none; }
     ${PLAYERS_PANEL} .table-header:has(> .snp-week-pick) { position: relative; }
     ${PLAYERS_PANEL} .snp-week-pick {
-      position: absolute; left: 16px; top: 15px; display: flex; padding: 2px; border-radius: 13px; background: rgb(32, 38, 53);
+      position: absolute; left: 16px; top: 15px; display: flex; gap: 2px; padding: 3px; border-radius: 14px; background: rgb(32, 38, 53);
     }
     ${PLAYERS_PANEL} .snp-week-pick button {
-      height: 22px; padding: 0 8px; border: 0; border-radius: 11px; background: none; cursor: pointer;
-      font: 700 12px Poppins, sans-serif; color: rgb(185, 196, 212);
+      height: 20px; min-width: 40px; padding: 0 10px; border: 0; border-radius: 10px; background: none; cursor: pointer;
+      font: 700 11px/20px Poppins, sans-serif; color: rgb(185, 196, 212);
     }
+    ${PLAYERS_PANEL} .snp-week { display: flex; gap: 2px; height: 14px; align-items: stretch; font-size: 12px; }
+    ${PLAYERS_PANEL} .snp-week i { flex: 0 0 5px; border-radius: 1.5px; background: rgba(255, 255, 255, 0.06); }
+    ${PLAYERS_PANEL} .snp-week i.done { background: rgba(185, 196, 212, 0.6); }
+    ${PLAYERS_PANEL} .snp-week i.live { background: #ff5b6e; }
+    ${PLAYERS_PANEL} .snp-week i.left { background: #00ceb8; }
+    ${PLAYERS_PANEL} .snp-shooting { cursor: pointer; }
     ${PLAYERS_PANEL} .snp-week-pick button:hover { color: #fff; }
     ${PLAYERS_PANEL} .snp-week-pick button[aria-checked="true"] { background: rgb(196, 213, 230); color: rgb(2, 32, 71); }
     ${PLAYERS_PANEL} .snp-delta {

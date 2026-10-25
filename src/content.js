@@ -347,6 +347,41 @@
     }
     document.addEventListener('snp:week-games-request', pickWeekGames);
 
+    // A week's schedule for the Players tab's strip, per team and day: '' (no
+    // game), 'done', 'live' or 'left'. Null while it loads (then
+    // 'snp:week-games-ready'). Read from a loaded week, else one scores query.
+    const weekSchedules = {};
+    function weekSchedule(e) {
+      const { season, week } = JSON.parse(e.detail);
+      const key = `${season}|${week}`;
+      const loaded = season === state.league?.season && state.weeks[week];
+      if (!loaded && !weekSchedules[key]) {
+        const type = season === state.league?.season ? state.league.season_type || 'regular' : 'regular';
+        weekSchedules[key] = api.graphql(`scores (week ${week})`, `query scores {
+  scores(sport: "nba", season_type: ${JSON.stringify(type)}, season: ${JSON.stringify(String(season))}, week: ${Number(week)}) {
+    date game_id metadata status start_time
+  }
+}`)
+          .then((data) => { weekSchedules[key] = data?.scores || []; })
+          .catch(() => { weekSchedules[key] = []; })
+          .finally(() => document.dispatchEvent(new CustomEvent('snp:week-games-ready')));
+      }
+      const scores = loaded ? null : Array.isArray(weekSchedules[key]) ? weekSchedules[key] : undefined;
+      let out = null;
+      if (loaded || scores) {
+        const days = loaded ? loaded.days : model.weekDays(scores);
+        const byTeam = loaded ? loaded.gamesByTeam : model.gamesByTeam(scores);
+        const now = Date.now();
+        const stateOf = (g) => (!g ? '' : g.status === 'complete' ? 'done'
+          : g.status === 'in_game' || (g.start != null && g.start <= now) ? 'live' : 'left');
+        const teamOf = Object.fromEntries(Object.entries(state.players || {}).filter(([, pl]) => pl.team).map(([id, pl]) => [id, pl.team]));
+        out = { days, teamOf,
+          teams: Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => stateOf(games[d]))])) };
+      }
+      document.dispatchEvent(new CustomEvent('snp:week-schedule', { detail: JSON.stringify(out) }));
+    }
+    document.addEventListener('snp:week-schedule-request', weekSchedule);
+
     // Every loaded week's fantasy points, with whichever scoring is in use.
     function rescore() {
       const settings = ui.scoringOf(state);
@@ -1311,6 +1346,7 @@
       document.removeEventListener('click', onOutsideClick, true);
       document.removeEventListener('snp:admin-score-request', adminDeltas);
       document.removeEventListener('snp:week-games-request', pickWeekGames);
+      document.removeEventListener('snp:week-schedule-request', weekSchedule);
       document.removeEventListener('snp:player-action', onPlayerAction);
       document.removeEventListener('snp:player-card', onPlayerCard);
       if (document.documentElement.dataset.snpNbaLeague === leagueId) delete document.documentElement.dataset.snpNbaLeague;

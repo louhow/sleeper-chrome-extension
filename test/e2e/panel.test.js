@@ -109,16 +109,22 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   .label span { text-transform: uppercase; }
   .name { width: 160px; }
   .filters button { margin: 0 4px 8px 24px; }
+  .filter-row { display: flex; align-items: center; gap: 8px; margin: 0 0 8px 24px; }
+  .filter-item { display: flex; align-items: center; gap: 6px; }
+  .custom-checkbox { width: 14px; height: 14px; border: 1px solid #888; border-radius: 3px; }
+  .custom-checkbox.checked { background: #f5b469; }
   /* Sleeper's header is 42px, its labels the bottom 25px. */
   .table-header { height: 42px; padding-top: 16px; box-sizing: border-box; }
 </style>
 <div class="integration-players-panel"><div class="filters"><button data-pos="ALL">ALL</button><button data-pos="PG">PG</button>
-  <div class="filter-dropdown"><div class="app-dropdown"></div></div></div>
+  <div class="filter-panel open"><div class="filter-row"><div class="filter-dropdown"><div class="app-dropdown"></div></div>
+    <div class="filter-item"><div class="custom-checkbox-item"><div class="custom-checkbox checked nba"><span class="checkmark"></span></div></div><div class="filter-label">Free agents</div></div>
+  </div></div></div>
   <div class="player-table"><div class="table-header"><div class="stat-key-header nba"></div></div><div class="ReactVirtualized__Grid"></div></div></div>
 <script>
   // Keys Sleeper has no label for print capitalized (and show uppercase).
   const LABELS = { fpts_proj: 'FPTS', fpts: 'FPTS', sp: 'MIN', pts: 'PTS', tpm: '3PM', reb: 'REB', ast: 'AST', stl: 'STL', blk: 'BLK', to: 'TO',
-    fgm: 'Fgm', fga: 'Fga', tpa: '3pa', ftm: 'Ftm', fta: 'Fta', GP: 'GP' };
+    fgm: 'Fgm', fga: 'Fga', tpa: '3pa', ftm: 'Ftm', fta: 'Fta', GP: 'GP', Week: 'Week' };
   const PLAYERS = ${JSON.stringify(players)};
   // Rostered players show their owner under the name, which makes the name area wider.
   const OWNERS = Object.fromEntries(PLAYERS.filter((p) => p.owner).map((p) => [p.id, p.owner]));
@@ -162,7 +168,7 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   function render() {
     const { playerStatsMap: map, statKeys, sort, positionFilter } = panel.state;
     document.querySelector('.stat-key-header').innerHTML = statKeys.map((k) => '<div class="label nba" data-key="' + k + '"><span>' + (LABELS[k] || k) + '</span></div>').join('');
-    const view = PLAYERS.filter((p) => positionFilter === 'ALL' || p.pos === positionFilter).map((p) => ({ player_id: p.id }));
+    const view = PLAYERS.filter((p) => positionFilter === 'ALL' || p.pos === positionFilter).map((p) => ({ player_id: p.id, team: p.team }));
     if (sort) view.sort((a, b) => (map[b.player_id][sort] || -1) - (map[a.player_id][sort] || -1));
     const grid = document.querySelector('.ReactVirtualized__Grid');
     grid.__reactInternalInstance$test = fiberOf({ players: view, playerStatsMap: map }, 3);
@@ -1586,11 +1592,18 @@ test('what-if scoring: the Players tab gets sortable adminFPTS and adminDelta co
 });
 
 const nflDialog = (sel = '') => `#sleeper-nfl-dialog ${sel}`;
-test('players tab opens on Projection for the current week, and Sleeper\'s week dropdown says so', async () => {
+// The Players tab remembers your view per league in the page's storage; each test starts without one.
+async function forgetPlayersView() {
+  await page.goto(PLAYERS_URL);
+  await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('snp:players-view:')).forEach((k) => localStorage.removeItem(k)));
+}
+
+test('players tab opens on Projection for the current week, then on whatever you had on last', async () => {
   const STAT_KEYS = ['fpts', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'];
-  const players = [{ id: 'guard', pos: 'PG', stats: { fpts: 10, fpts_proj: 12, pts: 10 } }];
+  const players = [{ id: 'guard', pos: 'PG', team: 'LAL', stats: { fpts: 10, fpts_proj: 12, pts: 10 } }];
   const dropdown = page.locator('.app-dropdown');
   documentBody = playersTable(players, { statType: 'stat', statInterval: 'season', statKeys: STAT_KEYS, sort: 'fpts' }, { leg: 2 });
+  await forgetPlayersView();
   await page.goto(PLAYERS_URL);
   await page.waitForFunction(() => panel.state.statType === 'proj' && panel.state.statInterval === 2, null, { timeout: 30000 });
   assert.deepEqual(await page.evaluate(() => panel.fetched), [['proj', 2]], 'loaded the way Sleeper\'s own dropdown loads a week');
@@ -1600,16 +1613,42 @@ test('players tab opens on Projection for the current week, and Sleeper\'s week 
   await page.waitForTimeout(1200);
   assert.deepEqual(await page.evaluate(() => [panel.state.statType, panel.state.statInterval, panel.fetched.length]), ['stat', 'season', 1]);
   assert.equal(await dropdown.textContent(), 'Season');
+  // And comes back next time: Stats for the season.
+  await page.goto(PLAYERS_URL);
+  await page.waitForFunction(() => panel.state.statType === 'stat' && panel.state.statInterval === 'season', null, { timeout: 30000 });
+  assert.deepEqual(await page.evaluate(() => panel.fetched), [], 'already what Sleeper opened on');
+  // Stats for this week, on Worst with Shooting: all of it comes back.
+  await page.waitForFunction(() => panel.snpOpenedFor);
+  await page.evaluate(() => panel.setState({ statInterval: 2, leg: 2 }));
+  await page.locator('.snp-week-pick button', { hasText: 'Worst' }).click();
+  await page.locator('.snp-shooting').click();
+  await page.waitForFunction(() => panel.state.statKeys.includes('fta'));
+  await page.goto(PLAYERS_URL);
+  await page.waitForFunction(() => panel.state.statType === 'stat' && panel.state.statInterval === 2, null, { timeout: 30000 });
+  await page.locator('.snp-week-pick [aria-checked="true"]', { hasText: 'Worst' }).waitFor();
+  await page.waitForFunction(() => panel.state.statKeys.includes('fta'));
+  assert.match(await page.locator('.snp-shooting .custom-checkbox').getAttribute('class'), /\bchecked\b/);
+  // That was the current week, so when the next one starts, it opens on that one.
+  documentBody = playersTable(players, { statType: 'stat', statInterval: 'season', statKeys: STAT_KEYS, sort: 'fpts' }, { leg: 3 });
+  await page.goto(PLAYERS_URL);
+  await page.waitForFunction(() => panel.state.statType === 'stat' && panel.state.statInterval === 3, null, { timeout: 30000 });
+  // A past week stays that week.
+  await page.waitForFunction(() => panel.snpOpenedFor);
+  await page.evaluate(() => panel.setState({ statType: 'proj', statInterval: 1, leg: 1 }));
+  await page.waitForTimeout(700);
+  await page.goto(PLAYERS_URL);
+  await page.waitForFunction(() => panel.state.statType === 'proj' && panel.state.statInterval === 1, null, { timeout: 30000 });
 
   // Already on this week: nothing to load, but Sleeper's dropdown reads "2026" until fixed.
   documentBody = playersTable(players, { statInterval: 1 }, { leg: 1 });
+  await forgetPlayersView();
   await page.goto(PLAYERS_URL);
   await page.waitForFunction(() => document.querySelector('.app-dropdown').textContent === 'Week 1', null, { timeout: 30000 });
   assert.deepEqual(await page.evaluate(() => panel.fetched), []);
+  await forgetPlayersView();
   documentBody = LOGGED_OUT;
 });
-
-test('players tab in Stats: games played, dimmed shot-volume columns, and a week\'s best or worst game', async () => {
+test('players tab in Stats: games played, games left, shooting at the end, and a week\'s best or worst game', async () => {
   sleeper.weekStats = [
     { player_id: 'shooter', game_id: 'g1', stats: { sp: 2000, pts: 30, fgm: 12, fga: 20, tpa: 6, ftm: 4, fta: 5 } },
     { player_id: 'shooter', game_id: 'g2', stats: { sp: 1500, pts: 6, fgm: 3, fga: 14, tpa: 2 } },
@@ -1621,9 +1660,10 @@ test('players tab in Stats: games played, dimmed shot-volume columns, and a week
   documentBody = playersTable([
     // Sleeper's week stats are per game already, with no games-played count.
     // Projected the other way round from how they scored.
-    { id: 'shooter', pos: 'SG', stats: { fpts: 18, fpts_proj: 30, sp: 1750, pts: 18, fgm: 7.5, fga: 17, tpa: 4, ftm: 2, fta: 2.5 } },
-    { id: 'steady', pos: 'C', stats: { fpts: 20, fpts_proj: 10, sp: 1800, pts: 20, fgm: 8, fga: 15, tpa: 1, ftm: 4, fta: 4 } },
+    { id: 'shooter', pos: 'SG', team: 'LAL', stats: { fpts: 18, fpts_proj: 30, sp: 1750, pts: 18, fgm: 7.5, fga: 17, tpa: 4, ftm: 2, fta: 2.5 } },
+    { id: 'steady', pos: 'C', team: 'BOS', stats: { fpts: 20, fpts_proj: 10, sp: 1800, pts: 20, fgm: 8, fga: 15, tpa: 1, ftm: 4, fta: 4 } },
   ], { statType: 'stat', statInterval: 1, statKeys: STAT_KEYS, sort: 'fpts_proj' });
+  await forgetPlayersView();
   await page.goto(PLAYERS_URL);
   const labels = () => page.locator('.stat-key-header .label').allTextContents();
   // A cell as it reads: our number when one is drawn over Sleeper's.
@@ -1635,8 +1675,33 @@ test('players tab in Stats: games played, dimmed shot-volume columns, and a week
   });
   const cell = (id, key) => page.evaluate(([i, k]) => readCell(i, k), [id, key]);
   const cellIs = (id, key, text) => page.waitForFunction(([i, k, t]) => readCell(i, k) === t, [id, key, text]);
-  await page.waitForFunction(() => panel.state.statKeys.includes('fta') && panel.state.statKeys.includes('GP'), null, { timeout: 30000 });
-  assert.deepEqual(await labels(), ['FPTS', 'GP', 'MIN', 'PTS', 'Fgm', 'Fga', '3PM', '3pa', 'REB', 'AST', 'STL', 'BLK', 'TO', 'Ftm', 'Fta']);
+  await page.waitForFunction(() => panel.state.statKeys.includes('GP') && panel.state.statKeys.includes('Week'), null, { timeout: 30000 });
+  assert.deepEqual(await labels(), ['FPTS', 'GP', 'Week', 'MIN', 'PTS', '3PM', 'REB', 'AST', 'STL', 'BLK', 'TO'], 'shooting stays out until asked for');
+  // The week at a glance: a mark a day, played, on now, still to play, from each team's schedule.
+  const strip = (id) => page.evaluate((i) => {
+    const el = document.querySelectorAll(`.player-list-item[data-id="${i}"] .cell`)[panel.state.statKeys.indexOf('Week')]?.querySelector('.snp-week');
+    return el && { marks: [...el.children].map((m) => m.className), title: el.title };
+  }, id);
+  await page.waitForFunction(() => document.querySelectorAll('.snp-week i').length === 14, null, { timeout: 30000 });
+  const { data } = await (await fetch('https://sleeper.com/graphql', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query: 'query scores { scores(sport: "nba", season_type: "regular", season: "2026", week: 1) { date status start_time metadata } }' }),
+  })).json();
+  const lal = data.scores.filter((g) => [g.metadata?.home_team?.team, g.metadata?.away_team?.team].includes('LAL'));
+  const marks = (await strip('shooter')).marks;
+  assert.equal(marks.length, 7);
+  assert.equal(marks.filter((m) => m !== 'none').length, lal.length, 'one mark per Lakers game');
+  const left = marks.filter((m) => m === 'left').length;
+  assert.match((await strip('shooter')).title, new RegExp(`^${left} games? left this week\\n`));
+  assert.equal(await page.evaluate(() => panel.state.playerStatsMap.shooter.Week), left, 'sorts by games left');
+  // Shooting: shot volume, which doesn't score, at the end of the table and dimmed.
+  const shootingBox = page.locator('.filter-row .snp-shooting');
+  assert.equal(await shootingBox.locator('.filter-label').textContent(), 'Shooting');
+  assert.doesNotMatch(await shootingBox.locator('.custom-checkbox').getAttribute('class'), /\bchecked\b/);
+  await shootingBox.click();
+  await page.waitForFunction(() => panel.state.statKeys.includes('fta'));
+  assert.deepEqual(await labels(), ['FPTS', 'GP', 'Week', 'MIN', 'PTS', '3PM', 'REB', 'AST', 'STL', 'BLK', 'TO', 'Fgm', 'Fga', '3pa', 'Ftm', 'Fta']);
+  assert.match(await shootingBox.locator('.custom-checkbox').getAttribute('class'), /\bchecked\b/);
   await cellIs('shooter', 'GP', '2');
   assert.equal(await cell('steady', 'GP'), '1');
   // Sleeper leaves Stats sorted by the projection, which isn't a column; it sorts by the FPTS shown instead.
@@ -1652,7 +1717,7 @@ test('players tab in Stats: games played, dimmed shot-volume columns, and a week
     getComputedStyle(document.querySelectorAll(`.player-list-item[data-id="${i}"] .cell`)[panel.state.statKeys.indexOf(k)]).opacity, [id, key]);
   assert.equal(await page.locator('.stat-key-header .label[data-key="fga"]').evaluate((el) => getComputedStyle(el).opacity), '0.5');
   assert.deepEqual([await opacity('shooter', 'fga'), await opacity('shooter', 'pts'), await opacity('shooter', 'GP')], ['0.5', '1', '1']);
-  // All 15 columns fit: no sideways scroll, each value under its header.
+  // All 16 columns fit: no sideways scroll, each value under its header.
   const layout = () => page.evaluate(() => {
     const header = document.querySelector('.stat-key-header');
     const labels = [...header.querySelectorAll('.label')].map((l) => l.getBoundingClientRect());
@@ -1703,7 +1768,7 @@ test('players tab in Stats: games played, dimmed shot-volume columns, and a week
   await pick.locator('button', { hasText: 'Avg' }).click();
   await cellIs('shooter', 'pts', '18.0');
   await cellIs('shooter', 'GP', '2');
-  assert.equal(await page.locator('.player-list-item [data-snp-cell]').count(), 2, 'only GP is drawn over');
+  assert.equal(await page.locator('.player-list-item [data-snp-cell]').count(), 4, 'only GP and the week are drawn over');
   assert.deepEqual(await order(), ['steady', 'shooter'], 'back to the averages, still by PTS');
   // Sorted by GP, Best drops the column, so FPTS takes over; back on Avg it stays FPTS.
   await page.locator('.stat-key-header .label[data-key="GP"]').click();
@@ -1721,10 +1786,15 @@ test('players tab in Stats: games played, dimmed shot-volume columns, and a week
   await pick.waitFor({ state: 'detached' });
   await cellIs('shooter', 'pts', '18.0');
   assert.ok(!(await labels()).includes('GP'));
+  assert.ok(!(await labels()).includes('Week'), 'no week strip for a season');
   assert.equal(await page.locator('.player-list-item [data-snp-cell]').count(), 0, 'Sleeper\'s numbers again');
-  await page.evaluate(() => panel.setState({ statType: 'proj', statKeys: ['fpts_proj', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'], sort: 'fpts_proj' }));
+  await page.evaluate(() => panel.setState({ statType: 'proj', statInterval: 1, statKeys: ['fpts_proj', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'], sort: 'fpts_proj' }));
   await page.waitForFunction(() => !panel.state.statKeys.includes('fga'));
-  assert.deepEqual(await labels(), ['FPTS', 'MIN', 'PTS', '3PM', 'REB', 'AST', 'STL', 'BLK', 'TO']);
+  assert.deepEqual(await labels(), ['FPTS', 'Week', 'MIN', 'PTS', '3PM', 'REB', 'AST', 'STL', 'BLK', 'TO'], 'a week\'s projection: games left, no shooting');
+  assert.equal(await shootingBox.count(), 0, 'Shooting is a Stats thing');
+  await fits();
+  await page.screenshot({ path: `${OUT}players-proj-week.png` });
+  await forgetPlayersView();
   sleeper.weekStats = null;
   documentBody = LOGGED_OUT;
 });
