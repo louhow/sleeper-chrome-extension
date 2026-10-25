@@ -129,7 +129,7 @@
     if (!real(id)) return `<span class="os-p ${kind} empty"><span class="headshot blank"></span><span class="dp-info"><span class="dp-name">Empty</span></span></span>`;
     const p = lineup.players[id] || { name: `Player #${id}`, positions: [] };
     return `<span class="os-p ${kind}">
-      <img class="headshot" src="${headshot(id, p)}" alt="">
+      <span class="os-face"><img class="headshot" src="${headshot(id, p)}" alt="">${globalThis.SNP.optimize.subArrow(kind)}</span>
       <span class="dp-info">
         <span class="dp-name"><b>${esc(p.name)}</b> <span class="team">${esc(p.position || '')} - ${esc(p.team || 'FA')}</span>${injury(p)}</span>
         ${sub}

@@ -56,6 +56,8 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
   - A change leads with who comes in (name in blue), so the Starting column reads as the new lineup top to bottom; who they replace sits beside them in the Replaces column, faded, with an Apply button.
     The player going out says where and why ("To bench · no game Sat · 31.91/g") and, when they have a finished game that could still be locked, the score they drop ("Drops lock-in 16.50 Wed vs GSW").
     The one coming in says where from and their next game ("From bench · Sat @ CHI 7:00pm").
+    Their headshots carry substitution marks, as soccer apps show them: a green arrow up coming in, a red arrow down going out (the NFL dialog too).
+    When the one going out has a finished game that could still be locked, "Lock 21.50 instead" under Apply keeps them in the lineup and locks it ("(if started)" when the extension didn't see them start it); the dialog stays open on the plan around the lock.
   - A finished game worth locking shows its score, the open value and when the window closes, with a Lock button.
   - A slot that stays is dimmed and says why: "No change", "Locked" (with the locked score), "Playing" or "Empty".
 - Applying one row saves just that slot and keeps the dialog open on the plan from the new lineup, with a note saying what saved.

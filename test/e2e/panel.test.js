@@ -1441,6 +1441,11 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const victimRow = page.locator(dialog('.os-row.swap.warning')).filter({ hasText: players[victim].full_name });
   assert.match(await victimRow.locator('.sub.drops.warn').textContent(), /^Drops lock-in 3\.00 \w{3} (vs|@) \w+$/, 'what benching gives up');
   assert.equal(await victimRow.locator('.score.red').textContent(), '3.00', 'the score shows in its tier color');
+  // Substitution marks, as soccer apps show them: green up coming in, red down going out.
+  assert.equal(await victimRow.locator('.os-p.in .os-arrow.in').getAttribute('aria-label'), 'Coming in');
+  assert.equal(await victimRow.locator('.os-p.out .os-arrow.out').getAttribute('aria-label'), 'Going out');
+  // A secondary option: keep them and lock that score instead.
+  assert.match(await victimRow.locator('.os-lock-instead').innerText(), /^Lock 3\.00 instead/);
   assert.match(await page.locator(dialog('.warn-banner')).textContent(), new RegExp(`${players[victim].full_name} 3\\.00.* finished games? you could still lock in`));
   assert.equal(await page.locator(dialog('.lose-banner')).count(), 0, 'no hard stop for a red score');
   assert.equal(await page.locator(dialog('[data-action="apply-lineup"]')).isDisabled(), false);
@@ -1512,6 +1517,20 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
   // Back to the starting lineup for the rest of the test.
   leg.starters = lineupBefore;
+  leg.starters_games = { ...existing };
+  // Lock instead: the UTIL starter stays, their finished game locks, nothing else moves.
+  await page.reload();
+  await page.locator(panel('button.optimize')).click();
+  const victimNow = page.locator(dialog('.os-row.swap')).filter({ has: page.locator(`.os-p.out [data-player="${victim}"]`) });
+  await victimNow.locator('.os-lock-instead').click();
+  await victimNow.waitFor({ state: 'detached' });
+  const lockOut = sleeper.mutations.at(-1);
+  assert.deepEqual(Object.keys(JSON.parse(lockOut.variables.starters_games)).filter((id) => !(id in existing)), [victim], 'just that lock');
+  assert.deepEqual(JSON.parse(lockOut.query.match(/starters: (\[[^\]]*\])/)[1]), lineupBefore, 'the lineup as it stands');
+  assert.match(await page.locator(dialog('.op-done')).textContent(), /^Locked .+ 3\.00$/);
+  assert.equal(await page.locator(dialog('.os-row.same.locked')).filter({ has: page.locator(`[data-player="${victim}"]`) }).count(), 1, 'now locked in its slot');
+  await page.keyboard.press('Escape');
+  await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
   leg.starters_games = { ...existing };
   const beforeGreen = sleeper.mutations.length;
 

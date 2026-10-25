@@ -114,6 +114,9 @@
           <button class="os-apply" data-op-row="${i}" ${m.saving || risky ? 'disabled' : ''}
             ${risky ? 'title="Tick the box above to confirm giving up that score"' : others.length ? `title="Also changes ${esc(others.join(', '))}"` : ''}>${busy ? 'Saving…' : 'Apply'}</button>
           ${others.length ? `<span class="os-with">with ${esc(others.join(', '))}</span>` : ''}
+          ${drops && plan.lockable ? `<button class="os-link os-lock-instead" data-op-lock-out="${esc(cur)}" ${m.saving ? 'disabled' : ''}
+            title="${esc(`Keep ${s.players[cur]?.name || 'them'} in the lineup and lock ${f2(drops.actual)} (${gameText(drops)}); locking is final${change.dropsUnsure ? '. Only if they were starting at tip-off' : ''}`)}">${m.busy === `lockout:${cur}` ? 'Locking…'
+              : `${lockIcon()}Lock ${f2(drops.actual)} instead${change.dropsUnsure ? ' (if started)' : ''}`}</button>` : ''}
         </span>
       </div>`;
     }
@@ -163,12 +166,20 @@
     if (!real(id)) return `<span class="os-p ${kind} empty"><span class="headshot blank"></span><span class="dp-info"><span class="dp-name">Empty</span></span></span>`;
     const p = s.players[id] || { name: `Player #${id}`, positions: [] };
     return `<span class="os-p ${kind}">
-      <img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}">
+      <span class="os-face"><img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}">${subArrow(kind)}</span>
       <span class="dp-info">
         <span class="dp-name"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button> ${positions(p)} <span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</span>
         ${sub}
       </span>
     </span>`;
+  }
+
+  // A substitution mark on the headshot, as soccer apps show them: a green arrow
+  // up for who comes in, a red arrow down for who goes out.
+  function subArrow(kind) {
+    if (kind !== 'in' && kind !== 'out') return '';
+    const path = kind === 'in' ? 'M6 2.5 10 7H7.6v3.5H4.4V7H2z' : 'M6 9.5 2 5h2.4V1.5h3.2V5H10z';
+    return `<span class="os-arrow ${kind}" aria-label="${kind === 'in' ? 'Coming in' : 'Going out'}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="${path}"/></svg></span>`;
   }
 
   // What the player in the slot is projected to score: that day, and per game left.
@@ -202,5 +213,5 @@
     return `<span class="score ${scoreTier(points)}">${f2(points)}</span>`;
   }
 
-  return { render, HOW };
+  return { render, HOW, subArrow };
 })();

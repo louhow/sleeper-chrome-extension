@@ -559,6 +559,8 @@
       };
     });
     // The lineup the plan starts from, slot by slot, and what each player in it is worth.
+    // Whether this lineup's finished games can be locked at all (your own, in season).
+    plan.lockable = l.lockable !== false;
     plan.current = [...l.starters];
     plan.slots = [...l.slots];
     plan.info = Object.fromEntries(Object.entries(look).map(([id, o]) => [id, {

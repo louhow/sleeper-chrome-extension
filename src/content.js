@@ -1125,6 +1125,25 @@
       return modalSave(() => saveStarters(starters), `Saved: ${movedText(changes)}`, replan);
     }
 
+    // A swap's secondary option: keep the starter going out and lock their
+    // finished game instead (one the extension couldn't confirm they started
+    // included, the button said so). On the lineup as it stands; the dialog stays open.
+    function lockOutRow(id) {
+      const fresh = freshPlan();
+      if (!fresh) return;
+      const { m, lineup } = fresh;
+      if (!lineup.lockable || !lineup.starters.includes(id)) return;
+      const days = model.playerDays(lineup.week, state.players[id]?.team, id);
+      const st = model.lockState(days, lineup.locks[id], Date.now(), lineup.started ? (game) => lineup.started(id, game) : null);
+      if (!(st.lockable || st.unsure) || !st.current) {
+        m.errors = [st.benched ? 'That game was played on your bench, so it can\'t be locked' : 'That game can no longer be locked'];
+        return schedule();
+      }
+      m.busy = `lockout:${id}`;
+      return modalSave(() => saveLeg('lock_in', lineup.roster.roster_id, lineup.starters, { ...lineup.locks, [id]: st.current.game.id }),
+        `Locked ${shortOf(id)} ${(st.current.actual ?? 0).toFixed(2)}`, replan);
+    }
+
     // Locks one recommended game now, on the lineup as it stands; the dialog stays open.
     function lockOptimizeRow(id) {
       const fresh = freshPlan();
@@ -1298,6 +1317,8 @@
       if (action === 'apply-lineup') applyOptimize();
       const row = e.target.closest('[data-op-row]');
       if (row) return applyOptimizeRow(Number(row.dataset.opRow));
+      const lockOut = e.target.closest('[data-op-lock-out]');
+      if (lockOut) return lockOutRow(lockOut.dataset.opLockOut);
       const lockRow = e.target.closest('[data-op-lock-row]');
       if (lockRow) return lockOptimizeRow(lockRow.dataset.opLockRow);
       const keep = e.target.closest('[data-op-keep], [data-op-relock]');

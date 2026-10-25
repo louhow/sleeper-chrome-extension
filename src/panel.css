@@ -2040,6 +2040,51 @@ button.optimize:hover:not(:disabled) {
 .os-row .dp-avg {
   color: var(--muted);
 }
+/* Substitution marks on the headshot: green up coming in, red down going out. */
+.os-face {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+}
+.os-arrow {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #0d1421;
+  box-shadow: 0 0 0 1.5px #0d1421;
+}
+.os-arrow svg {
+  width: 11px;
+  height: 11px;
+}
+.os-arrow.in svg { fill: #3ddc84; }
+.os-arrow.out svg { fill: #ff5b6e; }
+.os-p.out .os-arrow {
+  opacity: 1;
+}
+/* A swap's secondary option, under its Apply: two short lines in the action column. */
+.os-act .os-lock-instead {
+  display: block;
+  width: 100%;
+  color: var(--warn);
+  font-size: 10px;
+  line-height: 12px;
+  text-align: center;
+  white-space: normal;
+}
+.os-act .os-lock-instead .lock-icon {
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+.os-act .os-lock-instead:hover:not(:disabled) {
+  color: #ffe07a;
+}
 /* A change: who comes in first, then who they replace (faded, past a divider). */
 .os-p.in .dp-name button.name,
 .os-p.in .dp-name > b {
