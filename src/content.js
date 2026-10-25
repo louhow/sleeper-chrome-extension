@@ -15,9 +15,13 @@
   const FLOAT_AFTER_MS = 4000;
   const NOTICE_MS = 3000;
   const CLOCK_MS = 60e3;
-  // How often your own matchup leg is read again while the tab is visible, so
-  // the lineup history (who started which game, for Lock-In) has fewer gaps.
-  const LEG_POLL_MS = 3 * 60e3;
+  // Lock-In needs who was starting at each tip-off, and Sleeper keeps no lineup
+  // history, so your leg is read once a few minutes after each tip-off time of
+  // your players' games (while the tab is visible, or when it comes back during
+  // the game): Sleeper won't move a player whose game is on, so that read settles it.
+  const AFTER_TIP_MS = 5 * 60e3;
+  // Never read the legs more often than this, whatever asks.
+  const LEG_READ_GAP_MS = 60e3;
   // Career seasons fetched for the player card (one request each).
   const CAREER_SEASONS = 10;
   const CARD_SEASON_TABS = 6;
@@ -437,6 +441,9 @@
       state.currentWeek = Math.min(Math.max(current, state.minWeek), state.maxWeek);
       state.seasonType = nbaState.season_type;
       if (state.week == null) state.week = state.currentWeek;
+      // Lineups recorded for earlier weeks are no longer needed.
+      const oldWeeks = Array.from({ length: Math.max(0, state.currentWeek - state.minWeek) }, (_, i) => `lineups:${leagueId}:${state.minWeek + i}`);
+      if (oldWeeks.length) chrome.storage.local.remove(oldWeeks);
       await loadWeek(state.week);
       if (state.currentWeek !== state.week) loadWeek(state.currentWeek).catch(fail);
       state.ready = true;
@@ -520,7 +527,8 @@
       const standingsQuery = `query roster_standings {
   roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)}) { roster_id rank }
 }`;
-      const historyKey = `lineups:${leagueId}:${week}`;
+      // Only the current week's lineups matter for Lock-In.
+      const historyKey = week === state.currentWeek ? `lineups:${leagueId}:${week}` : null;
       const [matchups, projections, stats, scores, research, legs, standings, stored] = await Promise.all([
         api.get(`/v1/league/${leagueId}/matchups/${week}`),
         api.get(`/projections/nba/${season}/${week}?season_type=${seasonType}`),
@@ -531,9 +539,9 @@
         api.graphql(`roster_standings (week ${week})`, standingsQuery)
           .then((data) => data?.roster_standings ?? [])
           .catch(() => []),
-        chrome.storage.local.get(historyKey),
+        historyKey ? chrome.storage.local.get(historyKey) : {},
       ]);
-      state.lineupHistory[week] = stored[historyKey] || {};
+      if (historyKey) state.lineupHistory[week] = stored[historyKey] || {};
       const games = scores?.scores || [];
       const scoringSettings = ui.scoringOf(state);
       state.weeks[week] = {
@@ -551,6 +559,7 @@
         ranks: model.standingsRanks(state.rosters, standings),
       };
       seeLineups(week, legs);
+      if (week === state.currentWeek) planTipReads();
       schedule();
     }
 
@@ -570,9 +579,9 @@
     }
 
     // Reads the current week's legs again (lineups can change on Sleeper's apps too).
-    async function pollLegs() {
+    async function readLegs() {
       const week = state.currentWeek;
-      if (document.visibilityState !== 'visible' || !state.weeks[week] || state.saving || state.modal?.saving) return;
+      if (!state.weeks[week] || state.saving || state.modal?.saving || Date.now() - lastLegRead < LEG_READ_GAP_MS) return;
       const legs = await loadLegs(week);
       if (!legs || !state.weeks[week]) return;
       state.weeks[week].legs = legs;
@@ -580,8 +589,35 @@
       schedule();
     }
 
+    // Tip-off times of your players' games still to come this week, and the
+    // read after the next one. A read missed while the tab was hidden happens
+    // when it comes back, if that game is still on.
+    let tipTimer = null;
+    let missedTip = null;
+    function planTipReads() {
+      clearTimeout(tipTimer);
+      const week = state.weeks[state.currentWeek];
+      if (!week || !api.loggedIn()) return;
+      const now = Date.now();
+      const mine = state.rosters.filter((r) => ui.owns(state, r)).flatMap((r) => r.players || []);
+      const starts = mine.flatMap((id) => model.playerDays(week, state.players[id]?.team, id)).map((d) => d.game?.start);
+      const next = model.nextTipRead(starts, now, AFTER_TIP_MS, LEG_READ_GAP_MS);
+      if (!next) return;
+      tipTimer = setTimeout(() => {
+        if (document.visibilityState === 'visible') readLegs().catch(() => {});
+        else missedTip = next.tip;
+        planTipReads();
+      }, next.at - now);
+    }
+    function onVisible() {
+      if (document.visibilityState !== 'visible' || missedTip == null) return;
+      if (Date.now() < missedTip + model.FROZEN_MS) readLegs().catch(() => {});
+      missedTip = null;
+    }
+
     // Lineups, Lock-In picks (starters_games) and server projections for a week.
     // Needs the logged-in session; null when logged out or refused.
+    let lastLegRead = 0;
     async function loadLegs(week) {
       if (!api.loggedIn()) return null;
       const query = `query matchup_legs {
@@ -589,6 +625,7 @@
     leg matchup_id roster_id round starters points proj_points max_points custom_points starters_games subs
   }
 }`;
+      lastLegRead = Date.now();
       try {
         const data = await api.graphql(`matchup_legs (week ${week})`, query, { auth: true });
         return data?.matchup_legs ?? null;
@@ -1249,8 +1286,6 @@
     document.addEventListener('keydown', onKey);
     // Lock windows and game states move with the clock.
     const clock = setInterval(schedule, CLOCK_MS);
-    const legPoll = setInterval(() => pollLegs().catch(() => {}), LEG_POLL_MS);
-    const onVisible = () => pollLegs().catch(() => {});
     document.addEventListener('visibilitychange', onVisible);
 
     // Same league, other tab (Team <-> Matchup): keep the data, swap the view.
@@ -1270,7 +1305,7 @@
 
     function teardown() {
       clearInterval(clock);
-      clearInterval(legPoll);
+      clearTimeout(tipTimer);
       document.removeEventListener('visibilitychange', onVisible);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('click', onOutsideClick, true);

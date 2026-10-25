@@ -422,18 +422,41 @@ test('best lineup: a lock shuts the slot to the bench too, so a bench player who
 });
 
 test('lineup history: who was starting at a time, from the lineups seen', () => {
-  let h = model.seeLineup([], ['a', 'b'], 100);
-  h = model.seeLineup(h, ['a', 'b'], 200);
-  h = model.seeLineup(h, ['c', 'b'], 300);
-  h = model.seeLineup(h, ['c', 'b'], 400);
-  assert.deepEqual(plain(h), [{ from: 100, to: 200, starters: ['a', 'b'] }, { from: 300, to: 400, starters: ['c', 'b'] }]);
-  assert.deepEqual(plain(model.seeLineup(h, ['x'], 350)), plain(h), 'an older read changes nothing');
-  assert.equal(model.startedAt(h, 'a', 150), true, 'inside a span');
-  assert.equal(model.startedAt(h, 'c', 150), false);
-  assert.equal(model.startedAt(h, 'b', 250), true, 'between spans that agree');
-  assert.equal(model.startedAt(h, 'a', 250), null, 'between spans that disagree: a change happened, but when?');
-  assert.equal(model.startedAt(h, 'a', 50), null, 'before anything was seen');
-  assert.equal(model.startedAt([], 'a', 150), null);
+  const t = (n) => n * 1e6; // about 17 minutes a step, so 100 steps is over a day
+  let h = model.seeLineup([], ['a', 'b'], t(100));
+  h = model.seeLineup(h, ['a', 'b'], t(200));
+  h = model.seeLineup(h, ['c', 'b'], t(300));
+  h = model.seeLineup(h, ['c', 'b'], t(400));
+  assert.deepEqual(plain(h), [{ from: t(100), to: t(200), starters: ['a', 'b'] }, { from: t(300), to: t(400), starters: ['c', 'b'] }]);
+  assert.deepEqual(plain(model.seeLineup(h, ['x'], t(350))), plain(h), 'an older read changes nothing');
+  let many = [];
+  for (let i = 0; i < 150; i++) many = model.seeLineup(many, [String(i)], i);
+  assert.equal(many.length, 100, 'capped');
+  assert.deepEqual(plain(many.at(-1).starters), ['149'], 'keeping the latest');
+  assert.equal(model.startedAt(h, 'a', t(150)), true, 'inside a span');
+  assert.equal(model.startedAt(h, 'c', t(150)), false);
+  assert.equal(model.startedAt(h, 'b', t(250)), true, 'between spans that agree');
+  assert.equal(model.startedAt(h, 'a', t(250)), null, 'between spans that disagree: a change happened, but when?');
+  assert.equal(model.startedAt(h, 'a', t(50)), null, 'before anything was seen');
+  assert.equal(model.startedAt([], 'a', t(150)), null);
+  // Seen while the game was on, the lineup can't have changed for it since tip-off.
+  const live = [{ from: t(100), to: t(100), starters: ['x'] }, { from: t(260) + 5 * 60e3, to: t(260) + 5 * 60e3, starters: ['a'] }];
+  assert.equal(model.startedAt(live, 'a', t(260)), true, 'read 5 minutes after tip-off');
+  assert.equal(model.startedAt(live, 'a', t(260) - model.FROZEN_MS - 1), null, 'read after that game ended: unknown');
+});
+
+test('lineup reads follow tip-offs: one per tip-off time, never on a timer', () => {
+  const min = 60e3;
+  const day = [100 * min, 100 * min, 130 * min, 160 * min, null]; // two games at once, then two more
+  assert.deepEqual(plain(model.nextTipRead(day, 0, 5 * min, min)), { tip: 100 * min, at: 105 * min }, 'nothing until 5 minutes past the first');
+  assert.deepEqual(plain(model.nextTipRead(day, 105 * min, 5 * min, min)), { tip: 130 * min, at: 135 * min }, 'games together share one read');
+  assert.deepEqual(plain(model.nextTipRead(day, 102 * min, 5 * min, min)), { tip: 100 * min, at: 105 * min });
+  assert.deepEqual(plain(model.nextTipRead(day, 104.5 * min, 5 * min, min)), { tip: 100 * min, at: 105.5 * min }, 'at least a minute apart');
+  assert.equal(model.nextTipRead(day, 170 * min, 5 * min, min), null, 'none left');
+  // A day of reads is one per tip-off time.
+  let reads = 0;
+  for (let next = model.nextTipRead(day, 0, 5 * min, min); next; next = model.nextTipRead(day, next.at, 5 * min, min)) reads += 1;
+  assert.equal(reads, 3);
 });
 
 test('best lineup: a game played on the bench can\'t be locked after moving in, and an unseen one is only a maybe', () => {

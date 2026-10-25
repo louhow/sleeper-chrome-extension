@@ -24,8 +24,10 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
 - The points column marks a locked-in score with a padlock, in yellow, so it reads apart from a score still in play.
 - Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
 - Lock-In needs the player starting when the game tipped off: a game played on the bench can't be locked after moving them in.
-  Sleeper keeps no lineup history, so the extension remembers your lineups as it reads them (on each load, after each save, and every 3 minutes while the tab is visible), in the browser's extension storage.
-  A game it saw them starting for (or saw the same lineup both before and after tip-off) is lockable; one it saw them benched for isn't; anything else is a maybe, still lockable from the strip, with a title saying it depends on whether they started.
+  Sleeper keeps no lineup history, so the extension remembers your lineups as it reads them, in the browser's extension storage: the current week only (earlier weeks are deleted), at most 100 lineup changes.
+  It reads your leg on each load and after each save, plus once 5 minutes after each tip-off time of your players' games (games tipping off together share the read), only while the tab is visible; a read missed while it was hidden happens when it comes back, if the game is still on. Reads are never closer than a minute apart.
+  Sleeper won't move a player whose game is on, so a lineup seen in the two hours after tip-off settles it; so does the same lineup seen before and after.
+  A game it saw them starting for is lockable; one it saw them benched for isn't; anything else is a maybe, still lockable from the strip, with a title saying it depends on whether they started.
   Optimize only recommends locks it's sure of; a maybe shows in its row ("lockable if started"), and benching that player says "May drop lock-in".
 - Rostered and start percentages, as the mobile app shows them (rounded up, for the league's type).
 - Draft picks held, including picks acquired by trade.

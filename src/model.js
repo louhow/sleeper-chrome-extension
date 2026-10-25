@@ -277,28 +277,43 @@
     };
   }
 
-  // Whether a player was in the starting lineup at `time`, from lineups the
-  // extension saw: [{ from, to, starters }], each lineup seen unchanged from
-  // `from` to `to`. Inside a span it's that lineup; between two spans that
-  // agree, it's what both say. Otherwise null: Sleeper keeps no lineup history.
+  // Sleeper won't move a player once their game has tipped off, so any lineup
+  // seen in this long after tip-off (a game runs longer) is the one they tipped off in.
+  const FROZEN_MS = 2 * 3600e3;
+
+  // Whether a player was in the starting lineup when a game tipped off at
+  // `time`, from lineups the extension saw: [{ from, to, starters }], each
+  // lineup seen unchanged from `from` to `to`. A lineup seen while the game
+  // was on settles it; so do lineups seen before and after that agree.
+  // Otherwise null: Sleeper keeps no lineup history.
   function startedAt(history, id, time) {
     if (!history?.length || time == null) return null;
     const has = (h) => h.starters.includes(id);
-    const span = history.find((h) => h.from <= time && time <= h.to);
-    if (span) return has(span);
+    const during = history.find((h) => h.from <= time + FROZEN_MS && h.to >= time);
+    if (during) return has(during);
     const before = history.filter((h) => h.to < time).at(-1);
     const after = history.find((h) => h.from > time);
     return before && after && has(before) === has(after) ? has(before) : null;
   }
 
+  // When to read the lineup next for Lock-In: `after` past the next tip-off
+  // among `starts` (game start times; one read covers games tipping off
+  // together), and never sooner than `gap` from now. Null with none left.
+  function nextTipRead(starts, now, after, gap) {
+    const tip = Math.min(...starts.filter((t) => t != null && t + after > now));
+    return Number.isFinite(tip) ? { tip, at: Math.max(tip + after, now + gap) } : null;
+  }
+
   // Adds a lineup seen at `at` to a history (see startedAt): extends the last
   // span when unchanged, else starts a new one. Returns a new array.
+  // Keeps the latest `MAX_SPANS` lineups, far more than a week of changes needs.
   function seeLineup(history = [], starters, at) {
     const last = history.at(-1);
     if (last && at < last.to) return history;
     if (last && JSON.stringify(last.starters) === JSON.stringify(starters)) return [...history.slice(0, -1), { ...last, to: at }];
-    return [...history, { from: at, to: at, starters: [...starters] }];
+    return [...history, { from: at, to: at, starters: [...starters] }].slice(-MAX_SPANS);
   }
+  const MAX_SPANS = 100;
 
   // Score colors as Sleeper's mobile app shows a game's fantasy points
   // (green 24+, yellow 15+, red below). Thresholds observed, not from the API.
@@ -707,7 +722,7 @@
     ranks, rankShift, shiftTint,
     weekDays, gamesByTeam, pointsByGame, playerDays, lockInDefault, ownedPicks, spotRefs, swapTargets, applyMove, describeMove,
     taxiEligible, taxiOpen, reserveEligible,
-    lockedGameId, lockState, startedAt, seeLineup, scoreTier, openValue, bestLineup, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
+    lockedGameId, lockState, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, openValue, bestLineup, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
   };
 })();
