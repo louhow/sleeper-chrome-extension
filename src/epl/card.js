@@ -4,7 +4,8 @@
 (globalThis.SEP ||= {}).card = (() => {
   const { playerGames, weekTotals, started } = globalThis.SEP.model;
   const { scoreStats, breakdown } = globalThis.SEP.scoring;
-  const { esc, f2, f1, teamLogo, headshot, teamName, ownerOf, owns, positions, injuryTag, weekday, shortDate, gameTime, pct } = globalThis.SEP.ui;
+  const { esc, f2, f1, teamLogo, headshot, teamName, ownerOf, owns, playerOf, positions, injuryTag, weekday, shortDate, gameTime, pct, versus } = globalThis.SEP.ui;
+  const { height } = globalThis.SNP.card;
   const TABS = [['summary', 'Summary'], ['log', 'Game Log'], ['history', 'History']];
   // Game log columns: stat key, header, whether it's shown for goalkeepers only / outfield only.
   const LOG_COLS = [
@@ -15,10 +16,6 @@
 
   const dash = (v) => (v == null || v === '' ? '-' : v);
   const num = (v, digits = 0) => (v == null || Number.isNaN(v) ? '-' : Number(v).toFixed(digits));
-  const height = (inches) => {
-    const n = Number(inches);
-    return n ? `${Math.floor(n / 12)}'${n % 12}"` : '-';
-  };
   function ago(ms, now) {
     const s = Math.max(0, (now - ms) / 1000);
     const [n, unit] = s < 3600 ? [Math.round(s / 60), 'minute'] : s < 86400 ? [Math.round(s / 3600), 'hour'] : [Math.round(s / 86400), 'day'];
@@ -47,7 +44,7 @@
     const m = s.modal;
     const id = m.playerId;
     const c = s.cards?.[id] || {};
-    const p = s.players?.[id] || { name: `Player #${id}`, positions: [] };
+    const p = playerOf(s, id);
     const bio = c.bio || {};
     const owner = ownerOf(s, id);
     const mine = owner && owns(s, owner);
@@ -95,7 +92,7 @@
     const upcoming = !next ? '<p class="msg">No match this week.</p>' : `<div class="up-game">
         <img class="headshot" src="${headshot(id)}" alt="">
         <div class="up-main">
-          <div><b>${esc(p.name)}</b> ${next.home ? 'vs' : '@'} ${esc(next.opponentAbbr)} <img class="mini-logo" src="${teamLogo(next.opponent)}" alt=""></div>
+          <div><b>${esc(p.name)}</b> ${esc(versus(next))} <img class="mini-logo" src="${teamLogo(next.opponent)}" alt=""></div>
           <div class="sub">${esc(weekday(next.game.date, 'long'))}, ${esc(shortDate(next.game.date))}${next.game.start ? ` · ${esc(gameTime(next.game.start))}` : ''}${next.game.status === 'complete' ? ' · Final' : ''}</div>
         </div>
         <div class="up-pts"><b>${next.played ? f2(next.actual) : f2(next.proj)}</b><span>${next.played ? 'pts' : 'proj'}</span></div>
@@ -150,7 +147,7 @@
         const t = weekTotals(games, s.now);
         proj = games.length ? t.proj : null;
         final = t.played ? t.points : null;
-        opp = games.map((g) => `${g.home ? 'vs' : '@'} ${g.opponentAbbr}`).join(', ');
+        opp = games.map(versus).join(', ');
       } else if (log) {
         const rows = (list) => (list || []).filter(Boolean);
         const pr = rows(log.proj?.[w]);

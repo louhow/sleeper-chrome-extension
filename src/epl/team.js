@@ -2,7 +2,7 @@
 // player's match and points, then bench and injured reserve. Pure: state -> HTML.
 (globalThis.SEP ||= {}).team = (() => {
   const { playerGames, weekTotals, spotRefs, swapTargets, started } = globalThis.SEP.model;
-  const { esc, f2, teamName, ownerName, avatarImg, record, slotBadge, weekNav, lineup, teamTotals, reserveRule, nextGameText, gameChips, playerLine, pct, roleName } = globalThis.SEP.ui;
+  const { esc, f2, teamName, ownerName, avatarImg, record, slotBadge, weekNav, lineup, teamTotals, reserveRule, nextGameText, gameChips, playerLine, playerOf, pct, roleName } = globalThis.SEP.ui;
 
   function render(s) {
     if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
@@ -116,7 +116,7 @@
     if (!id || id === '0') {
       return `<article class="card empty${cls}">${slotBadge(slot, button, label)}<div class="headshot"></div><div class="info"><span class="name">Empty</span></div></article>`;
     }
-    const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+    const p = playerOf(s, id);
     const games = playerGames(l.week, p.team, id);
     const t = weekTotals(games, s.now);
     const research = l.week.research?.[id];

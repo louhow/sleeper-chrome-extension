@@ -1,9 +1,9 @@
 // Match tab: the selected team (left) against its opponent (right), slot by
 // slot, with win probability and each player's match. Pure: state -> HTML.
 (globalThis.SEP ||= {}).matchup = (() => {
-  const { playerGames, weekTotals, winProbability, started } = globalThis.SEP.model;
+  const { playerGames, weekTotals, winProbability } = globalThis.SEP.model;
   const { breakdown } = globalThis.SEP.scoring;
-  const { esc, f2, teamName, ownerName, avatarImg, record, shortName, injuryTag, positions, headshot, slotBadge, weekNav, lineup, teamTotals, gameChips, weekday, gameTime, roleName } = globalThis.SEP.ui;
+  const { esc, f2, shortName, playerOf, injuryTag, positions, headshot, slotBadge, weekNav, lineup, teamTotals, gameChips, versus, nextMatch, teamSide } = globalThis.SEP.ui;
 
   function render(s) {
     if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
@@ -24,9 +24,9 @@
     const noLegs = s.loggedIn && mine.week.legs == null && s.week <= s.currentWeek;
     return `
       <section class="mu-head">
-        ${teamSide(s, left, p1, 'mine')}
+        ${teamSide(s, left.l, left, p1, 'mine')}
         <div class="vs">VS</div>
-        ${right ? teamSide(s, right, p2, 'theirs') : `<div class="mu-team theirs bye"><span class="sub">${s.loggedIn ? 'No opponent this week' : 'Log in to Sleeper to see this week\'s matchup'}</span></div>`}
+        ${right ? teamSide(s, right.l, right, p2, 'theirs') : `<div class="mu-team theirs bye"><span class="sub">${s.loggedIn ? 'No opponent this week' : 'Log in to Sleeper to see this week\'s matchup'}</span></div>`}
       </section>
       ${noLegs ? '<p class="hint center">Matchup pairings come from Sleeper\'s logged-in API, which didn\'t answer; showing the roster\'s saved lineup.</p>' : ''}
       <div class="mu-starters">
@@ -47,26 +47,6 @@
     const own = l.leg;
     if (own?.matchup_id == null) return null;
     return l.week.legs.find((m) => m.matchup_id === own.matchup_id && m.roster_id !== l.roster.roster_id)?.roster_id ?? null;
-  }
-
-  function teamSide(s, sd, prob, cls) {
-    const { roster } = sd.l;
-    const pctValue = prob == null ? null : Math.round(prob * 100);
-    const trend = pctValue == null ? '' : pctValue >= 50 ? 'up' : 'down';
-    const rank = sd.l.week.ranks?.[roster.roster_id];
-    return `<div class="mu-team ${cls}">
-      ${avatarImg(s, roster)}
-      <div class="mu-who">
-        <div class="team-name">${esc(teamName(s, roster))}</div>
-        <div class="sub">@${esc(ownerName(s, roster) || 'unknown')} · ${record(roster)}${rank ? ` (#${rank})` : ''}</div>
-      </div>
-      <div class="mu-pts"><b>${sd.anyPoints ? f2(sd.points) : '–'}</b><span>${f2(sd.proj)}</span></div>
-      <div class="mu-bar"><span class="${trend}" style="width:${pctValue ?? 0}%"></span></div>
-      <div class="mu-meta">
-        ${pctValue == null ? '' : `<b class="${trend}">${pctValue}% WIN</b>`}
-        <span class="ytp">Yet to play (${sd.yetToPlay})</span>
-      </div>
-    </div>`;
   }
 
   // One row of starters: each side's k-th player in its own formation order.
@@ -95,15 +75,11 @@
     </div>`;
   }
 
+  // [opponent, when]: the next match, else the last one's result.
   function matchText(games, now) {
-    const next = games.find((g) => !started(g.game, now) || g.game.status === 'in_game');
     if (!games.length) return ['No match', ''];
-    if (!next) {
-      const last = games.at(-1);
-      return [`${last.home ? 'vs' : '@'} ${last.opponentAbbr}`, 'Final'];
-    }
-    const live = next.game.status === 'in_game' || (started(next.game, now) && next.game.status !== 'complete');
-    return [`${next.home ? 'vs' : '@'} ${next.opponentAbbr}`, live ? 'Live' : next.game.start ? `${weekday(next.game.date)} ${gameTime(next.game.start)}` : weekday(next.game.date)];
+    const next = nextMatch(games, now);
+    return next ? [versus(next), next.when] : [versus(games.at(-1)), 'Final'];
   }
 
   // Stat abbreviations as the app prints them where they differ from Sleeper's keys.
@@ -130,7 +106,7 @@
 
   function playerSide(s, sd, id, cls) {
     if (!id || id === '0') return `<div class="mp ${cls} empty"><div class="headshot"></div><div class="mp-id"><span class="name">Empty</span></div></div>`;
-    const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+    const p = playerOf(s, id);
     const st = sd.games[id] ?? (() => {
       const games = playerGames(sd.l.week, p.team, id);
       return { games, ...weekTotals(games, s.now) };

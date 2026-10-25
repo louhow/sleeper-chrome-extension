@@ -37,20 +37,24 @@
     const params = new URLSearchParams(location.search);
     if (params.get('league')) document.documentElement.dataset.sepRoute = `/leagues/${params.get('league')}`;
     // ?noclass=1 drops Sleeper's NBA placeholder class, to exercise the text-based lookup.
+    // Stands in for the core content script, which publishes each league's sport and is what the panel waits for.
+    const leagueId = document.documentElement.dataset.sepRoute.split('/')[2];
+    fetch(`https://api.sleeper.app/v1/league/${leagueId}`).then((r) => r.json()).then((league) => {
+      document.documentElement.dataset.snpLeagueSport = `${leagueId}:${league.sport}`;
+    });
     if (params.get('noclass')) addEventListener('DOMContentLoaded', () => document.querySelector('.empty-panel-container')?.removeAttribute('class'));
   </script>
-  <script src="../../src/api.js"></script>
-  <script src="../../src/epl/scoring.js"></script>
-  <script src="../../src/epl/model.js"></script>
-  <script src="../../src/epl/ui.js"></script>
-  <script src="../../src/epl/team.js"></script>
-  <script src="../../src/epl/matchup.js"></script>
-  <script src="../../src/epl/league.js"></script>
-  <script src="../../src/epl/players.js"></script>
-  <script src="../../src/epl/card.js"></script>
-  <script src="../../src/epl/dialogs.js"></script>
-  <script src="../../src/epl/view.js"></script>
-  <script src="../../src/epl/content.js"></script>
+  <script>
+    // The content scripts, in manifest order: the first entry (which EPL reads off, globalThis.SNP)
+    // less its content.js, then the Premier League entry.
+    fetch('../../manifest.json').then((r) => r.json()).then(({ content_scripts: entries }) => {
+      const epl = entries.find((e) => e.js.some((f) => f.startsWith('src/epl/')));
+      for (const file of [...entries[0].js.filter((f) => f !== 'src/content.js'), ...epl.js]) {
+        const script = Object.assign(document.createElement('script'), { src: `../../${file}`, async: false });
+        document.head.append(script);
+      }
+    });
+  </script>
 </head>
 <body>
   <div class="sidebar"><b>sleeper</b><p>Saturdays are for the goals</p></div>
