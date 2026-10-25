@@ -25,8 +25,9 @@
   // Sleeper's placeholder for sports its website doesn't run yet.
   const PLACEHOLDER_TEXT = /not supported on web/i;
 
-  // The stylesheet is inlined into each shadow root, so nothing ever paints unstyled.
-  const stylesheet = fetch(chrome.runtime.getURL('src/epl/panel.css')).then((r) => r.text());
+  // The stylesheet (base.css, then the EPL panel's own) is inlined into each
+  // shadow root, so nothing ever paints unstyled.
+  const stylesheet = globalThis.SNP.shared.stylesheet('src/epl/panel.css');
   const storage = chrome.storage?.local;
 
   let active = null;

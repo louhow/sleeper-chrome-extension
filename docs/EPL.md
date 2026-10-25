@@ -48,7 +48,7 @@ The panel waits for that attribute to name the league as `clubsoccer:epl` before
 - `src/epl/team.js`, `matchup.js`, `league.js`, `players.js`, `card.js`, `dialogs.js`, `view.js`: pure state -> HTML render functions.
 - `src/epl/content.js`: one session per league (survives Sleeper's in-page navigation), data loading, saves and events.
   Renders into a shadow root in place of Sleeper's placeholder; dialogs render in a separate page-level host.
-- `src/epl/panel.css`: all styles, inlined into each shadow root.
+- `src/epl/panel.css`: the panel's own styles, inlined into each shadow root after `src/base.css` (the tokens and widgets it shares with the NBA and NFL panel, such as dialogs, notices, the bid form and the API calls tab).
 
 ### Formations
 

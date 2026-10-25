@@ -1,21 +1,6 @@
-/* Lives inside a shadow root, so Sleeper's styles can't leak in and ours can't leak out. */
+/* The NBA/NFL panel, on top of base.css (tokens and the widgets it shares with the Premier League panel). */
 :host {
-  --text: #ffffff;
-  --muted: #8f9bb3;
-  --line: rgba(255, 255, 255, 0.08);
-  /* Dark ink: text on bright fills, and the darkest surface. */
-  --ink: #0d1421;
-  --card: color-mix(in srgb, var(--ink) 55%, transparent);
-  --cell: rgba(255, 255, 255, 0.05);
-  /* Dialogs, popovers and the floating panel. */
-  --surface: #18202f;
-  --surface-line: #2c3850;
-  --accent: #00ceb8;
-  /* Solid buttons (Apply, Add Player). */
-  --primary: #5ac8b4;
-  --primary-hover: #4bb6a3;
-  --danger: #ff5b6e;
-  --warn: #f8d24b;
+  /* Position colors. */
   --pg: #f2738c;
   --sg: #f78c3c;
   --sf: #9ff0cb;
@@ -39,65 +24,13 @@
   flex: 1 1 auto;
   min-height: 0;
 }
-:host(.floating) {
-  position: fixed;
-  top: 64px;
-  right: 16px;
-  bottom: 16px;
-  width: min(820px, calc(100vw - 32px));
-  z-index: 2147483000;
-  padding-top: 16px;
-  background: var(--surface);
-  border: 1px solid var(--surface-line);
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-}
 
-.root {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  font: 14px/1.35 Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: var(--text);
-}
-.app {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-button,
-select {
-  font: inherit;
-  font-size: 13px;
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
-  border: 0;
-  border-radius: 8px;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-button:not(.slot):hover:not(:disabled),
-select:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-button:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
 button:focus-visible,
 select:focus-visible,
 summary:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-}
-button.icon {
-  min-width: 32px;
-  padding: 6px 0;
 }
 
 .toolbar {
@@ -122,17 +55,6 @@ button.icon {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text);
 }
-.count {
-  display: inline-block;
-  min-width: 18px;
-  margin-left: 4px;
-  padding: 0 6px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.1);
-  font-size: 11px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
 
 .body {
   flex: 1;
@@ -140,39 +62,8 @@ button.icon {
   overflow: auto;
   padding: 0 24px 24px;
 }
-
-.msg {
-  margin: 32px 0;
-  color: var(--muted);
-  text-align: center;
-}
-.session-expired {
-  max-width: 420px;
-  margin: 32px auto;
-  padding: 18px 20px;
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--danger) 8%, transparent);
-  text-align: center;
-}
-.session-expired h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
 .nowrap {
   white-space: nowrap;
-}
-.session-expired p {
-  margin: 4px 0 0;
-  color: var(--muted);
-}
-.msg.error,
-pre.error {
-  color: var(--danger);
-}
-.sub {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 /* Team summary: one row with the score, waivers and the week picker. */
@@ -257,12 +148,6 @@ h3 {
 .section-head h3 {
   margin: 0;
 }
-.week-nav {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 .week-label {
   display: flex;
   flex-direction: column;
@@ -270,10 +155,6 @@ h3 {
   min-width: 76px;
   color: var(--accent);
   line-height: 1.15;
-}
-.week-label b {
-  font-size: 14px;
-  font-weight: 900;
 }
 .week-label span {
   font-size: 10px;
@@ -376,80 +257,13 @@ h3 {
 .slot.tx {
   color: var(--muted);
 }
-button.slot {
-  padding: 0;
-  border: 0;
-  font-family: inherit;
-  cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-button.slot:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
-}
 
 /* Lineup swapping */
-.hint {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.app {
-  position: relative;
-}
-.notice {
-  position: absolute;
-  left: 50%;
-  bottom: 20px;
-  z-index: 5;
-  max-width: calc(100% - 48px);
-  margin: 0;
-  padding: 10px 16px;
-  border-radius: 12px;
-  transform: translateX(-50%);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-  font-size: 13px;
-  font-weight: 700;
-  pointer-events: none;
-}
-.notice.ok {
-  background: #0f3b3a;
-  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  color: var(--accent);
-}
-.notice.error {
-  background: #3d1820;
-  border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
-  color: var(--danger);
-}
 .card {
   transition: opacity 0.15s ease, border-color 0.15s ease;
 }
-.card.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.card.selected .slot {
-  box-shadow: 0 0 0 3px var(--accent);
-}
-.card.target {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-}
-.card.target .slot {
-  box-shadow: 0 0 0 2px var(--accent);
-  animation: pulse 1.2s ease-in-out infinite;
-}
-.card.dim {
-  opacity: 0.35;
-}
 .card.dim .slot {
   cursor: default;
-}
-@keyframes pulse {
-  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .card.target .slot { animation: none; }
 }
 .headshot {
   flex: none;
@@ -466,9 +280,6 @@ button.slot:hover {
 .card.empty .headshot,
 .mp.empty .headshot {
   background: none;
-}
-.headshot.missing {
-  visibility: hidden;
 }
 .info {
   flex: 1;
@@ -824,40 +635,6 @@ ul.picks {
 }
 
 /* API call log */
-ol.calls {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.calls li {
-  border-bottom: 1px solid var(--line);
-}
-.calls summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 2px;
-  cursor: pointer;
-  list-style: none;
-}
-.calls summary::-webkit-details-marker {
-  display: none;
-}
-.calls .call {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.calls code {
-  font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
-  overflow-wrap: anywhere;
-}
-.calls .meta {
-  color: var(--muted);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
 .status {
   flex: none;
   min-width: 56px;
@@ -868,37 +645,6 @@ ol.calls {
   text-align: center;
   text-transform: uppercase;
 }
-.status.ok { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
-.status.cache { background: rgba(255, 255, 255, 0.08); color: var(--muted); }
-.status.pending { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
-.status.bad { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
-.calls pre {
-  max-height: 320px;
-  margin: 0 0 8px;
-  padding: 10px;
-  overflow: auto;
-  background: rgba(0, 0, 0, 0.35);
-  border-radius: 8px;
-  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: #c9d3e6;
-}
-.auth {
-  color: var(--warn);
-  font-weight: 700;
-}
-.calls pre.request {
-  color: var(--accent);
-}
-.calls a {
-  display: inline-block;
-  margin-bottom: 10px;
-  color: var(--accent);
-  font-size: 12px;
-  text-decoration: none;
-}
-.calls a:hover {
-  text-decoration: underline;
-}
 
 /* Matchup: compact team cards, then one line per player on each side of the slot. */
 .mu-head {
@@ -906,23 +652,6 @@ ol.calls {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-}
-.mu-head .vs {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 1;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  margin: -16px 0 0 -16px;
-  border-radius: 50%;
-  background: #1b2433;
-  border: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 900;
 }
 .mu-team {
   display: grid;
@@ -941,25 +670,14 @@ ol.calls {
   grid-template-areas: "pts who av" "bar bar bar" "meta meta meta";
   text-align: right;
 }
-.mu-team.bye {
-  display: grid;
-  place-items: center;
-}
 .mu-team .avatar {
   grid-area: av;
   width: 36px;
   height: 36px;
 }
-.mu-who {
-  grid-area: who;
-  min-width: 0;
-}
 .mu-who .sub {
   font-size: 11px;
   line-height: 1.2;
-}
-.mu-who .team-name {
-  font-size: 15px;
 }
 .mu-pts {
   grid-area: pts;
@@ -975,42 +693,10 @@ ol.calls {
   background: rgba(255, 255, 255, 0.1);
   overflow: hidden;
 }
-.mu-team.theirs .mu-bar {
-  justify-content: flex-end;
-}
-.mu-bar span {
-  border-radius: 2px;
-}
-.mu-bar .up,
-.mu-meta b.up {
-  background: var(--accent);
-  color: var(--accent);
-}
-.mu-bar .down,
-.mu-meta b.down {
-  background: var(--danger);
-  color: var(--danger);
-}
-.mu-meta {
-  grid-area: meta;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-.mu-meta b {
-  background: none !important;
-  font-weight: 900;
-}
 .mu-meta .proj {
   margin-left: auto;
   color: var(--text);
   font-variant-numeric: tabular-nums;
-}
-.mu-team.theirs .mu-meta {
-  flex-direction: row-reverse;
 }
 .mu-team.theirs .mu-meta .proj {
   margin-left: 0;
@@ -1266,14 +952,6 @@ span.team-link:hover {
   justify-content: space-between;
   margin: 12px 0 6px;
 }
-.mu-starters h3,
-h3.mu-title {
-  margin: 0;
-  font-size: 14px;
-}
-h3.mu-title {
-  margin: 14px 0 6px;
-}
 .mu-starters .hint {
   margin-top: 0;
   font-size: 11px;
@@ -1321,26 +999,8 @@ h3.mu-title {
   width: 26px;
   height: 26px;
 }
-.mp.empty {
-  color: var(--muted);
-  font-weight: 700;
-}
-.mp.empty .name {
-  color: var(--muted);
-}
 .mp.is-locked {
   border-color: color-mix(in srgb, var(--warn) 45%, transparent);
-}
-.mp-id {
-  grid-area: id;
-  min-width: 0;
-}
-.mp-id .name {
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .mp-id .sub {
   display: flex;
@@ -1350,48 +1010,9 @@ h3.mu-title {
   white-space: nowrap;
   overflow: hidden;
 }
-.mp.theirs .mp-id .sub {
-  justify-content: flex-end;
-}
 .mp-id .pos,
 .mp-id .team {
   font-size: 11px;
-}
-.mp-game {
-  grid-area: game;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-.mp-game b {
-  font-size: 12px;
-}
-.mp-game .sub {
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mp-pts {
-  grid-area: pts;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.mp.theirs .mp-pts {
-  align-items: flex-start;
-}
-.mp-pts b {
-  font-size: 14px;
-  font-weight: 900;
-}
-.mp-pts span {
-  color: var(--muted);
-  font-size: 10px;
 }
 .mp-lk {
   grid-area: lk;
@@ -1503,19 +1124,6 @@ button.lk.cancel {
 
 /* Dialogs (waiver bids, claims) in their own host over the whole page, styled
    after Sleeper's NFL "Make Waiver Bid" dialog. */
-.page-layer .notice {
-  position: fixed;
-  bottom: 32px;
-  z-index: 2147483001;
-}
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483000;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-}
 .backdrop {
   position: absolute;
   inset: 0;
@@ -1532,18 +1140,6 @@ button.lk.cancel {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
   overflow: hidden;
 }
-.dialog-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 20px 12px;
-}
-.dialog-head h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 900;
-}
 .dialog-head .close {
   background: transparent;
   color: var(--muted);
@@ -1554,18 +1150,6 @@ button.lk.cancel {
   overflow: auto;
   padding: 0 16px 12px;
 }
-.dialog-errors {
-  margin-bottom: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-  color: var(--danger);
-  font-size: 13px;
-  font-weight: 700;
-}
-.dialog-errors p {
-  margin: 0;
-}
 .banner {
   margin: 10px 0 12px;
   padding: 14px 18px;
@@ -1575,28 +1159,8 @@ button.lk.cancel {
   font-size: 13px;
   font-weight: 700;
 }
-.bid-form {
-  display: block;
-  padding: 12px 4px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-.bid-form .label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 .bid-form .label .sub {
   font-size: 11px;
-}
-.bid-input {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 700;
 }
 .bid-input input {
   width: 96px;
@@ -1607,15 +1171,6 @@ button.lk.cancel {
   color: #111;
   font: inherit;
   font-size: 14px;
-}
-.bid-input input::-webkit-outer-spin-button,
-.bid-input input::-webkit-inner-spin-button {
-  margin: 0;
-  -webkit-appearance: none;
-}
-.bid-input input:focus {
-  outline: none;
-  border-color: var(--accent);
 }
 .dp-head,
 .dp-row {
@@ -1630,9 +1185,6 @@ button.lk.cancel {
   font-weight: 900;
   text-transform: uppercase;
 }
-.dp-head span:nth-child(2) {
-  grid-column: 2 / 4;
-}
 .dp-row {
   width: 100%;
   margin: 0;
@@ -1645,43 +1197,10 @@ button.lk.cancel {
   font: inherit;
   text-align: left;
 }
-.dp-row.adding {
-  border-radius: 10px;
-  border-color: var(--line);
-  background: rgba(255, 255, 255, 0.04);
-}
-button.dp-row:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
-}
-button.dp-row.selected,
-button.dp-row.selected:hover {
-  border: 1px solid #e0b64a;
-  border-radius: 10px;
-  background: rgba(10, 14, 22, 0.55);
-}
 .dp-row .slot {
   width: 44px;
   height: 30px;
   font-size: 12px;
-}
-.dp-row .headshot {
-  width: 30px;
-  height: 30px;
-}
-.dp-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.dp-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-}
-.dp-name b {
-  margin-right: 2px;
-  font-size: 14px;
 }
 .dp-info .sub {
   font-size: 11px;
@@ -1708,74 +1227,9 @@ button.primary {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-button.primary:hover:not(:disabled) {
-  background: var(--primary-hover);
-}
-button.danger {
-  color: var(--danger);
-}
-ol.claims {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.claim {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 4px;
-  border-bottom: 1px solid var(--line);
-}
-.claim .rank {
-  color: var(--muted);
-  font-weight: 900;
-  text-align: center;
-}
-.claim-players {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.cp {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  font-size: 12px;
-}
 .cp-name {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.cp b {
-  font-size: 13px;
-}
-.cp .headshot {
-  width: 26px;
-  height: 26px;
-}
-.cp .sign {
-  width: 10px;
-  font-size: 16px;
-  font-weight: 900;
-}
-.cp.add .sign {
-  color: var(--accent);
-}
-.cp.drop .sign {
-  color: var(--danger);
-}
-.claim-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.claim-actions .bid-input input {
-  width: 56px;
 }
 
 /* Optimize Lineup: the toolbar button and its confirmation dialog. */
@@ -2685,10 +2139,6 @@ ul.pc-history {
   color: var(--danger);
   font-size: 12px;
   font-weight: 700;
-}
-button.danger.solid {
-  background: var(--danger);
-  color: #fff;
 }
 button.danger.solid:hover:not(:disabled) {
   background: #ff7484;
