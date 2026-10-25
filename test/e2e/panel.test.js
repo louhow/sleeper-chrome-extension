@@ -302,10 +302,10 @@ const nflLeagueTab = () => {
     [{ r: 1, owner: 'louhow', team: 'Lou Point Conversion', score: '19.40', win: 90, record: '8-4', proj: '122.23', av: 'a1' }, { r: 2, owner: 'kalviar', team: 'Tank you, Jeremiah', score: '6.60', win: 10, record: '3-9', proj: '71.77', av: 'a2' }],
   ];
   return `<!doctype html><title>Sleeper</title>
-<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .league-tab-container { position: absolute; left: 264px; top: 100px; width: 750px; } .league-matchup-row-item { padding: 8px; border: 1px solid #456; margin: 4px 0; }</style>
-<div class="league-tab-container"><div class="row"><div class="title">Matchups</div></div><div class="panel-row"><div class="league-matchups">
+<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } /* Sleeper nests its cards' list in another. */ .league-tab-container { position: absolute; left: 264px; top: 100px; width: 750px; } .league-matchup-row-item { padding: 8px; border: 1px solid #456; margin: 4px 0; }</style>
+<div class="league-tab-container"><div class="row"><div class="title">Matchups</div></div><div class="panel-row"><div class="league-matchups"><div class="league-matchups">
 ${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchup-header"><div class="matchup-row">${side(a)}<div class="vs-label"><div class="label">VS</div></div>${side(b, true)}</div></div></div>`).join('')}
-</div><div class="league-tab-standings">Standings</div></div></div>
+</div></div><div class="league-tab-standings">Standings</div></div></div>
 <script>
   window.__nflOpened = [];
   const league = { rosters: [1, 2, 3, 4].map((r) => ({ roster_id: r, owner_id: 'u' + r })), userId: 'u1' };
@@ -2480,7 +2480,10 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   const cards = page.locator('#sleeper-nfl-league .lg-match');
   await cards.first().waitFor({ timeout: 30000 });
   assert.equal(await cards.count(), 2);
-  assert.equal(await page.locator('.league-matchup-row-item').first().isVisible(), false, 'Sleeper\'s own cards stay, hidden');
+  assert.deepEqual(await page.locator('.league-matchup-row-item').evaluateAll((els) => els.map((el) => el.checkVisibility())), [false, false], 'Sleeper\'s own cards stay, hidden');
+  // Nothing of Sleeper's list takes room under ours.
+  const gap = await page.evaluate(() => document.querySelector('.league-tab-standings').getBoundingClientRect().top - document.querySelector('#sleeper-nfl-league').getBoundingClientRect().bottom);
+  assert.ok(gap < 24, `the standings follow the cards (${gap}px)`);
   assert.equal(await page.locator('.league-tab-standings').isVisible(), true, 'the rest of the tab stays');
   // Yours first, framed; each side as Sleeper shows it: owner, team, score, win chance and bar, record, projection.
   const first = cards.first();

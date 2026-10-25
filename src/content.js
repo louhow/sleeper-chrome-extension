@@ -1672,7 +1672,8 @@
       leagueShadow.querySelector('style').textContent = css;
     });
     const hideRows = Object.assign(document.createElement('style'), {
-      textContent: '.league-matchups.snp-nfl-ours > .league-matchup-row-item { display: none !important; }',
+      // Sleeper's cards sit in a list inside the list ours goes on top of.
+      textContent: '.league-matchups.snp-nfl-ours .league-matchup-row-item { display: none !important; }',
     });
     let leagueFrame = 0;
     const leagueWatch = new MutationObserver(() => {
