@@ -65,6 +65,20 @@ test('small helpers: open spots, unknown players, names, tags and games', () => 
   assert.equal(ui.pct(null), '–');
 });
 
+test('null-safe helpers: no number, roster or date renders a placeholder, never a throw', () => {
+  const s = { me: 'u1', usersById: {} };
+  assert.equal(ui.f2(NaN), '–');
+  assert.equal(ui.f2(undefined), '–');
+  assert.equal(ui.f2('3'), '3.00');
+  assert.equal(ui.teamName(s, undefined), 'Team ?');
+  assert.equal(ui.ownerName(s, null), '');
+  assert.equal(ui.avatar(s, null), null);
+  assert.equal(ui.record(null), '0-0');
+  assert.equal(ui.owns(s, null), false);
+  assert.equal(ui.weekday(null), '');
+  assert.equal(ui.weekday(''), '');
+});
+
 test('avatars: the image, else the plain circle (or the team initial in pickers)', () => {
   const failed = new Set(['https://x/broken.png']);
   assert.equal(ui.avatarImg('https://x/a.png', 'avatar', failed), '<img class="avatar" src="https://x/a.png" alt="">');

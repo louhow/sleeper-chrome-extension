@@ -3,7 +3,7 @@
 (globalThis.SNP ||= {}).ui = (() => {
   const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESCAPES[c]);
-  const f2 = (n) => (n == null ? '–' : n.toFixed(2));
+  const f2 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(2));
   const CDN = 'https://sleepercdn.com';
   // Combo slots take the colors of the positions they accept.
   const SLOT_PARTS = { G: ['pg', 'sg'], F: ['sf', 'pf'] };
@@ -27,18 +27,21 @@
   const headshot = (id) => `${CDN}/content/nba/players/thumb/${encodeURIComponent(id)}.jpg`;
   const teamLogo = (team) => `${CDN}/images/team_logos/nba/${encodeURIComponent(String(team).toLowerCase())}.webp`;
 
+  // Team helpers take a missing roster too (a bye, a matchup not loaded yet).
   function teamName(s, roster) {
-    const user = s.usersById?.[roster.owner_id];
-    return user?.metadata?.team_name || user?.display_name || `Team ${roster.roster_id}`;
+    const user = roster && s.usersById?.[roster.owner_id];
+    return user?.metadata?.team_name || user?.display_name || `Team ${roster?.roster_id ?? '?'}`;
   }
 
+  const ownerName = (s, roster) => s.usersById?.[roster?.owner_id]?.display_name || '';
+
   function avatar(s, roster) {
-    const owner = s.usersById?.[roster.owner_id];
+    const owner = s.usersById?.[roster?.owner_id];
     return owner?.metadata?.avatar || (owner?.avatar && `${CDN}/avatars/thumbs/${owner.avatar}`) || null;
   }
 
   function record(roster) {
-    const st = roster.settings || {};
+    const st = roster?.settings || {};
     return `${st.wins ?? 0}-${st.losses ?? 0}${st.ties ? `-${st.ties}` : ''}`;
   }
 
@@ -65,9 +68,9 @@
 
   const gameTime = (ms) =>
     new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
-  // A date ("2026-10-24", read at noon so no time zone moves it) or a time in ms.
-  const weekday = (date, style = 'short') =>
-    (typeof date === 'number' ? new Date(date) : new Date(`${date}T12:00:00`)).toLocaleDateString(undefined, { weekday: style });
+  // A date ("2026-10-24", read at noon so no time zone moves it) or a time in ms; '' for none.
+  const weekday = (date, style = 'short') => (date == null || date === '' ? '' :
+    (typeof date === 'number' ? new Date(date) : new Date(`${date}T12:00:00`)).toLocaleDateString(undefined, { weekday: style }));
   // A game from a player's side, e.g. "Thu @ MIA".
   const gameLabel = (d) => `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}`;
 
@@ -136,7 +139,7 @@
   const loading = (text = 'Loading…') => `<p class="msg">${esc(text)}</p>`;
   const errorMsg = (text) => `<p class="msg error">${esc(text)}</p>`;
 
-  const owns = (s, roster) => s.me != null && (roster.owner_id === s.me || (roster.co_owners || []).includes(s.me));
+  const owns = (s, roster) => s.me != null && roster != null && (roster.owner_id === s.me || (roster.co_owners || []).includes(s.me));
 
   // Where one roster's players are for the shown week: starters by slot, then
   // bench (by primary position in `order`), IR and taxi. The logged-in matchup
@@ -347,7 +350,7 @@
     return {
       rosterId: roster.roster_id,
       avatar: avatar(s, roster),
-      owner: s.usersById?.[roster.owner_id]?.display_name,
+      owner: ownerName(s, roster),
       team: teamName(s, roster),
       record: record(roster),
       ...numbers,
@@ -630,7 +633,7 @@
 
   return {
     reserveRule, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
-    esc, f2, CDN, headshot, teamLogo, teamName, avatar, record, shortName, injuryTag, positions, teamTag,
+    esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
     lineup, rosterParts, opponentOf, taxiRule, owns, real, playerOf, playerName, padTo, pct, researchLine,
     dash, num, height, ago, heat, scaler, tierClass,

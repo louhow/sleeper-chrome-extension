@@ -1,9 +1,8 @@
 // Rendering helpers shared by every view. Pure: data in, HTML strings out.
 (globalThis.SEP ||= {}).ui = (() => {
   const { playerGames, weekTotals, started, finished, slotAccepts, savedFormation, slotLabels, formationOf } = globalThis.SEP.model;
-  // The same helpers as NBA and NFL. The rest differ by sport, or take a missing roster or date where core's don't.
-  const { esc, CDN, shortName, gameTime, dialogErrors, notice } = globalThis.SNP.ui;
-  const f2 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(2));
+  // The same helpers as NBA and NFL; the rest differ by sport.
+  const { esc, f2, CDN, teamName, ownerName, avatar, record, owns, weekday, shortName, gameTime, dialogErrors, notice } = globalThis.SNP.ui;
   const f1 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(1));
   const INJURY_SEVERE = /^(out|ir|sus)/i;
   // Sleeper's apps list players by position in this order.
@@ -13,31 +12,12 @@
   const headshot = (id) => `${CDN}/content/clubsoccer/players/thumb/${encodeURIComponent(id)}.jpg`;
   const teamLogo = (teamId) => (teamId ? `${CDN}/images/team_logos/clubsoccer/${encodeURIComponent(teamId)}.png` : '');
 
-  function teamName(s, roster) {
-    const user = roster && s.usersById?.[roster.owner_id];
-    return user?.metadata?.team_name || user?.display_name || `Team ${roster?.roster_id ?? '?'}`;
-  }
-
-  function ownerName(s, roster) {
-    return s.usersById?.[roster?.owner_id]?.display_name || '';
-  }
-
-  function avatar(s, roster) {
-    const owner = s.usersById?.[roster?.owner_id];
-    return owner?.metadata?.avatar || (owner?.avatar && `${CDN}/avatars/thumbs/${owner.avatar}`) || null;
-  }
-
   const playerOf = (s, id) => s.players?.[id] || { name: `Player #${id}`, positions: [] };
 
   const avatarImg = (s, roster, cls = 'avatar') => {
     const src = avatar(s, roster);
     return src ? `<img class="${cls}" src="${esc(src)}" alt="">` : `<div class="${cls}"></div>`;
   };
-
-  function record(roster) {
-    const st = roster?.settings || {};
-    return `${st.wins ?? 0}-${st.losses ?? 0}${st.ties ? `-${st.ties}` : ''}`;
-  }
 
   function injuryTag(p) {
     return p?.injury ? `<span class="inj ${INJURY_SEVERE.test(p.injury) ? 'severe' : ''}">${esc(p.injury)}</span>` : '';
@@ -47,7 +27,6 @@
     return (p?.positions || []).map((pos) => `<span class="pos ${esc(pos.toLowerCase())}">${esc(pos)}</span>`).join('');
   }
 
-  const weekday = (date, style = 'short') => (date ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: style }) : '');
   const shortDate = (date) => (date ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }) : '');
 
   // Slot badge: F, M, D, GK in their colors; flex slots split the colors they
@@ -140,7 +119,6 @@
   const roleRank = (label) => (ROLE_ORDER.includes(label) ? ROLE_ORDER.indexOf(label) : ROLE_ORDER.length);
   const roleName = (label, n) => (n === 1 && label !== 'GK' ? ROLE_NAMES[label]?.replace(/s$/, '') : ROLE_NAMES[label]) || label;
 
-  const owns = (s, roster) => s.me != null && roster != null && (roster.owner_id === s.me || (roster.co_owners || []).includes(s.me));
   const myRoster = (s) => s.rosters?.find((r) => owns(s, r)) ?? null;
 
   const ownerOf = (s, playerId) => s.rosters?.find((r) => (r.players || []).includes(playerId)) ?? null;
