@@ -1991,7 +1991,9 @@
         const [mm, ss] = String(m.time_remaining || '15:00').split(':').map(Number);
         const elapsed = q ? Math.min(60, (q - 1) * 15 + (15 - (mm || 0) - (ss || 0) / 60)) : 0;
         const clock = !q ? 'Live' : m.quarter === 'Half' || m.quarter === 'half' ? 'Half' : q > 4 ? `OT ${m.time_remaining || ''}`.trim() : `Q${q} ${m.time_remaining || ''}`.trim();
-        const game = { id: g.game_id, start: g.start_time, status: g.status, home, away, homeScore: m.home_score, awayScore: m.away_score, clock, left: Math.max(0, 1 - elapsed / 60) };
+        // The team with the ball inside the 20, as Sleeper's RZ mark shows it.
+        const redZone = m.red_zone && m.possession ? m.possession : null;
+        const game = { id: g.game_id, start: g.start_time, status: g.status, home, away, homeScore: m.home_score, awayScore: m.away_score, clock, left: Math.max(0, 1 - elapsed / 60), redZone };
         games[home] = game;
         games[away] = game;
       }
@@ -2035,14 +2037,28 @@
       loadPanelWeek(week).catch(panelFail);
     }
 
-    function setPanelRoster(rosterId) {
+    // `remember`: the picker's choice, kept for next time (a team link is just for now).
+    function setPanelRoster(rosterId, remember = true) {
       state.rosterMenu = false;
       state.swap = null;
+      if (remember) chrome.storage.local.set({ [`roster:${leagueId}`]: rosterId });
       if (rosterId === state.rosterId) return schedulePanel();
       state.rosterId = rosterId;
-      chrome.storage.local.set({ [`roster:${leagueId}`]: rosterId });
       schedulePanel();
     }
+
+    function openPanelTeam(rosterId) {
+      setPanelRoster(rosterId, false);
+      state.tab = 'page';
+      const tabs = [...document.querySelectorAll('.center-tab-selector .item-tab')];
+      tabs.find((t) => /^team$/i.test(t.textContent.trim()))?.click();
+    }
+    panelRoot.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest?.('[data-open-team]')) {
+        e.preventDefault();
+        openPanelTeam(Number(e.target.closest('[data-open-team]').dataset.openTeam));
+      }
+    });
 
     // A swap on your own Team tab: tap a slot badge, then one of the spots it
     // can trade places with. Saved through Sleeper's Team component.
@@ -2120,6 +2136,19 @@
       }
       const pick = e.target.closest('[data-pick-roster]');
       if (pick) return setPanelRoster(Number(pick.dataset.pickRoster));
+      // A team on the Matchup tab opens on the Team tab, through Sleeper's own tab (so its router follows).
+      const team = e.target.closest('[data-open-team]');
+      if (team) return openPanelTeam(Number(team.dataset.openTeam));
+      // A player's name or headshot opens Sleeper's own player card (page-hook.js).
+      const player = e.target.closest('[data-player]');
+      if (player) {
+        // Sleeper's own map may not have them (a Matchup row knows just that matchup's players), so their basics go along.
+        const id = player.dataset.player;
+        const p = state.players[id] || {};
+        const basics = { player_id: id, sport: 'nfl', first_name: p.first, last_name: p.last, position: p.position, fantasy_positions: p.positions, team: p.team, injury_status: p.injury };
+        document.dispatchEvent(new CustomEvent('snp:nfl-player-card', { detail: JSON.stringify({ playerId: id, player: basics }) }));
+        return;
+      }
       const spot = e.target.closest('[data-spot]')?.dataset.spot;
       if (spot) return pickSpot(spot);
       const action = e.target.closest('[data-action]')?.dataset.action;

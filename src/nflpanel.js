@@ -86,7 +86,7 @@
       const result = g.mine > g.theirs ? 'W' : g.mine < g.theirs ? 'L' : 'T';
       return `${at} · Final ${result} ${g.mine ?? 0}-${g.theirs ?? 0}`;
     }
-    if (g.state === 'live') return `${at} · ${g.clock} · ${g.mine ?? 0}-${g.theirs ?? 0}`;
+    if (g.state === 'live') return `${at} · ${g.clock} · ${g.mine ?? 0}-${g.theirs ?? 0}${g.redZone === g.team ? ' · RZ' : ''}`;
     return `${at} · ${kickoff(g.start)}`;
   }
   const kickoff = (ms) => (ms == null ? '' : new Date(ms).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).replace(/\s(AM|PM)$/i, (m) => m.trim().toLowerCase()).replace(/:00(am|pm)/, '$1'));
@@ -224,7 +224,7 @@
       ${nfl.slotBadge(slot, button)}
       <img class="headshot${p.position === 'DEF' ? ' logo' : ''}" src="${nfl.headshot(id, p)}" alt="" data-player="${esc(id)}">
       <div class="info">
-        <div class="line1"><span class="name">${esc(p.name)}</span><span class="team">${esc(p.position || '')} - ${esc(p.team || 'FA')}</span>${nfl.injury(p)}</div>
+        <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button><span class="team">${esc(p.position || '')} - ${esc(p.team || 'FA')}</span>${nfl.injury(p)}</div>
         <div class="line2" title="Started and rostered in leagues like this one"><b>${pct(research?.started)}</b> Start<span class="bar">|</span><b>${pct(research?.owned)}</b> Rostered</div>
       </div>
       <div class="nfl-game ${g.state}">
@@ -292,12 +292,12 @@
     const { g, actual, proj } = numbers(s, id);
     const tier = g.state === 'done' && actual != null ? scoreTier(actual, s.tiers, p.positions?.[0] || p.position) : '';
     const at = g.state === 'bye' ? 'Bye' : `${g.homeSide ? 'vs' : '@'} ${g.opponent}`;
-    const when = g.state === 'done' ? `Final ${g.mine ?? 0}-${g.theirs ?? 0}` : g.state === 'live' ? `${g.clock} · ${g.mine ?? 0}-${g.theirs ?? 0}` : g.state === 'pre' ? kickoff(g.start) : '';
+    const when = g.state === 'done' ? `Final ${g.mine ?? 0}-${g.theirs ?? 0}` : g.state === 'live' ? `${g.clock} · ${g.mine ?? 0}-${g.theirs ?? 0}${g.redZone === g.team ? ' · RZ' : ''}` : g.state === 'pre' ? kickoff(g.start) : '';
     const short = p.position === 'DEF' ? p.name : `${(p.first || p.name || '').slice(0, 1)}. ${p.last || p.name}`;
     return `<div class="mp nfl ${cls}">
       <img class="headshot${p.position === 'DEF' ? ' logo' : ''}" src="${nfl.headshot(id, p)}" alt="" data-player="${esc(id)}">
       <div class="mp-id">
-        <div class="name"><span>${esc(short)}</span>${nfl.injury(p)}</div>
+        <div class="name"><button data-player="${esc(id)}">${esc(short)}</button>${nfl.injury(p)}</div>
         <div class="sub"><span class="team">${esc(p.position || '')} • ${esc(p.team || 'FA')}</span></div>
       </div>
       <div class="mp-game ${g.state}"><b>${esc(at)}</b><span class="sub">${esc(when)}</span></div>

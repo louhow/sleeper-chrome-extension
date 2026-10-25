@@ -1097,6 +1097,15 @@
     ${PLAYERS_PANEL} .snp-team-label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
     ${PLAYERS_PANEL} .snp-team-label small { color: rgb(120, 134, 156); font-size: 11px; line-height: 14px; }
     ${PLAYERS_PANEL} .owner[data-snp-owner] > :not(.snp-owner) { display: none !important; }
+    /* NFL rows have a game line too: the team line takes no more height than Sleeper's own (12px). */
+    ${PLAYERS_PANEL} .name-container:has(.game-schedule-live-description) .snp-owner { line-height: 12px; }
+    ${PLAYERS_PANEL} .name-container:has(.game-schedule-live-description) .snp-owner-avatar { width: 12px; height: 12px; }
+    /* Sleeper's red-zone mark, inline at the end of the game line rather than a bar on a line of its own. */
+    ${PLAYERS_PANEL} .player-meta-container .game-schedule-live-description { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    ${PLAYERS_PANEL} .player-meta-container .game-schedule-live-description .rz {
+      display: inline-block !important; position: static !important; width: auto !important; height: auto !important;
+      margin: 0 0 0 4px !important; padding: 0 3px !important; border-radius: 3px; font-size: 8px !important; line-height: 11px !important; vertical-align: 1px;
+    }
     ${PLAYERS_PANEL} .snp-owner { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; color: rgb(185, 196, 212); font-size: 10px; line-height: 16px; }
     ${PLAYERS_PANEL} .snp-owner > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     ${PLAYERS_PANEL} .snp-owner-avatar { flex: none; width: 16px; height: 16px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18); }
@@ -1175,6 +1184,45 @@
   document.addEventListener('snp:nfl-lineup-request', (e) => {
     const { leagueId, full } = JSON.parse(e.detail);
     send('snp:nfl-lineup', nflLineup(leagueId, full));
+  });
+
+  // Sleeper's own player card, for any player, from the extension's NFL Team
+  // and Matchup tabs. Sleeper builds the card and hands it to openModal in its
+  // own handlers: the Team component's _onClickPlayerNews, a Matchup row's
+  // click. One of them runs with openModal caught, which gives the card as
+  // Sleeper makes it; it's opened again with the player asked for.
+  function catchCard(props, run) {
+    const open = props.openModal;
+    let card = null;
+    props.openModal = (el) => {
+      card = el;
+    };
+    try {
+      run();
+    } catch {
+      card = null;
+    } finally {
+      props.openModal = open;
+    }
+    return card && card.props ? { card, open, playersMap: card.props.playersMap || props.playersMap || {} } : null;
+  }
+  function sleeperCard() {
+    const team = teamFiber()?.stateNode;
+    const first = team?.props?.roster?.players?.[0];
+    if (team?._onClickPlayerNews && first) return catchCard(team.props, () => team._onClickPlayerNews(first));
+    const row = document.querySelector('.matchup-player-row-container .row');
+    const click = row && props(row, (x) => typeof x.onClick === 'function')?.onClick;
+    const owner = row && props(row, (x) => typeof x.openModal === 'function' && x.playersMap);
+    return click && owner ? catchCard(owner, () => click({ stopPropagation() {}, preventDefault() {} })) : null;
+  }
+  document.addEventListener('snp:nfl-player-card', (e) => {
+    const { playerId, player: basics } = JSON.parse(e.detail);
+    const caught = sleeperCard();
+    // Sleeper's own record of the player when it has one; Sleeper's card fetches the rest either way.
+    const player = caught && (caught.playersMap[playerId] || basics);
+    if (!caught || !player) return;
+    const { card, open } = caught;
+    open({ ...card, key: null, props: { ...card.props, playerIds: [playerId], selectedPlayerId: playerId, playersMap: { ...caught.playersMap, [playerId]: player } } });
   });
 
   // Saves a lineup through Sleeper's own actions, so its screen updates as if you'd made the swaps.

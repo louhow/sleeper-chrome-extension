@@ -157,14 +157,16 @@
     }).join('')}</div></div>`;
   }
 
+  // With `t.rosterId` (the Matchup tab), the avatar, owner and team name open that team on the Team tab.
   function side(t, cls, failed) {
     const pct = parseFloat(t.win);
     const trend = Number.isNaN(pct) ? '' : pct >= 50 ? 'up' : 'down';
+    const link = t.rosterId != null ? ` team-link" data-open-team="${esc(t.rosterId)}" role="link" tabindex="0" title="${esc(`${t.team}'s team`)}` : '';
     return `<div class="mu-team ${cls}">
-      ${t.avatar && !failed.has(t.avatar) ? `<img class="avatar" src="${esc(t.avatar)}" alt="">` : '<div class="avatar"></div>'}
+      ${t.avatar && !failed.has(t.avatar) ? `<img class="avatar${link}" src="${esc(t.avatar)}" alt="">` : `<div class="avatar${link}"></div>`}
       <div class="mu-who">
-        <div class="sub">@${esc(t.owner || 'unknown')}</div>
-        <div class="team-name">${esc(t.team)}</div>
+        <div class="sub">${link ? `<span class="${link.slice(1)}">@${esc(t.owner || 'unknown')}</span>` : `@${esc(t.owner || 'unknown')}`}</div>
+        <div class="team-name">${link ? `<span class="${link.slice(1)}">${esc(t.team)}</span>` : esc(t.team)}</div>
       </div>
       <div class="mu-pts">${esc(t.score || '–')}</div>
       <div class="mu-bar"><span class="${trend}" style="width:${Math.max(0, Math.min(100, t.bar))}%"></span></div>

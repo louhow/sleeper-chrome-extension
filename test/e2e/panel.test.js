@@ -147,6 +147,15 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   /* Sleeper's header is 42px, its labels the bottom 25px. */
   .table-header { height: 42px; padding-top: 16px; box-sizing: border-box; }
   .table-header:has(.section-header) { height: 58px; padding-top: 12px; }
+  /* Sleeper's NFL rows: 52px, a position line and a game line under the name; its game line
+     is inline-block while its red-zone mark is a flex box, which drops the mark onto a line of its own. */
+  .player-list-item.nfl { height: 52px; align-items: center; }
+  .player-list-item.nfl .name-container { font-size: 11px; }
+  .player-list-item.nfl .name { font-size: 12px; line-height: 12px; }
+  .player-list-item.nfl .position-container { font-size: 9px; line-height: 12px; }
+  .player-list-item.nfl .game-schedule-live-description { display: inline-block; overflow: hidden; white-space: nowrap; font-size: 11px; min-height: 11px; opacity: 0.6; }
+  .player-list-item.nfl .game-schedule-live-description .rz { display: flex; align-items: center; justify-content: center; padding: 2px; border-radius: 3px; background: #ff2a6d; font-weight: bold; font-size: 8px; margin: 0 3px; position: relative; top: -1px; }
+  .player-list-item.nfl .owner { font-size: 9px; line-height: 12px; }
   .section-header { display: flex; height: 16px; font-size: 11px; font-weight: 700; }
 </style>
 <div class="integration-players-panel"><div class="filters"><div class="header-top"><button data-pos="ALL">ALL</button><button data-pos="PG">PG</button>
@@ -226,7 +235,9 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
     if (sort) view.sort((a, b) => (map[b.player_id][sort] || -1) - (map[a.player_id][sort] || -1));
     const grid = document.querySelector('.ReactVirtualized__Grid');
     grid.__reactInternalInstance$test = fiberOf({ players: view, playerStatsMap: map }, 3);
-    grid.innerHTML = view.map(({ player_id: id }) => '<div class="player-list-item" data-id="' + id + '"><div class="owner-cell"></div><div class="player-meta-container"><div class="name-container"><div class="name">' + id + '</div>' +
+    const nfl = panel.props.sport === 'nfl';
+    const game = (p) => (nfl ? '<div class="position-container">' + p.pos + ' - ' + p.team + '</div><div class="game-schedule-live-description">' + (p.game || 'Sun 1:00 PM') + (p.redZone ? '<span class="rz">RZ</span>' : '') + '</div>' : '');
+    grid.innerHTML = view.map(({ player_id: id }) => '<div class="player-list-item' + (nfl ? ' nfl' : '') + '" data-id="' + id + '"><div class="owner-cell"></div><div class="player-meta-container"><div class="name-container"><div class="name">' + id + '</div>' + game(PLAYERS.find((p) => p.id === id)) +
       (OWNERS[id] ? '<div class="owner"><i class="fa fa-arrow-right">→</i><div>' + USERS[owned[id].user_id].display_name + '</div></div>' : '') + '</div></div>' +
       statKeys.map((k) => '<div class="cell nba">' + (map[id][k] == null ? '-' : (map[id][k] / (k === 'sp' ? 60 : 1) / (map[id].gp || 1)).toFixed(1)) + '</div>').join('') + '</div>').join('');
     for (const row of grid.children) row.__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: { player: { player_id: row.dataset.id } } } };
@@ -337,7 +348,7 @@ ${token ? `<script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>` : "<
   .center-tab-selector { display: flex; gap: 8px; padding: 20px 24px; }
   .scrollbar-container { flex: 1; min-height: 0; overflow: auto; }
 </style>
-${wrapped ? '<div class="postdraft-panel"><div class="center-tab-selector"><span class="item-tab">MATCHUP</span><span class="item-tab">TEAM</span></div><div class="scrollbar-container"><div class="team-panel">' : ''}
+${wrapped ? `<div class="postdraft-panel"><div class="center-tab-selector"><span class="item-tab" onclick="history.pushState({}, '', '/leagues/${NFL_LEAGUE}/matchup')">MATCHUP</span><span class="item-tab" onclick="history.pushState({}, '', '/leagues/${NFL_LEAGUE}/team')">TEAM</span></div><div class="scrollbar-container"><div class="team-panel">` : ''}
 <div class="user-tab-menu"><div class="row"><b>Lou Point Conversion</b><div class="actions">
   <div class="btn-container space"><div class="btn">W</div><div class="btn-text">WAIVER</div></div>
   <div class="btn-container space"><div class="btn">T</div><div class="btn-text">TRADE</div></div>
@@ -365,9 +376,19 @@ ${wrapped ? '</div></div></div>' : ''}
         return {};
       },
       rosterUpdateStarters: async () => ({ errors: ['not in season'] }),
+      // Sleeper's modal layer; the player card it gets is recorded.
+      openModal: (el) => window.__nflModals.push({ type: el.type, playerId: el.props.selectedPlayerId, ids: el.props.playerIds, known: Boolean(el.props.playersMap[el.props.selectedPlayerId]) }),
     },
     stateNode: { state: { starters: [['QB', 'qbA'], ['RB', 'rbPlayed'], ['WR', 'wrA'], ['FLEX', 'rbB'], ['SUPER_FLEX', 'wrB']]
       .map(([slotPosition, playerId]) => ({ slotPosition, playerId })) } },
+  };
+  window.__nflModals = [];
+  // Every player Sleeper knows, as its playersMap holds them all.
+  team.memoizedProps.playersMap = new Proxy(team.memoizedProps.playersMap, { get: (map, id) => map[id] || (typeof id === 'string' ? { player_id: id, first_name: 'Any', last_name: id } : undefined) });
+  // Sleeper's Team component opens its player card for a player id (Sleeper's own _onClickPlayerNews).
+  team.stateNode.props = team.memoizedProps;
+  team.stateNode._onClickPlayerNews = function (id) {
+    this.props.openModal({ type: 'PlayerCard', props: { sport: 'nfl', playerIds: [id], selectedPlayerId: id, playersMap: this.props.playersMap, week: 7 } });
   };
   window.__nflTeam = team;
   const roster = document.querySelector('.team-roster');
@@ -2269,7 +2290,8 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
   delete games.qbx[6];
   const stats = (fpts) => ({ fpts, rush_att: 1 });
   documentBody = playersTable([
-    { id: 'qbx', pos: 'QB', team: 'DET', owner: 'Cookie Monster', stats: stats(20) },
+    // Live, in the red zone, as Sleeper marks it.
+    { id: 'qbx', pos: 'QB', team: 'DET', owner: 'Cookie Monster', stats: stats(20), game: '5:28 4th 13-43 vs TB', redZone: true },
     { id: 'tex', pos: 'TE', team: 'KC', owner: 'Cling Kong', stats: stats(12) },
     { id: 'rbx', pos: 'RB', team: 'SF', stats: stats(8) },
   ], { statType: 'stat', statInterval: 6, statKeys: NFL_KEYS, sort: 'fpts' }, {
@@ -2333,6 +2355,18 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
   for (const [name, [group, first, last]] of Object.entries(spans)) {
     assert.ok(Math.abs(group.left - first.left) <= 1 && Math.abs(group.right - last.right) <= 1, `${name} spans its columns`);
   }
+  // Each row's name, position, game and team lines fit its 52px; the RZ mark stays on the game line.
+  const overflow = await page.evaluate(() => [...document.querySelectorAll('.player-list-item')].filter((row) => {
+    const box = row.getBoundingClientRect();
+    return [...row.querySelectorAll('.name-container > *')].some((el) => el.getBoundingClientRect().bottom > box.bottom + 0.5);
+  }).map((row) => row.dataset.id));
+  assert.deepEqual(overflow, [], 'nothing spills out of a row');
+  const rz = await page.evaluate(() => {
+    const line = document.querySelector('.player-list-item[data-id="qbx"] .game-schedule-live-description');
+    const mark = line.querySelector('.rz').getBoundingClientRect();
+    return { mark: [mark.width, mark.height], line: line.getBoundingClientRect().height };
+  });
+  assert.ok(rz.mark[0] < 24 && rz.mark[1] <= 12 && rz.line <= 13, `a small mark on the game line: ${JSON.stringify(rz)}`);
   // Values line up under their labels.
   const misaligned = await page.evaluate(() => {
     const labels = [...document.querySelectorAll('.stat-key-header > .label')];
@@ -2393,6 +2427,11 @@ test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from
   await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: teams[2] }).waitFor();
   await page.keyboard.press('ArrowDown');
   await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: teams[3] }).waitFor();
+  // A player's name opens Sleeper's own player card, for that player.
+  const firstId = await page.locator(nflPanel('.card.nfl .line1 button.name')).first().getAttribute('data-player');
+  await page.locator(nflPanel('.card.nfl .line1 button.name')).first().click();
+  await page.waitForFunction(() => window.__nflModals.length === 1);
+  assert.deepEqual(await page.evaluate(() => window.__nflModals[0]), { type: 'PlayerCard', playerId: firstId, ids: [firstId], known: true });
   // Logged out, nothing to edit.
   assert.equal(await page.locator(nflPanel('button.slot, .optimize')).count(), 0);
   // Sleeper's own tab, and back.
@@ -2471,6 +2510,15 @@ test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup
   await options.nth(3).click();
   await head.locator('.mu-team.mine .team-name').filter({ hasText: a }).waitFor();
   assert.equal((await head.locator('.mu-team.theirs .team-name').textContent()).trim(), b);
+  // A player's name opens Sleeper's player card, whoever's side they're on.
+  const theirId = await page.locator(nflPanel('.mp.nfl.theirs .name button')).first().getAttribute('data-player');
+  await page.locator(nflPanel('.mp.nfl.theirs .name button')).first().click();
+  await page.waitForFunction(() => window.__nflModals.length === 1);
+  assert.equal(await page.evaluate(() => window.__nflModals[0].playerId), theirId);
+  // A team's name, owner or avatar opens it on the Team tab, as on NBA.
+  await head.locator('.mu-team.theirs .team-name .team-link').click();
+  await page.waitForURL(`**/leagues/${NFL_LEAGUE}/team`);
+  await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: b }).waitFor({ timeout: 30000 });
   documentBody = LOGGED_OUT;
 });
 

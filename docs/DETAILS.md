@@ -226,6 +226,11 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
 - Any team from the picker (A to Z, with avatars); the arrow keys go through them and stop at the ends.
 - Your own lineup, for the week Sleeper's Team tab shows: tap a slot badge, then one of the highlighted players. Players whose game has kicked off stay put, as Sleeper locks them. Saves go through Sleeper's own Team component (`updateMatchupLeg`), as Optimize's do.
 - Optimize lineup sits in the toolbar, as on the NBA Team tab, and opens the same dialog.
+- A player's name or headshot (Team and Matchup tabs) opens Sleeper's own player card, the one its Players tab shows.
+  Sleeper builds that card in its own handlers (the Team component's `_onClickPlayerNews`, a Matchup row's click) and hands it to `openModal`; page-hook runs one of them with `openModal` caught, then opens the card it got for the player asked for.
+  A Matchup row knows only that matchup's players, so the extension sends the player's name, position and team along; Sleeper's card loads the rest.
+- On the Matchup tab, a team's avatar, owner or name opens it on the Team tab (just for now: the picker's choice stays), as on NBA.
+- Live games show Sleeper's RZ mark when the player's team has the ball inside the 20.
 - Matchup: the League tab's matchup card on top (avatars, scores, win chance and bar, record, projection), then both lineups slot by slot, bench, IR and taxi. The picker picks a matchup (both teams), as on the NBA Matchup tab.
 - Points are Sleeper's stats scored with the league's settings; the live projection is what's scored plus the projection for the game time left. Win chance is Sleeper's own formula (see the League tab).
 - The data: `/v1/league/<id>/matchups/<week>` (logged in, `matchup_legs`) for who's starting, `/projections/nfl/<season>/<week>` and `/stats/nfl/<season>/<week>` for players, projections and points, GraphQL `scores` for each game, `/players/nfl/research/...` for start and rostered %.
@@ -247,6 +252,8 @@ Sleeper's own NFL Players table, with these additions (the same hooks as the NBA
   Hovering a mark shows the week, the opponent (from Sleeper's own schedule) and the score, with points per game over those weeks; sorting by the column sorts by that.
   The scores come from `/stats/nfl/<season>/<week>` (finished weeks once per page load, the week on now every two minutes at most) and, for the week on now, GraphQL `scores` for where each game stands.
 - Sleeper's group headers (Fantasy, Rushing, Receiving, Passing) move with the columns, centered over their own.
+- Sleeper's red-zone mark (RZ) sits at the end of the game line: Sleeper's own styles drop it onto a line of its own, the width of the name area, which spills out of the row.
+  Team lines take Sleeper's 12px (the NFL rows have a game line too), so a rostered player's four lines fit the row.
 - The team picker and team lines of the NBA Players tab: every league team with its avatar, narrowing the list to one team through Sleeper's owner filter, arrow keys through the teams (stopping at the ends), and each rostered player's team avatar and name.
 - The view you last had on comes back, as on the NBA Players tab.
 
