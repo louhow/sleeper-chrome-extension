@@ -257,6 +257,8 @@ test('club form: results from the record after each match, last five', () => {
   assert.deepEqual(plain(forms.A), { abbr: 'A', record: '1-1-1', form: ['W', 'D', 'L'] });
   assert.deepEqual(plain(forms.B), { abbr: 'B', record: '0-1-1', form: ['L', 'D'] });
   assert.deepEqual(plain(model.clubForms(schedule, 2).A.form), ['D', 'L']);
+  const unrecorded = model.clubForms([...schedule, { status: 'complete', week: 4, date: '2026-08-04', home: { team: 'A', abbr: 'A' }, away: { team: 'C', abbr: 'C' } }]);
+  assert.deepEqual(plain(unrecorded.A), plain(forms.A), 'a finished match without a record yet changes nothing');
 });
 
 test('the rules that are the same as NBA and NFL come from the core model', () => {

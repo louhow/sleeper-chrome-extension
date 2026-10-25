@@ -35,8 +35,15 @@
   function routePath() {
     return document.documentElement.dataset.sepRoute || location.pathname;
   }
+  // The core content script (the manifest's first entry) reads every league's
+  // sport and publishes it on the page as "<league id>:<sport>"
+  // (html[data-snp-league-sport]). The panel waits for it, so it never touches
+  // another sport's page.
+  const SPORT_ATTR = 'data-snp-league-sport';
+  const isEpl = (leagueId) => document.documentElement.getAttribute(SPORT_ATTR) === `${leagueId}:${SPORT}`;
   function sync() {
-    const [, leagueId = null, page = null] = routePath().match(ROUTE) ?? [];
+    const [, routeLeague = null, page = null] = routePath().match(ROUTE) ?? [];
+    const leagueId = routeLeague && isEpl(routeLeague) ? routeLeague : null;
     if (leagueId !== (active?.leagueId ?? null)) {
       active?.destroy();
       active = leagueId ? mount(leagueId, page) : null;
@@ -92,7 +99,10 @@
       swap: null,
       saving: false,
       notice: null,
-      ready: false,
+      ready: false, // first league + week load finished; the panel stays blank until then
+      // Sleeper turned down the page's login (see api.sessionExpired): show nothing but how to fix it,
+      // since the logged-out fallbacks (public rosters, no matchups) would show the wrong lineups.
+      sessionExpired: false,
       claims: null,
       trending: null,
       season: null,
@@ -102,7 +112,6 @@
       waiverStatus: (id) => waiverStatus(id),
     };
     let destroyed = false;
-    let disabled = false;
     let frame = 0;
     let seasonLoading = false;
     const api = createApi(schedule);
@@ -116,7 +125,7 @@
     // Elements that mark Sleeper's own chrome (header, tabs, chat): the climb never crosses them.
     const CHROME = 'h1, h2, h3, nav, input, select, textarea, button, a, [role="button"]';
     function attach() {
-      if (destroyed || disabled) return;
+      if (destroyed) return;
       const box = findBox();
       if (box) {
         if (hidden?.parent !== box) {
@@ -211,11 +220,10 @@
         frame = 0;
         if (destroyed || !styled) return;
         state.now = Date.now();
+        state.sessionExpired = api.sessionExpired();
         renderLayer();
-        if (!(state.ready || state.error)) {
-          root.innerHTML = '<div class="app"><p class="msg">Loading Premier League league…</p></div>';
-          return;
-        }
+        // Blank until everything for the first paint is in, like Sleeper's own tabs.
+        if (!(state.ready || state.error || state.sessionExpired)) return;
         const body = root.querySelector('.body');
         const scrollTop = body?.scrollTop ?? 0;
         const focused = shadow.activeElement?.matches?.('[data-search]');
@@ -299,12 +307,6 @@
       state.error = null;
       state.loggedIn = api.loggedIn();
       const league = await api.get(`/v1/league/${leagueId}`);
-      if (league.sport !== SPORT) {
-        disabled = true;
-        teardown();
-        console.info(`[sleeper-epl] ${league.sport} league, staying hidden`);
-        return;
-      }
       const rosterKey = `roster:${leagueId}`;
       const [sportState, users, rosters, scheduleRows, players, prefs, me] = await Promise.all([
         api.get(`/v1/state/${SPORT}`),
@@ -329,7 +331,7 @@
         pool: null,
         me,
         myRosterId: myRoster?.roster_id ?? null,
-        rosterId: (myRoster || savedRoster || rosters[0])?.roster_id ?? null,
+        rosterId: (savedRoster || myRoster || rosters[0])?.roster_id ?? null,
         minWeek: league.settings?.start_week || 1,
         maxWeek: Math.max(league.settings?.playoff_week_start || 0, ...(scheduleRows || []).map((g) => g.week || 0)) || 38,
         schedule: scheduleRows || [],
@@ -1011,7 +1013,9 @@
     return { leagueId, attach, show, destroy };
   }
 
-  new MutationObserver(sync).observe(document, { childList: true, subtree: true });
+  // The sport arrives as an attribute change; within the same task as the core's
+  // teardown, so the panel takes the placeholder's spot before the next paint.
+  new MutationObserver(sync).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: [SPORT_ATTR, 'data-sep-route'] });
   addEventListener('popstate', sync);
   addEventListener('resize', sync);
   setInterval(sync, 500);

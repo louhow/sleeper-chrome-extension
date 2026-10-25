@@ -18,17 +18,24 @@ The extension fills that page with the mobile app's tabs.
 
 The panel replaces the "not supported on web yet" placeholder and only mounts for `clubsoccer:epl` leagues.
 If Sleeper's page has no placeholder to fill, it opens as a floating panel instead.
+Like the NBA tabs, it stays blank until the league and the week have loaded.
+If Sleeper turns down the page's login, it shows how to log back in instead of the logged-out view.
 
 ## How it works
 
-The EPL code lives in `src/epl/` under its own namespace (`globalThis.SEP`) and its own content-script entry in `manifest.json`, so it never touches the NBA and NFL code (`globalThis.SNP`).
-The only shared file is `src/api.js`, the logging API client.
+The EPL code lives in `src/epl/` under its own namespace (`globalThis.SEP`) and its own content-script entry in `manifest.json`, loaded after the NBA and NFL entry (`globalThis.SNP`).
+It reads off `SNP` where the rule or helper is the same for every sport: the API client (`src/api.js`), the Hungarian solver, claim checks and standings ranks (`SNP.model`), escaping and a few render helpers (`SNP.ui`), the API tab (`SNP.view`).
+It never changes `SNP` or the NBA and NFL pages.
+
+The NBA and NFL entry reads every league's sport first and publishes it on the page as `html[data-snp-league-sport]` (`<league id>:<sport>`).
+The panel waits for that attribute to name the league as `clubsoccer:epl` before it mounts, so it never touches another sport's page.
 
 - `src/epl/scoring.js`: fantasy points from a Sleeper soccer stat line.
   Soccer scoring is keyed by position and stat (`pos_m_g` is a midfielder's goals) and Sleeper's stat rows carry the same keys, so points are a weighted sum.
   Checked against Sleeper's own `pts_std` for standard-scoring leagues.
 - `src/epl/model.js`: pure rules.
-  Matches per gameweek (a club can play twice), weekly totals, which positions each slot accepts (`FM_FLEX` takes F or M, and so on), lineup and IR moves, formations, a Hungarian-algorithm lineup optimizer, Sleeper's win-probability formula, standings, FAAB and roster-room checks for claims, and a best guess at waiver status.
+  Matches per gameweek (a club can play twice), weekly totals, which positions each slot accepts (`FM_FLEX` takes F or M, and so on), lineup and IR moves, formations, the lineup optimizer, standings, club form and a best guess at waiver status.
+  The Hungarian solver, Sleeper's win-probability formula, and the FAAB and roster-room checks for claims come from `SNP.model`.
 - `src/epl/ui.js`: shared render helpers and the resolved lineup for a roster and week.
 - `src/epl/team.js`, `matchup.js`, `league.js`, `players.js`, `card.js`, `dialogs.js`, `view.js`: pure state -> HTML render functions.
 - `src/epl/content.js`: one session per league (survives Sleeper's in-page navigation), data loading, saves and events.
@@ -70,11 +77,14 @@ Logged out, the Match and League tabs show lineups but no pairings.
   The add dialog lets you switch between a free-agent add and a waiver claim, and Sleeper has the final say.
 - Trades are not supported; use the app.
 - Stat labels in the game log and card (KP, DRB, and so on) are the extension's reading of Sleeper's stat keys.
-- There are no automated tests for the EPL code yet.
 
 ## Development
 
+Unit tests: `test/unit/epl-model.test.js` and `test/unit/epl-ui.test.js` (run with `npm test`), loaded by `loadSep` in `test/unit/load.js`.
+The end-to-end suite checks that the panel never mounts on an NBA league page; there is no end-to-end test of the panel itself yet.
+
 `test/epl/harness.html` is a stand-in for Sleeper's EPL league page.
+It loads the content scripts listed in `manifest.json` and stands in for the core's sport attribute.
 Serve the repository root and open it:
 
 ```bash

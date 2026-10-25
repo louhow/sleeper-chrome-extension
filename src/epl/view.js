@@ -8,6 +8,7 @@
 
   function render(s, log) {
     const body = s.tab === 'api' ? apiView(s, log)
+      : s.sessionExpired ? sessionExpired()
       : s.page === 'match' ? globalThis.SEP.matchup.render(s)
       : s.page === 'players' ? globalThis.SEP.players.render(s)
       : s.page === 'league' ? globalThis.SEP.league.render(s)
@@ -25,10 +26,18 @@
       <div class="tabs" role="tablist">${PAGES.map(([id, label]) => tab(id, label)).join('')}<button role="tab" data-tab="api" aria-selected="${s.tab === 'api'}" class="api-tab ${s.tab === 'api' ? 'active' : ''}">API <span class="count">${log.length}</span></button></div>
       <div class="tools">
         ${s.loggedIn ? '' : '<span class="sub" title="Log in to Sleeper to edit your lineup and add players">Logged out</span>'}
-        ${options ? `<select data-action="roster" aria-label="Team to show">${options}</select>` : ''}
+        ${options && !s.sessionExpired ? `<select data-action="roster" aria-label="Team to show">${options}</select>` : ''}
         <button class="icon" data-action="refresh" title="Refetch everything" aria-label="Refresh">↻</button>
       </div>
     </nav>`;
+  }
+
+  function sessionExpired() {
+    return `<div class="session-expired" role="alert">
+      <h3>Log back in to Sleeper</h3>
+      <p>Sleeper turned down this browser's login, so your lineup, matchup and claims can't load correctly.</p>
+      <p>Log out of Sleeper, log back in, then reload this page.</p>
+    </div>`;
   }
 
   return { render };

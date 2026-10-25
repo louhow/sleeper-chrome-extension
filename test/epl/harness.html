@@ -37,6 +37,11 @@
     const params = new URLSearchParams(location.search);
     if (params.get('league')) document.documentElement.dataset.sepRoute = `/leagues/${params.get('league')}`;
     // ?noclass=1 drops Sleeper's NBA placeholder class, to exercise the text-based lookup.
+    // Stands in for the core content script, which publishes each league's sport and is what the panel waits for.
+    const leagueId = document.documentElement.dataset.sepRoute.split('/')[2];
+    fetch(`https://api.sleeper.app/v1/league/${leagueId}`).then((r) => r.json()).then((league) => {
+      document.documentElement.dataset.snpLeagueSport = `${leagueId}:${league.sport}`;
+    });
     if (params.get('noclass')) addEventListener('DOMContentLoaded', () => document.querySelector('.empty-panel-container')?.removeAttribute('class'));
   </script>
   <script>

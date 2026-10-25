@@ -2633,3 +2633,25 @@ test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes a
   await button.waitFor({ state: 'detached' });
   documentBody = LOGGED_OUT;
 });
+
+// The Premier League panel (src/epl/) loads on every league page too, and waits for the sport the core publishes.
+test('the Premier League panel never mounts on an NBA league page', async () => {
+  documentBody = LOGGED_OUT;
+  await page.addInitScript(() => {
+    window.__eplMounted = false;
+    new MutationObserver(() => {
+      if (document.querySelector('#sleeper-epl-panel, #sleeper-epl-dialog')) window.__eplMounted = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  // A slow league call, so Sleeper's placeholder is up well before anyone knows the sport.
+  const slow = async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return route.fallback();
+  };
+  await page.route(`https://api.sleeper.app/v1/league/${LEAGUE}`, slow);
+  await page.goto(TEAM_URL);
+  await page.locator(panel('.card .days')).first().waitFor({ timeout: 30000 });
+  await page.unroute(`https://api.sleeper.app/v1/league/${LEAGUE}`, slow);
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.snpLeagueSport), `${LEAGUE}:nba`);
+  assert.equal(await page.evaluate(() => window.__eplMounted), false);
+});

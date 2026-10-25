@@ -389,7 +389,7 @@
     for (const g of schedule || []) {
       if (g.status !== 'complete') continue;
       for (const side of [g.home, g.away]) {
-        if (!side?.team) continue;
+        if (!side?.team || !side.record) continue;
         (byTeam[side.team] ||= { abbr: side.abbr, games: [] }).games.push({ week: g.week, date: g.date, record: parse(side.record) });
       }
     }

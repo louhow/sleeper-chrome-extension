@@ -21,9 +21,9 @@
   top: 64px;
   right: 16px;
   bottom: 16px;
-  width: min(900px, calc(100vw - 32px));
+  width: min(820px, calc(100vw - 32px));
   z-index: 2147483000;
-  padding-top: 12px;
+  padding-top: 16px;
   background: #18202f;
   border: 1px solid #2c3850;
   border-radius: 12px;
@@ -73,7 +73,7 @@ button, select {
   cursor: pointer;
 }
 button:not(.slot):hover:not(:disabled), select:hover { background: rgba(255, 255, 255, 0.14); }
-button:disabled { opacity: 0.35; cursor: default; }
+button:disabled { opacity: 0.3; cursor: default; }
 button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visible, [tabindex]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
@@ -132,6 +132,17 @@ button.name:hover, button.name:focus-visible { background: none !important; text
 }
 .msg { margin: 32px 0; color: var(--muted); text-align: center; }
 .msg.error, pre.error { color: var(--danger); }
+.session-expired {
+  max-width: 420px;
+  margin: 32px auto;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 91, 110, 0.4);
+  border-radius: 12px;
+  background: rgba(255, 91, 110, 0.08);
+  text-align: center;
+}
+.session-expired h3 { margin: 0 0 8px; font-size: 16px; }
+.session-expired p { margin: 4px 0 0; color: var(--muted); }
 .sub { color: var(--muted); font-size: 12px; }
 .hint { margin-top: 2px; color: var(--muted); font-size: 12px; }
 .hint.center { text-align: center; }

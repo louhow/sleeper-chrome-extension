@@ -102,6 +102,8 @@ test('match text: next match, live, or the final results', () => {
   assert.equal(ui.nextGameText([], NOW), 'No match this week');
   assert.equal(ui.nextGameText([g('complete', NOW - 9e6, true, 'ARS'), g('complete', NOW - 1e6, false, 'MUN')], NOW), 'Final · vs ARS, @ MUN');
   assert.equal(ui.nextGameText([g('in_game', NOW - 1e3, false, 'MUN')], NOW), 'Live @ MUN');
+  assert.equal(ui.nextGameText([g('pre_game', NOW - 1e3, false, 'MUN')], NOW), 'Live @ MUN', 'kicked off by the clock, before Sleeper says so');
+  assert.equal(ui.nextMatch([g('complete', NOW - 9e6, true, 'ARS'), g('pre_game', NOW + 9e6, false, 'MUN')], NOW).opponentAbbr, 'MUN');
   assert.equal(ui.nextGameText([g('pre_game', null, true, 'BOU')], NOW), `${ui.weekday('2026-10-24')} vs BOU`);
   const chips = ui.gameChips([{ ...g('complete', NOW - 9e6, true, 'ARS'), opponent: '11' }, { ...g('pre_game', NOW + 9e6, false, 'MUN'), opponent: '12' }], NOW);
   assert.match(chips, /^<span class="chip done" title="[^"]+ vs ARS"><img src="https:\/\/sleepercdn.com\/images\/team_logos\/clubsoccer\/11.png" alt="ARS"><\/span><span class="chip"/);
@@ -198,4 +200,13 @@ test('API tab: one entry per call, with status, timing and a preview when open',
   assert.match(html, /<pre class="request">query me \{ me \{ user_id \} \}<\/pre><pre class="error">401 from graphql me<\/pre>/);
   assert.match(html, /Open raw response ↗/);
   assert.match(view.render({ ...s, openCalls: new Set() }, []), /<p class="msg">No calls yet.<\/p>/);
+});
+
+test('a login Sleeper turned down shows how to fix it instead of the logged-out fallbacks', () => {
+  const s = { ...weekState(), tab: 'page', page: 'team', loggedIn: true, sessionExpired: true, openCalls: new Set(), playersTab: {} };
+  const html = view.render(s, []);
+  assert.match(html, /<div class="session-expired" role="alert">\s*<h3>Log back in to Sleeper<\/h3>/);
+  assert.doesNotMatch(html, /team-card|data-action="roster"/, 'no lineup and no team picker');
+  assert.match(view.render({ ...s, tab: 'api' }, []), /No calls yet/, 'the API tab still shows what was refused');
+  assert.match(view.render({ ...s, sessionExpired: false }, []), /class="team-card"/);
 });

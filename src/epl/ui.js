@@ -1,6 +1,6 @@
 // Rendering helpers shared by every view. Pure: data in, HTML strings out.
 (globalThis.SEP ||= {}).ui = (() => {
-  const { playerGames, weekTotals, started, slotAccepts, savedFormation, slotLabels, formationOf } = globalThis.SEP.model;
+  const { playerGames, weekTotals, started, finished, slotAccepts, savedFormation, slotLabels, formationOf } = globalThis.SEP.model;
   // The same helpers as NBA and NFL. The rest differ by sport, or take a missing roster or date where core's don't.
   const { esc, CDN, shortName, gameTime, dialogErrors, notice } = globalThis.SNP.ui;
   const f2 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(2));
@@ -70,11 +70,11 @@
   const versus = (g) => `${g.home ? 'vs' : '@'} ${g.opponentAbbr}`;
 
   // A player's next match this week, with `when` it is ("Sun 9:00am", or "Live"); null once all are over.
+  // Past its kickoff a match is live, as weekTotals counts it, even before Sleeper's status says so.
   function nextMatch(games, now = Date.now()) {
-    const next = games.find((g) => !started(g.game, now) || g.game.status === 'in_game');
+    const next = games.find((g) => !finished(g.game));
     if (!next) return null;
-    const live = next.game.status === 'in_game' || (started(next.game, now) && next.game.status !== 'complete');
-    const when = live ? 'Live' : next.game.start ? `${weekday(next.game.date)} ${gameTime(next.game.start)}` : weekday(next.game.date);
+    const when = started(next.game, now) ? 'Live' : next.game.start ? `${weekday(next.game.date)} ${gameTime(next.game.start)}` : weekday(next.game.date);
     return { ...next, when };
   }
 
