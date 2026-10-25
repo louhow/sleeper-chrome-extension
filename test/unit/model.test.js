@@ -129,6 +129,14 @@ test("win probability matches Sleeper's (37% vs 63% at 157.23 vs 181.21)", () =>
   assert.equal(lo, 0.01, 'clamped to 1-99%');
 });
 
+test('win probability: a settled tie is a coin flip, missing numbers count as 0, no projection stays finite', () => {
+  assert.deepEqual(plain(model.winProbability(0, 0, 0, 0)), [0.5, 0.5], 'no points and no projections');
+  assert.deepEqual(plain(model.winProbability(40, 40, 40, 40)), [0.5, 0.5], 'a finished tie');
+  assert.deepEqual(plain(model.winProbability(null, null, 10, 10)), [0, 1], 'side one has nothing, side two is settled at 10');
+  assert.deepEqual(plain(model.winProbability(undefined, 20, 0, 20)), plain(model.winProbability(0, 20, 0, 20)));
+  for (const p of model.winProbability(5, 0, 0, 10)) assert.ok(Number.isFinite(p), 'a projection of 0 never divides by zero');
+});
+
 test('standings ranks use roster_standings, else record then waiver order', () => {
   const rosters = [
     { roster_id: 1, settings: { wins: 0, waiver_position: 14 } },

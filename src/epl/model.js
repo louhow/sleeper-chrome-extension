@@ -3,7 +3,7 @@
 (globalThis.SEP ||= {}).model = (() => {
   // The same rules as NBA and NFL, from the core model (loaded before this entry).
   const core = globalThis.SNP.model;
-  const { cheapestAssignment, standingsRanks, FAAB, rosterRoom, faabLeft, claimError, sortClaims } = core;
+  const { cheapestAssignment, winProbability, standingsRanks, FAAB, rosterRoom, faabLeft, claimError, sortClaims } = core;
 
   // GraphQL `scores` rows (or /schedule rows) -> games, earliest first.
   function gamesFromScores(rows) {
@@ -332,16 +332,6 @@
     });
     plan.changes = plan.changes.map((c) => ({ ...c, proj: look[c.id].value, left: look[c.id].left }));
     return plan;
-  }
-
-  // Sleeper's win probability (core's port of its web app), for any numbers:
-  // missing ones count as 0, and level teams with nothing left to play are a
-  // coin flip (core says [0, 0], which the win bar would show as 0% each).
-  function winProbability(current1, proj1, current2, proj2) {
-    const [c1, p1, c2, p2] = [current1, proj1, current2, proj2].map((n) => n || 0);
-    const r2 = (n) => n.toFixed(2);
-    if (r2(c1) === r2(p1) && r2(c2) === r2(p2) && r2(c1) === r2(c2)) return [0.5, 0.5];
-    return core.winProbability(c1, p1, c2, p2);
   }
 
   // Standings order: record, then points for, then waiver order. Returns rosters sorted.

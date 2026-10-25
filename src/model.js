@@ -817,6 +817,9 @@
 
   // Sleeper's win probability (ported from its web app): each side is a normal
   // distribution centred on its projection, tighter as the current score nears it.
+  // Missing numbers count as 0. Once both sides are settled (current = projection)
+  // the score decides it, and level teams are a coin flip: Sleeper says [0, 0]
+  // there, which the win bar would show as 0% each.
   function erfc(x) {
     const z = Math.abs(x);
     const t = 1 / (1 + z / 2);
@@ -827,24 +830,26 @@
   const clamp = (lo, hi, v) => Math.max(lo, Math.min(hi, v || 0));
 
   function winProbability(current1, proj1, current2, proj2) {
+    const [c1, p1, c2, p2] = [current1, proj1, current2, proj2].map((n) => Number(n) || 0);
     const r2 = (n) => Number(n.toFixed(2));
-    if (r2(current1) === r2(proj1) && r2(current2) === r2(proj2)) {
-      const a = r2(current1);
-      const b = r2(current2);
-      return a === b ? [0, 0] : a > b ? [1, 0] : [0, 1];
+    if (r2(c1) === r2(p1) && r2(c2) === r2(p2)) {
+      const a = r2(c1);
+      const b = r2(c2);
+      return a === b ? [0.5, 0.5] : a > b ? [1, 0] : [0, 1];
     }
     const spread = (current, proj) => {
-      const n = 1 + 10 * (1 - current / proj);
+      // No projection: as wide as a side with nothing scored yet.
+      const n = 1 + 10 * (proj ? 1 - current / proj : 1);
       const variance = Math.sqrt((current - proj) ** 2 / n) ** 2 || 0.1;
       return { mean: proj, variance };
     };
-    const a = spread(current1, proj1);
-    const b = spread(current2, proj2);
+    const a = spread(c1, p1);
+    const b = spread(c2, p2);
     const mean = a.mean - b.mean;
     const sd = Math.sqrt(a.variance + b.variance);
     const cdf0 = 0.5 * erfc(mean / (sd * Math.SQRT2));
-    const p1 = clamp(0.01, 0.99, 1 - cdf0);
-    return [p1, clamp(0.01, 0.99, 1 - p1)];
+    const win = clamp(0.01, 0.99, 1 - cdf0);
+    return [win, clamp(0.01, 0.99, 1 - win)];
   }
 
   // roster_id -> rank. Uses Sleeper's roster_standings when it has rows; before
