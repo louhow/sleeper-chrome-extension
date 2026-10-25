@@ -814,6 +814,31 @@ test('matchup: fills the Matchup tab with both teams', async () => {
   assert.ok(await page.locator(panel('.chip img')).count(), 'team logos for the week');
   assert.ok(!(await page.locator(panel('[data-lock]')).count()), 'no lock controls when logged out');
   await page.screenshot({ path: `${OUT}matchup.png` });
+  // The picker picks a matchup: both teams, each with its avatar and name.
+  const pick = page.locator(panel('.pair-pick'));
+  const names = async (el) => (await el.locator('.tp-name').allTextContents()).map((x) => x.trim());
+  const left = (await page.locator(panel('.mu-team.mine .team-name')).textContent()).trim();
+  const right = (await page.locator(panel('.mu-team.theirs .team-name')).textContent()).trim();
+  assert.deepEqual(await names(pick.locator('.tp-button')), [left, right], 'the matchup shown, left team first');
+  await pick.locator('.tp-button').click();
+  const options = pick.locator('.tp-menu [data-pick-roster]');
+  const matchups = (await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}/matchups/1`)).json()).filter((m) => m.matchup_id != null);
+  assert.equal(await options.count(), new Set(matchups.map((m) => m.matchup_id)).size, 'one entry a matchup');
+  for (let i = 0; i < await options.count(); i++) assert.equal((await names(options.nth(i))).length, 2, 'two teams an entry');
+  assert.equal(await options.locator('.tp-avatar').count(), 2 * await options.count());
+  await page.screenshot({ path: `${OUT}matchup-picker.png` });
+  const [first] = await names(options.nth(0));
+  const other = options.nth(1);
+  const [a, b] = await names(other);
+  await other.click();
+  await page.locator(panel('.mu-team.mine .team-name')).filter({ hasText: a }).waitFor();
+  assert.equal((await page.locator(panel('.mu-team.theirs .team-name')).textContent()).trim(), b);
+  // Arrow keys go through the matchups and stop at the ends.
+  await page.keyboard.press('ArrowUp');
+  await page.locator(panel('.mu-team.mine .team-name')).filter({ hasText: first }).waitFor();
+  await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(300);
+  assert.equal((await page.locator(panel('.mu-team.mine .team-name')).textContent()).trim(), first, 'the first matchup stays');
 });
 
 test('matchup: switching to Team keeps the session and data', async () => {

@@ -1431,7 +1431,16 @@
       // order (A to Z), stopping at the first and the last.
       if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
         const typing = e.composedPath().some((el) => el instanceof Element && el.matches('input, select, textarea, [contenteditable]'));
-        if (typing || state.modal || !state.onPanel || state.page !== 'team' || state.tab !== 'page' || !state.rosters?.length) return;
+        if (typing || state.modal || !state.onPanel || (state.page !== 'team' && state.page !== 'matchup') || state.tab !== 'page' || !state.rosters?.length) return;
+        // On the Matchup tab, through the matchups (the picker's order), by their left team.
+        const pairs = state.page === 'matchup' ? view.matchupPairs(state) : [];
+        if (pairs.length) {
+          const at = pairs.findIndex((p) => p.some((r) => r?.roster_id === state.rosterId));
+          const next = pairs[at + (e.key === 'ArrowDown' ? 1 : -1)];
+          if (at < 0 || !next) return;
+          e.preventDefault();
+          return setRoster(next[0].roster_id);
+        }
         const teams = [...state.rosters].sort((a, b) => ui.teamName(state, a).localeCompare(ui.teamName(state, b)));
         const at = teams.findIndex((r) => r.roster_id === state.rosterId);
         const next = teams[at + (e.key === 'ArrowDown' ? 1 : -1)];

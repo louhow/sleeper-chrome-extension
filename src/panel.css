@@ -1103,6 +1103,34 @@ button.tp-button:hover:not(:disabled) {
   font-size: 11px;
   line-height: 14px;
 }
+/* The Matchup tab's picker: both teams of a matchup, side by side. */
+.pair-pick .tp-button {
+  width: 340px;
+}
+.pair-pick .tp-menu {
+  width: 380px;
+}
+.tp-pair {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tp-pair .tp-name {
+  flex: 1 1 0;
+}
+.tp-pair .tp-name.bye {
+  color: var(--muted);
+  font-weight: 600;
+}
+.tp-vs {
+  flex: none;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
 /* A shortcut, not a selection: outlined, quiet until hovered. */
 .my-team {
   display: inline-flex;

@@ -128,6 +128,7 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 - The toolbar's team picker shows every team with its avatar, name and owner, A to Z (yours marked "you"); the pick is kept for next time.
 - While you're looking at someone else's team, a "My team" button beside it goes back to yours in one click.
 - The arrow up and down keys go through every team in the picker's order, yours included, and stop at the first and the last (not while typing).
+- On the Matchup tab the picker picks a matchup instead: the week's matchups, both teams each with its avatar and name (yours first, then A to Z), the team shown on the left; "My matchup" goes back to yours, and the arrow keys go through the matchups and stop at the ends.
 - On the Matchup tab, and on the League tab's matchups, a team's avatar, owner or name opens it on the Team tab (just for now: the picker's choice stays).
 
 ### League

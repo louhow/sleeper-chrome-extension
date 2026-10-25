@@ -24,7 +24,7 @@
   function toolbar(s, log) {
     const tab = (id, label) =>
       `<button role="tab" data-tab="${id}" aria-selected="${s.tab === id}" class="${s.tab === id ? 'active' : ''}">${label}</button>`;
-    const picker = s.rosters?.length ? teamPicker(s) : '';
+    const picker = !s.rosters?.length ? '' : s.page === 'matchup' ? matchupPicker(s) : teamPicker(s);
     // Only on the owner's editable Team tab, once the week's games are in.
     const l = s.ready && s.page === 'team' && s.tab === 'page' && !s.error && !s.sessionExpired ? lineup(s) : null;
     const optimize = !(l?.editable && l.week) ? ''
@@ -62,6 +62,53 @@
           <span class="tp-label"><b>${esc(teamName(s, r))}</b><small>@${esc(owner?.display_name || 'unknown')}${mine?.roster_id === r.roster_id ? ' · you' : ''}</small></span></button>`;
       }).join('')}</div>
     </div>`;
+  }
+
+  // The Matchup tab picks a matchup, not a team: the week's pairs, each with
+  // both teams' avatars and names (yours first, then A to Z by the left team),
+  // and, while it's someone else's, a one-click way back to yours.
+  function matchupPicker(s) {
+    const pairs = matchupPairs(s);
+    if (!pairs.length) return teamPicker(s);
+    const pic = (r, cls) => {
+      const url = r && avatar(s, r);
+      return url ? `<img class="${cls}" src="${esc(url)}" alt="">` : `<span class="${cls} blank">${esc(r ? teamName(s, r).slice(0, 1).toUpperCase() : '')}</span>`;
+    };
+    const half = (r) => (r ? `${pic(r, 'tp-avatar')}<span class="tp-name">${esc(teamName(s, r))}</span>` : '<span class="tp-name bye">No opponent</span>');
+    const current = pairs.find((p) => p.some((r) => r?.roster_id === s.rosterId));
+    // The shown team stays on the left.
+    const shown = current && (current[0]?.roster_id === s.rosterId ? current : [current[1], current[0]]);
+    const mine = pairs.find((p) => p.some((r) => r && owns(s, r)));
+    const back = mine && mine !== current
+      ? `<button class="my-team" data-pick-roster="${mine[0].roster_id}" title="Back to your matchup"><span aria-hidden="true">←</span>My matchup</button>` : '';
+    return `${back}<div class="team-pick pair-pick${s.rosterMenu ? ' open' : ''}">
+      <button class="tp-button" data-action="roster-menu" data-roster="${s.rosterId ?? ''}" aria-haspopup="listbox" aria-expanded="${Boolean(s.rosterMenu)}" aria-label="Matchup to show">
+        ${shown ? `<span class="tp-pair">${half(shown[0])}<span class="tp-vs">vs</span>${half(shown[1])}</span>` : '<span class="tp-name">Pick a matchup</span>'}<span class="tp-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="tp-menu" role="listbox">${pairs.map((p) => p === current ? shown : p).map((p) => `<button role="option" data-pick-roster="${p[0].roster_id}" aria-selected="${p === shown}">
+          <span class="tp-pair">${half(p[0])}<span class="tp-vs">vs</span>${half(p[1])}</span></button>`).join('')}</div>
+    </div>`;
+  }
+
+  // The shown week's matchups as pairs of rosters ([a, b], b null without an
+  // opponent): yours first, yours on the left, then A to Z by the left team.
+  function matchupPairs(s) {
+    const week = s.weeks?.[s.week];
+    const pool = week?.legs?.length ? week.legs : week?.matchups || [];
+    const byId = Object.fromEntries((s.rosters || []).map((r) => [r.roster_id, r]));
+    const groups = new Map();
+    for (const m of pool) {
+      const roster = byId[m.roster_id];
+      if (!roster) continue;
+      const key = m.matchup_id ?? `solo:${m.roster_id}`;
+      groups.set(key, [...(groups.get(key) || []), roster]);
+    }
+    const name = (r) => teamName(s, r);
+    const pairs = [...groups.values()].map((list) => {
+      const [a, b = null] = [...list].sort((x, y) => (owns(s, y) - owns(s, x)) || name(x).localeCompare(name(y)));
+      return [a, b];
+    });
+    return pairs.sort((x, y) => (owns(s, y[0]) - owns(s, x[0])) || name(x[0]).localeCompare(name(y[0])));
   }
 
   // In place of the tab while Sleeper rejects the page's login.
@@ -334,5 +381,5 @@
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   }
 
-  return { render };
+  return { render, matchupPairs };
 })();
