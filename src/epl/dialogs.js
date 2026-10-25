@@ -3,7 +3,7 @@
 // Pure: state -> HTML.
 (globalThis.SEP ||= {}).dialogs = (() => {
   const { playerGames, weekTotals, rosterRoom, faabLeft, sortClaims, FAAB, started } = globalThis.SEP.model;
-  const { esc, f2, headshot, positions, injuryTag, slotBadge, lineup, nextGameText, dialog, dialogErrors, myRoster, shortName } = globalThis.SEP.ui;
+  const { esc, f2, headshot, positions, injuryTag, slotBadge, lineup, nextGameText, dialog, dialogErrors, myRoster, shortName, playerOf } = globalThis.SEP.ui;
 
   function render(s) {
     const m = s.modal;
@@ -20,7 +20,7 @@
   }
 
   function playerRow(s, slot, id, { button = false, selected = false, disabled = false, label } = {}) {
-    const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+    const p = playerOf(s, id);
     const games = gamesOf(s, id);
     const t = weekTotals(games, s.now);
     const inner = `
@@ -48,7 +48,7 @@
 
   function addDialog(s, m) {
     const roster = myRoster(s);
-    const p = s.players?.[m.playerId] || { name: `Player #${m.playerId}` };
+    const p = playerOf(s, m.playerId);
     const settings = s.league?.settings || {};
     const waiver = m.status === 'waiver';
     const faab = settings.waiver_type === FAAB;
@@ -88,7 +88,7 @@
 
   function dropDialog(s, m) {
     const roster = myRoster(s);
-    const p = s.players?.[m.playerId] || { name: `Player #${m.playerId}` };
+    const p = playerOf(s, m.playerId);
     if (!roster) return dialog('Drop Player', '', '<p class="msg">Log in to Sleeper to drop players.</p>');
     const games = gamesOf(s, m.playerId);
     const locked = games.some((g) => started(g.game, s.now));
@@ -110,7 +110,7 @@
     const description = roster && faab ? `$${faabLeft(s.league, roster)} remaining · waiver position ${roster.settings?.waiver_position ?? '–'}` : '';
     if (!roster) return dialog('Waiver Claims', '', '<p class="msg">Log in to Sleeper to see your claims.</p>');
     const player = (id, sign) => {
-      const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+      const p = playerOf(s, id);
       return `<div class="cp ${sign === '+' ? 'add' : 'drop'}">
         <span class="sign">${sign}</span>
         <img class="headshot" src="${headshot(id)}" alt="">
@@ -146,7 +146,7 @@
     const l = lineup(s);
     const plan = m.plan;
     if (!l || !plan) return dialog('Optimize lineup', '', '<p class="msg">Nothing to optimize.</p>');
-    const name = (id) => shortName(s.players[id] || { name: `Player #${id}` });
+    const name = (id) => shortName(playerOf(s, id));
     const label = (slot) => (slot === 'BN' ? 'Bench' : slot.replace('_FLEX', ' flex'));
     const rows = plan.changes.map((c) => `<li class="op-change ${c.to === 'BN' ? 'out' : 'in'}">
         <img class="headshot" src="${headshot(c.id)}" alt="" data-player="${esc(c.id)}">

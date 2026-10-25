@@ -23,24 +23,7 @@
     og: 'Own Goals', yc: 'Yellow Card', yc2: 'Second Yellow', rc: 'Red Card', xg: 'xG', xa: 'xA',
     p_att: 'Passes', poss: 'Possession', tc: 'Touches', cnr: 'Corners Taken',
   };
-  const POSITION_LABELS = { f: 'Forward', m: 'Midfielder', d: 'Defender', gk: 'Goalkeeper' };
   const SETTING_KEY = /^pos_(gk|f|m|d)_(.+)$/;
-
-  // "pos_m_g" -> "Midfielder: Goals".
-  function settingLabel(key) {
-    const m = key.match(SETTING_KEY);
-    if (!m) return STAT_LABELS[key] || key;
-    return `${POSITION_LABELS[m[1]] || m[1].toUpperCase()}: ${STAT_LABELS[m[2]] || m[2]}`;
-  }
-
-  // Scoring rows that matter for one position, with the league's weights: [{ key, stat, label, weight }].
-  function positionScoring(settings, position) {
-    const pos = String(position || '').toLowerCase();
-    return Object.entries(settings || {})
-      .filter(([key, weight]) => weight && key.startsWith(`pos_${pos}_`))
-      .map(([key, weight]) => ({ key, stat: key.slice(pos.length + 5), label: STAT_LABELS[key.slice(pos.length + 5)] || key, weight }))
-      .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
-  }
 
   // The scored parts of one stat line, biggest first: [{ stat, label, value, points }].
   function breakdown(settings, stats) {
@@ -54,5 +37,5 @@
     return out.sort((a, b) => Math.abs(b.points) - Math.abs(a.points));
   }
 
-  return { scoreStats, STAT_LABELS, settingLabel, positionScoring, breakdown };
+  return { scoreStats, STAT_LABELS, breakdown };
 })();

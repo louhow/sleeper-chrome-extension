@@ -1,6 +1,10 @@
 // Pure functions that turn raw API responses into what the views show, plus
 // the lineup, waiver and standings rules. No DOM, no network.
 (globalThis.SEP ||= {}).model = (() => {
+  // The same rules as NBA and NFL, from the core model (loaded before this entry).
+  const core = globalThis.SNP.model;
+  const { cheapestAssignment, standingsRanks, FAAB, rosterRoom, faabLeft, claimError, sortClaims } = core;
+
   // GraphQL `scores` rows (or /schedule rows) -> games, earliest first.
   function gamesFromScores(rows) {
     return (rows || []).map((s) => {
@@ -263,58 +267,6 @@
     return FORMATION_ORDER.map((pos) => counts[pos]).join('-');
   }
 
-  // Hungarian algorithm: the row -> column assignment with the lowest total
-  // cost, for an n x m matrix with n <= m.
-  function cheapestAssignment(cost) {
-    const n = cost.length;
-    const m = cost[0]?.length ?? 0;
-    const u = new Array(n + 1).fill(0);
-    const v = new Array(m + 1).fill(0);
-    const row = new Array(m + 1).fill(0);
-    const way = new Array(m + 1).fill(0);
-    for (let i = 1; i <= n; i++) {
-      row[0] = i;
-      let j0 = 0;
-      const minv = new Array(m + 1).fill(Infinity);
-      const used = new Array(m + 1).fill(false);
-      do {
-        used[j0] = true;
-        const i0 = row[j0];
-        let delta = Infinity;
-        let j1 = 0;
-        for (let j = 1; j <= m; j++) {
-          if (used[j]) continue;
-          const reduced = cost[i0 - 1][j - 1] - u[i0] - v[j];
-          if (reduced < minv[j]) {
-            minv[j] = reduced;
-            way[j] = j0;
-          }
-          if (minv[j] < delta) {
-            delta = minv[j];
-            j1 = j;
-          }
-        }
-        for (let j = 0; j <= m; j++) {
-          if (used[j]) {
-            u[row[j]] += delta;
-            v[j] -= delta;
-          } else {
-            minv[j] -= delta;
-          }
-        }
-        j0 = j1;
-      } while (row[j0] !== 0);
-      do {
-        const j1 = way[j0];
-        row[j0] = row[j1];
-        j0 = j1;
-      } while (j0);
-    }
-    const colOf = new Array(n);
-    for (let j = 1; j <= m; j++) if (row[j]) colOf[row[j] - 1] = j - 1;
-    return colOf;
-  }
-
   // Slots that take fewer positions come first on a tie, so a pure forward
   // sits at F and the flex stays open for anyone.
   const slotSpecificity = (slot) => 5 - slotAccepts(slot).length;
@@ -382,36 +334,14 @@
     return plan;
   }
 
-  // Sleeper's win probability (ported from its web app): each side is a normal
-  // distribution centred on its projection, tighter as the current score nears it.
-  function erfc(x) {
-    const z = Math.abs(x);
-    const t = 1 / (1 + z / 2);
-    const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 +
-      t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
-    return x >= 0 ? r : 2 - r;
-  }
-  const clamp = (lo, hi, v) => Math.max(lo, Math.min(hi, v || 0));
-
+  // Sleeper's win probability (core's port of its web app), for any numbers:
+  // missing ones count as 0, and level teams with nothing left to play are a
+  // coin flip (core says [0, 0], which the win bar would show as 0% each).
   function winProbability(current1, proj1, current2, proj2) {
-    const r2 = (n) => Number((n || 0).toFixed(2));
-    if (r2(current1) === r2(proj1) && r2(current2) === r2(proj2)) {
-      const a = r2(current1);
-      const b = r2(current2);
-      return a === b ? [0.5, 0.5] : a > b ? [1, 0] : [0, 1];
-    }
-    const spread = (current, proj) => {
-      const n = 1 + 10 * (1 - current / (proj || 1));
-      const variance = Math.sqrt((current - proj) ** 2 / n) ** 2 || 0.1;
-      return { mean: proj, variance };
-    };
-    const a = spread(current1, proj1);
-    const b = spread(current2, proj2);
-    const mean = a.mean - b.mean;
-    const sd = Math.sqrt(a.variance + b.variance);
-    const cdf0 = 0.5 * erfc(mean / (sd * Math.SQRT2));
-    const p1 = clamp(0.01, 0.99, 1 - cdf0);
-    return [p1, clamp(0.01, 0.99, 1 - p1)];
+    const [c1, p1, c2, p2] = [current1, proj1, current2, proj2].map((n) => n || 0);
+    const r2 = (n) => n.toFixed(2);
+    if (r2(c1) === r2(p1) && r2(c2) === r2(p2) && r2(c1) === r2(c2)) return [0.5, 0.5];
+    return core.winProbability(c1, p1, c2, p2);
   }
 
   // Standings order: record, then points for, then waiver order. Returns rosters sorted.
@@ -424,11 +354,6 @@
       pointsFor(b) - pointsFor(a) ||
       (a.settings?.waiver_position ?? 0) - (b.settings?.waiver_position ?? 0));
   }
-  function standingsRanks(rosters, standingsRows) {
-    if (standingsRows?.length) return Object.fromEntries(standingsRows.map((s) => [s.roster_id, s.rank]));
-    return Object.fromEntries(standings(rosters).map((r, i) => [r.roster_id, i + 1]));
-  }
-
   // "WLLWWLW" -> last five, and the streak as Sleeper shows it ("3W").
   function streak(roster) {
     const s = roster.metadata?.streak;
@@ -439,45 +364,6 @@
     let n = 0;
     for (let i = rec.length - 1; i >= 0 && rec[i] === last; i--) n++;
     return `${n}${last}`;
-  }
-
-  // Waivers, ported from Sleeper's add/drop dialog. waiver_type 2 is FAAB.
-  const FAAB = 2;
-
-  function rosterRoom(league, roster) {
-    const r = roster || {};
-    return (league.roster_positions || []).length - (r.players || []).length + (r.reserve || []).length + (r.taxi || []).length;
-  }
-
-  function faabLeft(league, roster) {
-    return Math.max(0, (league.settings?.waiver_budget || 0) - (roster?.settings?.waiver_budget_used || 0));
-  }
-
-  function claimError({ league, roster, waiver, bid, drops }) {
-    const settings = league.settings || {};
-    const inactive = new Set([...(roster.reserve || []), ...(roster.taxi || [])]);
-    const room = rosterRoom(league, roster) + drops.filter((id) => !inactive.has(id)).length;
-    if (room <= 0) {
-      const need = 1 - rosterRoom(league, roster);
-      return `You must select ${need} player${need > 1 ? 's' : ''} to drop`;
-    }
-    if (waiver && settings.waiver_type === FAAB) {
-      const min = settings.waiver_bid_min || 0;
-      const left = faabLeft(league, roster);
-      if (bid === '' || bid == null || Number.isNaN(Number(bid))) return 'Invalid bid amount';
-      if (Number(bid) < 0) return 'Bid cannot be negative';
-      if (!Number.isInteger(Number(bid))) return 'Bids are whole dollars';
-      if (Number(bid) < min) return `Bid must be a minimum of $${min}`;
-      if (Number(bid) > left) return `You only have $${left} remaining`;
-    }
-    return null;
-  }
-
-  function sortClaims(claims) {
-    const bid = (c) => c.settings?.waiver_bid ?? 0;
-    const priority = (c) => c.settings?.priority ?? Infinity;
-    return [...claims].sort((a, b) =>
-      bid(b) - bid(a) || priority(a) - priority(b) || String(a.transaction_id).localeCompare(String(b.transaction_id)));
   }
 
   // Best guess at whether an unrostered player is on waivers: dropped within the

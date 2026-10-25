@@ -1,8 +1,8 @@
 // League tab: this week's matchups, the standings table and the week's
 // transactions, as the mobile app's League tab shows them. Pure: state -> HTML.
 (globalThis.SEP ||= {}).league = (() => {
-  const { winProbability, standings, pointsFor, pointsAgainst, streak, faabLeft } = globalThis.SEP.model;
-  const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, weekNav, headshot, positions, owns } = globalThis.SEP.ui;
+  const { winProbability, standings, pointsFor, pointsAgainst, streak, faabLeft, FAAB } = globalThis.SEP.model;
+  const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, teamSide, weekNav, headshot, positions, owns, playerOf } = globalThis.SEP.ui;
 
   function render(s) {
     if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
@@ -38,29 +38,16 @@
     const ta = teamTotals(s, la);
     const tb = lb && teamTotals(s, lb);
     const [p1, p2] = tb ? winProbability(ta.points, ta.proj, tb.points, tb.proj) : [null, null];
-    const side = (l, t, p, cls) => {
-      const pctValue = p == null ? null : Math.round(p * 100);
-      const trend = pctValue == null ? '' : pctValue >= 50 ? 'up' : 'down';
-      const rank = s.weeks[s.week]?.ranks?.[l.roster.roster_id];
-      const mine = owns(s, l.roster);
-      return `<div class="mu-team ${cls}${mine ? ' is-mine' : ''}" data-roster="${l.roster.roster_id}" role="button" tabindex="0">
-        ${avatarImg(s, l.roster)}
-        <div class="mu-who"><div class="team-name">${esc(teamName(s, l.roster))}</div><div class="sub">@${esc(ownerName(s, l.roster))} · ${record(l.roster)}${rank ? ` (#${rank})` : ''}</div></div>
-        <div class="mu-pts"><b>${t.anyPoints ? f2(t.points) : '–'}</b><span>${f2(t.proj)}</span></div>
-        <div class="mu-bar"><span class="${trend}" style="width:${pctValue ?? 0}%"></span></div>
-        <div class="mu-meta">${pctValue == null ? '' : `<b class="${trend}">${pctValue}% WIN</b>`}<span class="ytp">Yet to play (${t.yetToPlay})</span></div>
-      </div>`;
-    };
     return `<section class="mu-head">
-      ${side(la, ta, p1, 'mine')}
+      ${teamSide(s, la, ta, p1, 'mine', { link: true })}
       <div class="vs">VS</div>
-      ${lb ? side(lb, tb, p2, 'theirs') : '<div class="mu-team theirs bye"><span class="sub">Bye</span></div>'}
+      ${lb ? teamSide(s, lb, tb, p2, 'theirs', { link: true }) : '<div class="mu-team theirs bye"><span class="sub">Bye</span></div>'}
     </section>`;
   }
 
   function standingsTable(s) {
     const rows = standings(s.rosters);
-    const faab = s.league.settings?.waiver_type === 2;
+    const faab = s.league.settings?.waiver_type === FAAB;
     return `<table class="standings">
       <thead><tr><th>Rank</th><th>Name</th><th class="num">${faab ? 'Waiver' : 'Priority'}</th><th class="num">PF</th><th class="num">PA</th></tr></thead>
       <tbody>${rows.map((r, i) => `<tr class="${owns(s, r) ? 'is-mine' : ''}${r.roster_id === s.rosterId ? ' shown' : ''}" data-roster="${r.roster_id}">
@@ -79,7 +66,7 @@
     if (!list.length) return '<p class="msg">No transactions this week.</p>';
     const byRoster = Object.fromEntries(s.rosters.map((r) => [r.roster_id, r]));
     const player = (id, sign) => {
-      const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+      const p = playerOf(s, id);
       return `<div class="cp ${sign === '+' ? 'add' : 'drop'}"><span class="sign">${sign}</span><img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}"><span class="cp-name"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button> ${positions(p)}<span class="team">• ${esc(p.teamAbbr || 'FA')}</span></span></div>`;
     };
     const items = [...list].sort((a, b) => (b.status_updated || b.created) - (a.status_updated || a.created)).map((t) => {

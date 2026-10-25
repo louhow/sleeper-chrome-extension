@@ -71,7 +71,6 @@
       page: PAGE_BY_ROUTE[routePage] || 'match',
       tab: 'page',
       now: Date.now(),
-      today: new Date().toLocaleDateString('en-CA'),
       error: null,
       league: null,
       usersById: null,
@@ -321,7 +320,7 @@
         for (const side of [g.home, g.away]) if (side?.team) state.teams[side.team] = { abbr: side.abbr, name: side.name };
       }
       const savedRoster = rosters.find((r) => r.roster_id === prefs?.[rosterKey]);
-      const myRoster = me && rosters.find((r) => r.owner_id === me || (r.co_owners || []).includes(me));
+      const myRoster = ui.myRoster({ me, rosters });
       Object.assign(state, {
         league,
         usersById: Object.fromEntries(users.map((u) => [u.user_id, u])),
@@ -408,8 +407,6 @@
         week,
         games,
         gamesByTeam: model.gamesByTeam(games),
-        projRows: projections || [],
-        statRows: stats || [],
         proj: model.pointsByGame(projections || [], settings, scoring.scoreStats),
         actual: model.pointsByGame(stats || [], settings, scoring.scoreStats),
         research: research || {},
@@ -556,7 +553,7 @@
       const benched = lineup.starters.map((id) => (toReserve.has(id) ? '0' : id));
       const startersChanged = !same(next.starters, lineup.starters);
       const moved = model.describeMove(lineup, next)
-        .map(({ id, to }) => `${ui.shortName(state.players[id] || { name: `Player #${id}` })} to ${to}`)
+        .map(({ id, to }) => `${ui.shortName(ui.playerOf(state, id))} to ${to}`)
         .join(', ');
       state.swap = null;
       return save(async () => {
@@ -600,44 +597,42 @@
       }
       if (!plan.changes.length) return;
       const moved = plan.changes.length > 3 ? `${plan.changes.length} lineup changes` : plan.changes
-        .map(({ id, to }) => `${ui.shortName(state.players[id] || { name: `Player #${id}` })} to ${to === 'BN' ? 'bench' : to.replace('_FLEX', ' flex')}`)
+        .map(({ id, to }) => `${ui.shortName(ui.playerOf(state, id))} to ${to === 'BN' ? 'bench' : to.replace('_FLEX', ' flex')}`)
         .join(', ');
       return modalSave(() => saveStarters(plan.starters), `Saved: ${moved}`);
+    }
+
+    function openModal(modal) {
+      state.modal = modal;
+      state.notice = null;
+      schedule();
     }
 
     // Opens the add / waiver-bid dialog for an unrostered player.
     function openAdd(playerId) {
       const guess = waiverStatus(playerId);
-      state.modal = { kind: 'add', playerId, status: guess, guess, bid: '', drops: [], errors: [], saving: false, focus: true };
-      state.notice = null;
-      schedule();
+      openModal({ kind: 'add', playerId, status: guess, guess, bid: '', drops: [], errors: [], saving: false, focus: true });
     }
 
     function openDrop(playerId) {
-      state.modal = { kind: 'drop', playerId, errors: [], saving: false };
-      state.notice = null;
-      schedule();
+      openModal({ kind: 'drop', playerId, errors: [], saving: false });
     }
 
     function openClaims() {
-      state.modal = { kind: 'claims', errors: [], saving: false };
-      state.notice = null;
-      schedule();
+      openModal({ kind: 'claims', errors: [], saving: false });
       loadClaims();
     }
 
     // Player card: each part loads on its own and renders as it arrives.
     function openCard(playerId, back = null) {
       if (!state.ready) return;
-      state.modal = { kind: 'player', playerId, tab: 'summary', season: null, back };
-      state.notice = null;
-      schedule();
+      openModal({ kind: 'player', playerId, tab: 'summary', season: null, back });
       if (state.cards[playerId]) return;
       const c = (state.cards[playerId] = { logs: {} });
       const player = state.players[playerId] || {};
       const current = Number(state.league.season);
-      const back_ = Math.min(Math.max(Number(player.years_exp) || 0, 0), CAREER_SEASONS - 1);
-      const years = Array.from({ length: back_ + 1 }, (_, i) => current - i);
+      const past = Math.min(Math.max(Number(player.years_exp) || 0, 0), CAREER_SEASONS - 1);
+      const years = Array.from({ length: past + 1 }, (_, i) => current - i);
       const id = encodeURIComponent(playerId);
       const type = state.league.season_type || 'regular';
       const part = (promise, apply, fallback) => promise
@@ -708,9 +703,19 @@
       }
     }
 
-    const name = (id) => state.players[id]?.name || `Player #${id}`;
+    const name = (id) => ui.playerOf(state, id).name;
     const LISTS = '$k_adds: [String], $v_adds: [Int], $k_drops: [String], $v_drops: [Int]';
     const ARGS = 'k_adds: $k_adds, v_adds: $v_adds, k_drops: $k_drops, v_drops: $v_drops';
+
+    // A free-agent add and/or drop, then the rosters it changed.
+    async function freeAgentMove(label, variables) {
+      await api.graphql(label, `mutation league_create_transaction(${LISTS}) {
+  league_create_transaction(league_id: ${JSON.stringify(leagueId)}, type: "free_agent", ${ARGS}) {
+    ${TRANSACTION_FIELDS}
+  }
+}`, { auth: true, variables });
+      await refreshRosters();
+    }
 
     // Submits the add dialog: a waiver claim (with a FAAB bid) or a free-agent add, plus drops.
     function submitClaim() {
@@ -728,22 +733,16 @@
       const bid = waiver && state.league.settings?.waiver_type === model.FAAB;
       if (bid) Object.assign(variables, { k_settings: ['waiver_bid'], v_settings: [Number(m.bid)] });
       const dropping = m.drops.length ? ` (dropping ${m.drops.map(name).join(', ')})` : '';
-      const league = JSON.stringify(leagueId);
       return modalSave(async () => {
         if (waiver) {
           await api.graphql('submit_waiver_claim', `mutation submit_waiver_claim(${LISTS}${bid ? ', $k_settings: [String], $v_settings: [Int]' : ''}) {
-  submit_waiver_claim(league_id: ${league}, ${ARGS}${bid ? ', k_settings: $k_settings, v_settings: $v_settings' : ''}) {
+  submit_waiver_claim(league_id: ${JSON.stringify(leagueId)}, ${ARGS}${bid ? ', k_settings: $k_settings, v_settings: $v_settings' : ''}) {
     ${TRANSACTION_FIELDS}
   }
 }`, { auth: true, variables });
           await loadClaims();
         } else {
-          await api.graphql('league_create_transaction', `mutation league_create_transaction(${LISTS}) {
-  league_create_transaction(league_id: ${league}, type: "free_agent", ${ARGS}) {
-    ${TRANSACTION_FIELDS}
-  }
-}`, { auth: true, variables });
-          await refreshRosters();
+          await freeAgentMove('league_create_transaction', variables);
         }
       }, waiver
         ? `${bid ? `$${Number(m.bid)} bid` : 'Claim'} placed for ${name(m.playerId)}${dropping}`
@@ -756,14 +755,7 @@
       if (m?.kind !== 'drop' || m.saving || !roster) return;
       const rid = Number(roster.roster_id);
       const variables = { k_adds: [], v_adds: [], k_drops: [m.playerId], v_drops: [rid] };
-      return modalSave(async () => {
-        await api.graphql('league_create_transaction (drop)', `mutation league_create_transaction(${LISTS}) {
-  league_create_transaction(league_id: ${JSON.stringify(leagueId)}, type: "free_agent", ${ARGS}) {
-    ${TRANSACTION_FIELDS}
-  }
-}`, { auth: true, variables });
-        await refreshRosters();
-      }, `Dropped ${name(m.playerId)}`);
+      return modalSave(() => freeAgentMove('league_create_transaction (drop)', variables), `Dropped ${name(m.playerId)}`);
     }
 
     // After an add or drop: rosters, the week's lineup and this week's transactions.
@@ -932,9 +924,9 @@
         m.errors = [];
         return schedule();
       }
-      const save_ = e.target.closest('[data-claim-save]');
-      if (save_) {
-        const id = save_.dataset.claimSave;
+      const claimSave = e.target.closest('[data-claim-save]');
+      if (claimSave) {
+        const id = claimSave.dataset.claimSave;
         const input = layerRoot.querySelector(`[data-claim-bid="${CSS.escape(id)}"]`);
         return updateClaimBid(id, input?.value ?? '');
       }
@@ -996,8 +988,8 @@
     const clock = setInterval(schedule, CLOCK_MS);
 
     // Same league, another Sleeper route: follow it when it names a tab.
-    function show(routePage_) {
-      const page = PAGE_BY_ROUTE[routePage_];
+    function show(route) {
+      const page = PAGE_BY_ROUTE[route];
       if (page && page !== state.page) setPage(page);
     }
 

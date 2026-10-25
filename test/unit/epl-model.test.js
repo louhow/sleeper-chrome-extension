@@ -258,3 +258,10 @@ test('club form: results from the record after each match, last five', () => {
   assert.deepEqual(plain(forms.B), { abbr: 'B', record: '0-1-1', form: ['L', 'D'] });
   assert.deepEqual(plain(model.clubForms(schedule, 2).A.form), ['D', 'L']);
 });
+
+test('the rules that are the same as NBA and NFL come from the core model', () => {
+  const { SEP: sep, SNP } = loadSep();
+  for (const name of ['cheapestAssignment', 'standingsRanks', 'FAAB', 'rosterRoom', 'faabLeft', 'claimError', 'sortClaims']) {
+    assert.equal(sep.model[name], SNP.model[name], name);
+  }
+});

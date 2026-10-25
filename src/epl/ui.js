@@ -1,11 +1,10 @@
 // Rendering helpers shared by every view. Pure: data in, HTML strings out.
 (globalThis.SEP ||= {}).ui = (() => {
   const { playerGames, weekTotals, started, slotAccepts, savedFormation, slotLabels, formationOf } = globalThis.SEP.model;
-  const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESCAPES[c]);
+  // The same helpers as NBA and NFL. The rest differ by sport, or take a missing roster or date where core's don't.
+  const { esc, CDN, shortName, gameTime, dialogErrors, notice } = globalThis.SNP.ui;
   const f2 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(2));
   const f1 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(1));
-  const CDN = 'https://sleepercdn.com';
   const INJURY_SEVERE = /^(out|ir|sus)/i;
   // Sleeper's apps list players by position in this order.
   const POSITION_ORDER = ['F', 'M', 'D', 'GK'];
@@ -28,6 +27,8 @@
     return owner?.metadata?.avatar || (owner?.avatar && `${CDN}/avatars/thumbs/${owner.avatar}`) || null;
   }
 
+  const playerOf = (s, id) => s.players?.[id] || { name: `Player #${id}`, positions: [] };
+
   const avatarImg = (s, roster, cls = 'avatar') => {
     const src = avatar(s, roster);
     return src ? `<img class="${cls}" src="${esc(src)}" alt="">` : `<div class="${cls}"></div>`;
@@ -38,12 +39,6 @@
     return `${st.wins ?? 0}-${st.losses ?? 0}${st.ties ? `-${st.ties}` : ''}`;
   }
 
-  // "B. Mbeumo", falling back to the full name when first/last are missing.
-  function shortName(p) {
-    if (!p) return 'Unknown';
-    return p.first && p.last ? `${p.first[0]}. ${p.last}` : p.name;
-  }
-
   function injuryTag(p) {
     return p?.injury ? `<span class="inj ${INJURY_SEVERE.test(p.injury) ? 'severe' : ''}">${esc(p.injury)}</span>` : '';
   }
@@ -52,8 +47,6 @@
     return (p?.positions || []).map((pos) => `<span class="pos ${esc(pos.toLowerCase())}">${esc(pos)}</span>`).join('');
   }
 
-  const gameTime = (ms) =>
-    new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
   const weekday = (date, style = 'short') => (date ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: style }) : '');
   const shortDate = (date) => (date ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }) : '');
 
@@ -73,19 +66,28 @@
       : `<span class="slot ${esc(cls)}"${style}${title}>${text}</span>`;
   }
 
+  // "vs BOU" at home, "@ BOU" away.
+  const versus = (g) => `${g.home ? 'vs' : '@'} ${g.opponentAbbr}`;
+
+  // A player's next match this week, with `when` it is ("Sun 9:00am", or "Live"); null once all are over.
+  function nextMatch(games, now = Date.now()) {
+    const next = games.find((g) => !started(g.game, now) || g.game.status === 'in_game');
+    if (!next) return null;
+    const live = next.game.status === 'in_game' || (started(next.game, now) && next.game.status !== 'complete');
+    const when = live ? 'Live' : next.game.start ? `${weekday(next.game.date)} ${gameTime(next.game.start)}` : weekday(next.game.date);
+    return { ...next, when };
+  }
+
   // A player's next game this week, e.g. "Sun 9:00am vs BOU", or the result.
   function nextGameText(games, now = Date.now()) {
     if (!games.length) return 'No match this week';
-    const next = games.find((g) => !started(g.game, now) || g.game.status === 'in_game');
-    if (!next) return `Final · ${games.map((g) => `${g.home ? 'vs' : '@'} ${g.opponentAbbr}`).join(', ')}`;
-    const live = next.game.status === 'in_game' || (started(next.game, now) && next.game.status !== 'complete');
-    const time = live ? 'Live' : next.game.start ? `${weekday(next.game.date)} ${gameTime(next.game.start)}` : weekday(next.game.date);
-    return `${time} ${next.home ? 'vs' : '@'} ${next.opponentAbbr}`;
+    const next = nextMatch(games, now);
+    return next ? `${next.when} ${versus(next)}` : `Final · ${games.map(versus).join(', ')}`;
   }
 
   // Logo chips for a player's games this week, opponent's logo, dimmed once played.
   function gameChips(games, now = Date.now()) {
-    return games.map((g) => `<span class="chip${g.game.status === 'complete' ? ' done' : started(g.game, now) ? ' live' : ''}" title="${esc(`${weekday(g.game.date)} ${g.home ? 'vs' : '@'} ${g.opponentAbbr}`)}"><img src="${teamLogo(g.opponent)}" alt="${esc(g.opponentAbbr || '')}"></span>`).join('');
+    return games.map((g) => `<span class="chip${g.game.status === 'complete' ? ' done' : started(g.game, now) ? ' live' : ''}" title="${esc(`${weekday(g.game.date)} ${versus(g)}`)}"><img src="${teamLogo(g.opponent)}" alt="${esc(g.opponentAbbr || '')}"></span>`).join('');
   }
 
   // A dialog over the page; the backdrop and ✕ close it.
@@ -102,10 +104,6 @@
     </div>`;
   }
 
-  function dialogErrors(list) {
-    return list?.length ? `<div class="dialog-errors" role="alert">${list.map((e) => `<p>${esc(e)}</p>`).join('')}</div>` : '';
-  }
-
   function weekNav(s) {
     return `<div class="week-nav">
       <button class="icon" data-action="prev" aria-label="Previous week" ${s.week <= s.minWeek ? 'disabled' : ''}>‹</button>
@@ -114,8 +112,27 @@
     </div>`;
   }
 
-  function notice(s) {
-    return s.notice ? `<p class="notice ${esc(s.notice.kind)}" role="status">${esc(s.notice.text)}</p>` : '';
+  // One team's side of a matchup: avatar, name, points and the win bar. `link` makes it open that team.
+  function teamSide(s, l, totals, prob, cls, { link = false } = {}) {
+    const { roster } = l;
+    const pctValue = prob == null ? null : Math.round(prob * 100);
+    const trend = pctValue == null ? '' : pctValue >= 50 ? 'up' : 'down';
+    const rank = l.week?.ranks?.[roster.roster_id];
+    const mine = link && owns(s, roster) ? ' is-mine' : '';
+    const attrs = link ? ` data-roster="${roster.roster_id}" role="button" tabindex="0"` : '';
+    return `<div class="mu-team ${cls}${mine}"${attrs}>
+      ${avatarImg(s, roster)}
+      <div class="mu-who">
+        <div class="team-name">${esc(teamName(s, roster))}</div>
+        <div class="sub">@${esc(ownerName(s, roster) || 'unknown')} · ${record(roster)}${rank ? ` (#${rank})` : ''}</div>
+      </div>
+      <div class="mu-pts"><b>${totals.anyPoints ? f2(totals.points) : '–'}</b><span>${f2(totals.proj)}</span></div>
+      <div class="mu-bar"><span class="${trend}" style="width:${pctValue ?? 0}%"></span></div>
+      <div class="mu-meta">
+        ${pctValue == null ? '' : `<b class="${trend}">${pctValue}% WIN</b>`}
+        <span class="ytp">Yet to play (${totals.yetToPlay})</span>
+      </div>
+    </div>`;
   }
 
   const ROLE_ORDER = ['F', 'M', 'D', 'GK'];
@@ -208,7 +225,7 @@
 
   // Shared player row for lists: headshot, name, positions, club, injury, then whatever `right` is.
   function playerLine(s, id, { sub = '', nameButton = true } = {}) {
-    const p = s.players?.[id] || { name: `Player #${id}`, positions: [] };
+    const p = playerOf(s, id);
     const name = nameButton ? `<button class="name" data-player="${esc(id)}">${esc(p.name)}</button>` : `<span class="name">${esc(p.name)}</span>`;
     return `<img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}">
       <div class="info">
@@ -218,8 +235,8 @@
   }
 
   return {
-    esc, f2, f1, CDN, headshot, teamLogo, teamName, ownerName, avatar, avatarImg, record, shortName, injuryTag, positions,
-    gameTime, weekday, shortDate, slotBadge, nextGameText, gameChips, dialog, dialogErrors, weekNav, notice,
+    esc, f2, f1, CDN, headshot, teamLogo, teamName, ownerName, avatar, avatarImg, record, shortName, playerOf, injuryTag, positions,
+    gameTime, weekday, shortDate, slotBadge, versus, nextMatch, nextGameText, gameChips, teamSide, dialog, dialogErrors, weekNav, notice,
     owns, myRoster, ownerOf, lineup, teamTotals, reserveRule, pct, playerLine, positionRank, roleName,
   };
 })();

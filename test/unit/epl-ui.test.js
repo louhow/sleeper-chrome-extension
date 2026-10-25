@@ -2,9 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSep } from './load.js';
 
-const { SEP } = loadSep();
+const { SEP, SNP } = loadSep();
 const { ui, model, scoring, view } = SEP;
 const plain = (x) => JSON.parse(JSON.stringify(x));
+
+test('helpers that are the same as NBA and NFL come from the core', () => {
+  for (const name of ['esc', 'CDN', 'shortName', 'gameTime', 'dialogErrors', 'notice']) assert.equal(ui[name], SNP.ui[name], name);
+});
 
 const NOW = Date.parse('2026-10-24T12:00:00Z');
 const user = (id, name, extra = {}) => ({ user_id: id, display_name: name, ...extra });
