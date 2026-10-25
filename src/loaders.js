@@ -1,8 +1,11 @@
-// League data both sports load the same way: rosters, who is logged in, a
-// week's matchup legs and games, and the league's own score colors.
+// Data every sport loads the same way: its players, a league's rosters, who
+// is logged in, a week's matchup legs and games, and the league's own score
+// colors. The Premier League panel (src/epl/) uses these too.
 (globalThis.SNP ||= {}).loaders = (() => {
   const { model, scoring, ui } = globalThis.SNP;
+  // A transaction's fields every sport asks for; a sport adds its own after them.
   const TRANSACTION_FIELDS = 'adds drops leg roster_ids settings status transaction_id type created creator';
+  const PLAYERS_TTL_MS = 12 * 3600e3;
 
   // The logged-in user's roster (as owner or co-owner), or null.
   const myRoster = (rosters, me) => ui.myRoster({ rosters, me });
@@ -16,6 +19,26 @@
     ${fields}
   }
 }`;
+
+  // A sport's players, as `toPlayer(raw)` keeps each, by player id. The list
+  // is megabytes, so it's kept in the extension's storage under `key` and
+  // fetched again only after PLAYERS_TTL_MS, or when `force`d.
+  async function players(api, sport, key, toPlayer, force = false) {
+    const path = `/v1/players/${sport}`;
+    const storage = globalThis.chrome?.storage?.local;
+    if (!force && storage) {
+      const { [key]: hit } = await storage.get(key);
+      if (hit && Date.now() - hit.savedAt < PLAYERS_TTL_MS) {
+        api.cached(path, hit.players, JSON.stringify(hit.players).length);
+        return hit.players;
+      }
+    }
+    const raw = await api.get(path);
+    const out = {};
+    for (const [id, p] of Object.entries(raw)) out[id] = toPlayer(p);
+    if (storage) await storage.set({ [key]: { savedAt: Date.now(), players: out } });
+    return out;
+  }
 
   // A league's loads; `tag` prefixes their console warnings.
   function leagueData(api, leagueId, tag) {
@@ -52,15 +75,21 @@
       },
 
       // A week's matchup legs (lineups, Sleeper's points and projections), with
-      // `fields` of each. Needs the logged-in session; null when logged out or refused.
+      // `fields` of each, or the first of a list of them Sleeper takes (for a
+      // sport whose legs may not have them all). Needs the logged-in session;
+      // null when logged out or refused.
       async legs(week, fields) {
         if (!api.loggedIn()) return null;
-        try {
-          const data = await api.graphql(`matchup_legs (week ${week})`, `query matchup_legs {
+        const query = (f) => `query matchup_legs {
   matchup_legs(league_id: ${league}, round: ${Number(week)}) {
-    ${fields}
+    ${f}
   }
-}`, { auth: true });
+}`;
+        try {
+          const label = `matchup_legs (week ${week})`;
+          const data = Array.isArray(fields)
+            ? await api.graphqlAny(label, fields.map(query), { auth: true })
+            : await api.graphql(label, query(fields), { auth: true });
           return data?.matchup_legs ?? null;
         } catch (err) {
           console.warn(`[${tag}] matchup_legs unavailable`, err);
@@ -126,5 +155,5 @@
     return tiers;
   }
 
-  return { TRANSACTION_FIELDS, myRoster, usersById, scoresQuery, leagueData, loadTiers };
+  return { TRANSACTION_FIELDS, myRoster, usersById, scoresQuery, players, leagueData, loadTiers };
 })();

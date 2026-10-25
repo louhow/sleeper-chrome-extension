@@ -12,9 +12,7 @@
   const { createApi, model, scoring, ui, bridge, shared, loaders,
     nbaPanelView, nbaCardView, nbaOptimizeView, nbaWaiversView, nbaWhatIfView, nbaCard, nbaWaivers, nbaOptimize, nbaPlayers } = globalThis.SNP;
   const PANEL_PAGES = new Set(['team', 'matchup', 'league']);
-  const PLAYERS_PATH = '/v1/players/nba';
   const PLAYERS_KEY = 'players:nba:v4';
-  const PLAYERS_TTL_MS = 12 * 3600e3;
   const FLOAT_AFTER_MS = 4000;
   const CLOCK_MS = 60e3;
   // Lock-In needs who was starting at each tip-off, and Sleeper keeps no lineup
@@ -250,31 +248,17 @@
     schedule();
   }
 
-  async function loadPlayers(force) {
-    if (!force) {
-      const { [PLAYERS_KEY]: hit } = await chrome.storage.local.get(PLAYERS_KEY);
-      if (hit && Date.now() - hit.savedAt < PLAYERS_TTL_MS) {
-        api.cached(PLAYERS_PATH, hit.players, JSON.stringify(hit.players).length);
-        return hit.players;
-      }
-    }
-    const raw = await api.get(PLAYERS_PATH);
-    const players = {};
-    for (const [id, p] of Object.entries(raw)) {
-      players[id] = {
-        name: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-        first: p.first_name,
-        last: p.last_name,
-        team: p.team,
-        position: p.position,
-        positions: p.fantasy_positions || [],
-        injury: p.injury_status,
-        years_exp: p.years_exp,
-      };
-    }
-    await chrome.storage.local.set({ [PLAYERS_KEY]: { savedAt: Date.now(), players } });
-    return players;
-  }
+  // The fields the panel keeps of each NBA player.
+  const toPlayer = (p) => ({
+    name: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+    first: p.first_name,
+    last: p.last_name,
+    team: p.team,
+    position: p.position,
+    positions: p.fantasy_positions || [],
+    injury: p.injury_status,
+    years_exp: p.years_exp,
+  });
 
   async function loadLeague(force = false) {
     state.error = null;
@@ -302,7 +286,7 @@
       api.get(`/v1/league/${leagueId}/winners_bracket`),
       api.get(`/v1/league/${leagueId}/traded_picks`),
       api.get(`/v1/league/${leagueId}/drafts`),
-      loadPlayers(force),
+      loaders.players(api, 'nba', PLAYERS_KEY, toPlayer, force),
       chrome.storage.local.get([rosterKey, whatIfKey]),
       data.me(),
     ]);

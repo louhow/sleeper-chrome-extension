@@ -10,13 +10,11 @@
   const SPORT = 'clubsoccer:epl';
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
   const PAGE_BY_ROUTE = { team: 'team', matchup: 'match', players: 'players', league: 'league', standings: 'league', transactions: 'league' };
-  const PLAYERS_PATH = `/v1/players/${SPORT}`;
   const PLAYERS_KEY = 'players:epl:v1';
-  const PLAYERS_TTL_MS = 12 * 3600e3;
   const FLOAT_AFTER_MS = 4000;
   const CLOCK_MS = 60e3;
   const CAREER_SEASONS = 5;
-  const TRANSACTION_FIELDS = 'adds drops leg roster_ids settings status status_updated transaction_id type created creator metadata';
+  const TRANSACTION_FIELDS = `${loaders.TRANSACTION_FIELDS} status_updated metadata`;
   const LEG_FIELDS = [
     'leg matchup_id roster_id round starters points proj_points max_points custom_points players_points',
     'leg matchup_id roster_id round starters points proj_points custom_points',
@@ -116,6 +114,7 @@
     let frame = 0;
     let seasonLoading = false;
     const api = createApi(schedule);
+    const leagueData = loaders.leagueData(api, leagueId, 'sleeper-epl');
 
     // Mounts the panel over Sleeper's placeholder box, or floats it when
     // there's none. Sleeper centers the placeholder inside a box whose layout
@@ -267,41 +266,29 @@
       schedule();
     }
 
-    async function loadPlayers(force) {
-      if (!force && storage) {
-        const { [PLAYERS_KEY]: hit } = await storage.get(PLAYERS_KEY);
-        if (hit && Date.now() - hit.savedAt < PLAYERS_TTL_MS) {
-          api.cached(PLAYERS_PATH, hit.players, JSON.stringify(hit.players).length);
-          return hit.players;
-        }
-      }
-      const raw = await api.get(PLAYERS_PATH);
-      const players = {};
-      for (const [id, p] of Object.entries(raw)) {
-        const name = p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim();
-        players[id] = {
-          name,
-          first: p.first_name,
-          last: p.last_name,
-          team: p.team,
-          teamAbbr: p.team_abbr,
-          position: p.position,
-          positions: p.fantasy_positions || (p.position ? [p.position] : []),
-          injury: p.injury_status,
-          injuryReturn: p.metadata?.soccer_injury_return_date || null,
-          years_exp: p.years_exp,
-          number: p.number,
-          age: p.age,
-          height: p.height,
-          weight: p.weight,
-          rank: p.search_rank,
-          active: p.active !== false && p.status !== 'RET',
-          competitions: p.competitions || null,
-          search: `${p.search_full_name || ''} ${name.toLowerCase()} ${(p.team_abbr || '').toLowerCase()}`,
-        };
-      }
-      if (storage) await storage.set({ [PLAYERS_KEY]: { savedAt: Date.now(), players } });
-      return players;
+    // The fields the panel keeps of each player.
+    function toPlayer(p) {
+      const name = p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim();
+      return {
+        name,
+        first: p.first_name,
+        last: p.last_name,
+        team: p.team,
+        teamAbbr: p.team_abbr,
+        position: p.position,
+        positions: p.fantasy_positions || (p.position ? [p.position] : []),
+        injury: p.injury_status,
+        injuryReturn: p.metadata?.soccer_injury_return_date || null,
+        years_exp: p.years_exp,
+        number: p.number,
+        age: p.age,
+        height: p.height,
+        weight: p.weight,
+        rank: p.search_rank,
+        active: p.active !== false && p.status !== 'RET',
+        competitions: p.competitions || null,
+        search: `${p.search_full_name || ''} ${name.toLowerCase()} ${(p.team_abbr || '').toLowerCase()}`,
+      };
     }
 
     async function loadLeague(force = false) {
@@ -312,11 +299,11 @@
       const [sportState, users, rosters, scheduleRows, players, prefs, me] = await Promise.all([
         api.get(`/v1/state/${SPORT}`),
         api.get(`/v1/league/${leagueId}/users`),
-        loadRosters(),
+        leagueData.rosters(),
         api.get(`/schedule/${SPORT}/${league.season_type || 'regular'}/${league.season}`).catch(() => []),
-        loadPlayers(force),
+        loaders.players(api, SPORT, PLAYERS_KEY, toPlayer, force),
         storage ? storage.get([rosterKey]) : {},
-        loadMe(),
+        leagueData.me(),
       ]);
       for (const p of Object.values(players)) if (p.team && p.teamAbbr) state.teams[p.team] ||= { abbr: p.teamAbbr };
       for (const g of scheduleRows || []) {
@@ -351,33 +338,6 @@
       loadClaims();
       loadTrending();
       if (state.page === 'players') loadSeason();
-    }
-
-    async function loadRosters() {
-      if (api.loggedIn()) {
-        try {
-          const data = await api.graphql('league_rosters', `query league_rosters {
-  league_rosters(league_id: ${JSON.stringify(leagueId)}) {
-    roster_id owner_id co_owners players starters reserve taxi settings metadata
-  }
-}`, { auth: true });
-          if (data?.league_rosters?.length) return data.league_rosters;
-        } catch (err) {
-          console.warn('[sleeper-epl] league_rosters unavailable, using the public endpoint', err);
-        }
-      }
-      return api.get(`/v1/league/${leagueId}/rosters`);
-    }
-
-    async function loadMe() {
-      if (!api.loggedIn()) return null;
-      try {
-        const data = await api.graphql('me', 'query me { me { user_id } }', { auth: true });
-        return data?.me?.user_id ?? null;
-      } catch (err) {
-        console.warn('[sleeper-epl] could not identify the logged-in user', err);
-        return null;
-      }
     }
 
     async function loadWeek(week) {
@@ -423,18 +383,8 @@
 
     // Lineups, matchup pairings and Sleeper's own points for a week. Needs the
     // logged-in session; null when logged out or refused.
-    async function loadLegs(week) {
-      if (!api.loggedIn()) return null;
-      const queries = LEG_FIELDS.map((fields) => `query matchup_legs {
-  matchup_legs(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)}) { ${fields} }
-}`);
-      try {
-        const data = await api.graphqlAny(`matchup_legs (week ${week})`, queries, { auth: true });
-        return data?.matchup_legs ?? null;
-      } catch (err) {
-        console.warn('[sleeper-epl] matchup_legs unavailable', err);
-        return null;
-      }
+    function loadLegs(week) {
+      return leagueData.legs(week, LEG_FIELDS);
     }
 
     async function loadClaims() {
@@ -756,7 +706,7 @@
 
     // After an add or drop: rosters, the week's lineup and this week's transactions.
     async function refreshRosters() {
-      state.rosters = await loadRosters();
+      state.rosters = await leagueData.rosters();
       state.pool = null;
       const week = state.weeks[state.currentWeek];
       if (week) {

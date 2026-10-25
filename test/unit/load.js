@@ -11,8 +11,9 @@ function run(context, files) {
   }
 }
 
-export function loadSnp() {
-  const context = vm.createContext({});
+// `globals`: what the scripts would find in the browser, such as a stand-in `chrome`.
+export function loadSnp(globals = {}) {
+  const context = vm.createContext({ ...globals });
   run(context, manifest.content_scripts[0].js);
   return context.SNP;
 }
