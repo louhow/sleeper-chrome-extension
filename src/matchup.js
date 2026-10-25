@@ -2,14 +2,14 @@
 // slot, with Lock-In status and the lock control for the logged-in owner.
 (globalThis.SNP ||= {}).matchup = (() => {
   const { playerDays, lockState, lockInDefault, winProbability } = globalThis.SNP.model;
-  const { esc, f2, headshot, teamLogo, teamName, avatar, record, shortName, injuryTag, positions, gameTime, weekday, slotBadge, weekNav, lineup,
-    whatIfOn } = globalThis.SNP.ui;
+  const { esc, f2, headshot, teamLogo, teamName, shortName, injuryTag, teamTag, gameTime, weekday, gameLabel, slotBadge, weekNav, lineup, real, playerOf,
+    whatIfOn, loading, errorMsg, opponentOf, teamSideOf, matchupPair, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
 
   function render(s) {
-    if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
+    if (s.error) return errorMsg(s.error);
     const mine = lineup(s);
-    if (!mine) return '<p class="msg">Loading…</p>';
-    if (!mine.week) return `<div class="section-head"><h3>Starters</h3>${weekNav(s, null)}</div><p class="msg">Loading week…</p>`;
+    if (!mine) return loading();
+    if (!mine.week) return `<div class="section-head"><h3>Starters</h3>${weekNav(s, null)}</div>${loading('Loading week…')}`;
 
     const oppId = opponentOf(mine);
     const theirs = oppId != null ? lineup(s, oppId) : null;
@@ -17,36 +17,17 @@
     const right = theirs && side(s, theirs);
     const [p1, p2] = right ? winProbability(left.points, left.proj, right.points, right.proj) : [null, null];
     const settings = s.league.settings || {};
-    const rows = (title, slotFor, a, b, count = 0) => {
-      const n = Math.max(a.length, b.length, count);
-      if (!n) return '';
-      return `<h3 class="mu-title">${title}</h3>${Array.from({ length: n }, (_, i) => row(s, slotFor(i), left, a[i], right, b[i], false)).join('')}`;
-    };
+    const row = (slot, idA, idB, starter) => muRow(playerSide(s, left, idA, 'mine', starter), slotBadge(slot),
+      right && playerSide(s, right, idB, 'theirs', starter));
+    const section = (title, slot, a, b, count) => muSection(title, a, b, count, (idA, idB) => row(slot, idA, idB, false));
 
     return `
-      <section class="mu-head">
-        ${teamSide(s, left, p1, 'mine')}
-        <div class="vs">VS</div>
-        ${right ? teamSide(s, right, p2, 'theirs') : '<div class="mu-team theirs bye"><span class="sub">No opponent this week</span></div>'}
-      </section>
-      <div class="mu-starters">
-        <div>
-          <h3>Starters</h3>
-          ${mine.lockable ? `<div class="hint">${s.saving ? 'Saving…' : 'Lock in a finished game before the player\'s next game starts'}</div>` : ''}
-        </div>
-        ${weekNav(s, mine.week)}
-      </div>
-      ${mine.slots.map((slot, i) => row(s, slot, left, mine.starters[i], right, theirs?.starters[i], true)).join('')}
-      ${rows('Bench', () => 'BN', mine.bench, theirs?.bench || [])}
-      ${rows('Injured Reserve', () => 'IR', mine.reserve, theirs?.reserve || [], settings.reserve_slots)}
-      ${rows('Taxi Squad', () => 'TX', mine.taxi, theirs?.taxi || [], settings.taxi_slots)}`;
-  }
-
-  function opponentOf(l) {
-    const own = l.leg ?? l.matchup;
-    if (own?.matchup_id == null) return null;
-    const pool = l.leg ? l.week.legs : l.week.matchups;
-    return pool.find((m) => m.matchup_id === own.matchup_id && m.roster_id !== l.roster.roster_id)?.roster_id ?? null;
+      ${matchupPair(teamOf(s, left, p1), right && teamOf(s, right, p2), { tag: 'section', failed: s.failedAvatars })}
+      ${muStarters(mine.lockable ? (s.saving ? 'Saving…' : 'Lock in a finished game before the player\'s next game starts') : '', weekNav(s, mine.week))}
+      ${mine.slots.map((slot, i) => row(slot, mine.starters[i], theirs?.starters[i], true)).join('')}
+      ${section('Bench', 'BN', mine.bench, theirs?.bench || [])}
+      ${section('Injured Reserve', 'IR', mine.reserve, theirs?.reserve || [], settings.reserve_slots)}
+      ${section('Taxi Squad', 'TX', mine.taxi, theirs?.taxi || [], settings.taxi_slots)}`;
   }
 
   // Team totals. Sleeper's own leg numbers win when logged in; otherwise they're
@@ -54,7 +35,7 @@
   function side(s, l) {
     const states = {};
     for (const id of l.starters) {
-      if (!id || id === '0') continue;
+      if (!real(id)) continue;
       const days = playerDays(l.week, s.players[id]?.team, id);
       states[id] = { days, ...lockState(days, l.locks[id], s.now, l.started ? (game) => l.started(id, game) : null) };
     }
@@ -79,43 +60,21 @@
     };
   }
 
-  function teamSide(s, sd, prob, cls) {
-    const { roster } = sd.l;
-    const owner = s.usersById?.[roster.owner_id];
-    const image = avatar(s, roster);
-    const pct = prob == null ? null : Math.round(prob * 100);
-    const trend = pct == null ? '' : pct >= 50 ? 'up' : 'down';
-    const rank = sd.l.week.ranks?.[roster.roster_id];
-    // The avatar, owner and team name open that team on the Team tab.
-    const link = `data-open-team="${roster.roster_id}" role="link" tabindex="0" title="${esc(`${teamName(s, roster)}'s team`)}"`;
-    return `<div class="mu-team ${cls}">
-      ${image ? `<img class="avatar team-link" src="${esc(image)}" alt="" ${link}>` : `<div class="avatar team-link" ${link}></div>`}
-      <div class="mu-who">
-        <div class="sub"><span class="team-link" ${link}>@${esc(owner?.display_name || 'unknown')}</span></div>
-        <div class="team-name"><span class="team-link" ${link}>${esc(teamName(s, roster))}</span></div>
-      </div>
-      <div class="mu-pts">${sd.anyPoints ? f2(sd.points) : '–'}</div>
-      <div class="mu-bar"><span class="${trend}" style="width:${pct ?? 0}%"></span></div>
-      <div class="mu-meta">
-        ${pct == null ? '' : `<b class="${trend}">${pct}% WIN</b>`}
-        <span>${record(roster)}${rank ? ` (#${rank})` : ''}</span>
-        <span class="ytp">Yet to play (${sd.yetToPlay})</span>
-        <span class="proj">${f2(sd.proj)}</span>
-      </div>
-    </div>`;
-  }
-
-  function row(s, slot, left, idA, right, idB, starter) {
-    return `<div class="mu-row">
-      ${playerSide(s, left, idA, 'mine', starter)}
-      ${slotBadge(slot)}
-      ${right ? playerSide(s, right, idB, 'theirs', starter) : '<div class="mp theirs empty"></div>'}
-    </div>`;
+  // A team's card over the matchup (ui.teamSide): `prob`, its chance to win.
+  function teamOf(s, sd, prob) {
+    const { roster, week } = sd.l;
+    return teamSideOf(s, roster, {
+      points: sd.anyPoints ? sd.points : null,
+      win: prob,
+      rank: week.ranks?.[roster.roster_id],
+      yetToPlay: sd.yetToPlay,
+      proj: sd.proj,
+    });
   }
 
   function playerSide(s, sd, id, cls, starter) {
-    if (!id || id === '0') return `<div class="mp ${cls} empty"><div class="headshot"></div><div class="mp-id"><span class="name">Empty</span></div></div>`;
-    const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+    if (!real(id)) return muEmpty(cls);
+    const p = playerOf(s.players, id);
     const st = sd.states[id] ?? (() => {
       const days = playerDays(sd.l.week, p.team, id);
       return { days, ...lockState(days, sd.l.locks[id], s.now, sd.l.started ? (game) => sd.l.started(id, game) : null) };
@@ -125,7 +84,7 @@
     const curValue = cur ? (curDone || cur.actual != null ? cur.actual ?? 0 : cur.proj) : null;
     const ref = `${sd.l.roster.roster_id}:${id}`;
     // Mirrored on the opponent's side, so the logos sit toward the middle.
-    const who = `<span>${positions(p)} <span class="team">• ${esc(p.team || 'FA')}</span></span>`;
+    const who = `<span>${teamTag(p, { chips: true, sep: '•' })}</span>`;
     const games = `<span class="mp-games">${st.games.map((d) => gameChip(d, st)).join('')}</span>`;
     const confirming = starter && s.lockConfirm === ref && !st.locked && sd.l.lockable && (st.lockable || st.unsure);
     const result = `<div class="mp-game">
@@ -175,8 +134,7 @@
       d === st.current ? 'current' : '',
       d === st.locked ? 'locked' : '',
     ].filter(Boolean).join(' ');
-    const label = `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}`;
-    return `<span class="chip ${cls}" title="${esc(label)}"><img src="${teamLogo(d.opponent)}" alt="${esc(d.opponent)}"></span>`;
+    return `<span class="chip ${cls}" title="${esc(gameLabel(d))}"><img src="${teamLogo(d.opponent)}" alt="${esc(d.opponent)}"></span>`;
   }
 
   // League tab: every matchup of the week, each as the Matchup tab's header
@@ -185,7 +143,7 @@
   function league(s) {
     const week = s.weeks?.[s.week];
     const head = `<div class="lg-head"><h3>Matchups</h3>${weekNav(s, week)}</div>`;
-    if (!week) return `${head}<p class="msg">Loading week…</p>`;
+    if (!week) return `${head}${loading('Loading week…')}`;
     const groups = new Map();
     for (const r of s.rosters || []) {
       const l = lineup(s, r.roster_id);
@@ -204,11 +162,11 @@
       const [p1, p2] = right ? winProbability(left.points, left.proj, right.points, right.proj) : [null, null];
       const label = `Open ${teamName(s, a.roster)}${b ? ` vs ${teamName(s, b.roster)}` : ''} on the Matchup tab`;
       // A box that opens the matchup, holding team links (so not a <button>).
-      return `<div class="lg-match mu-head${a.mine ? ' own' : ''}" role="button" tabindex="0" data-open-matchup="${a.roster.roster_id}" aria-label="${esc(label)}">
-        ${teamSide(s, left, p1, 'mine')}
-        <span class="vs">VS</span>
-        ${right ? teamSide(s, right, p2, 'theirs') : '<div class="mu-team theirs bye"><span class="sub">No opponent this week</span></div>'}
-      </div>`;
+      return matchupPair(teamOf(s, left, p1), right && teamOf(s, right, p2), {
+        cls: `lg-match${a.mine ? ' own' : ''}`,
+        attrs: `role="button" tabindex="0" data-open-matchup="${a.roster.roster_id}" aria-label="${esc(label)}"`,
+        failed: s.failedAvatars,
+      });
     }).join('')}</div>`;
   }
 

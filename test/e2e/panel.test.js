@@ -2575,7 +2575,7 @@ test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes a
   assert.match(await page.locator(nflDialog('.op-sum')).textContent(), /51\.00\s*→\s*68\.00\s*\+17\.00/);
   // One row per slot, in lineup order, like the NBA dialog: who comes in leads, beside who they replace.
   assert.equal(await page.locator(nflDialog('.os-row')).count(), 5);
-  const names = (sel) => page.locator(nflDialog(`.os-row.swap ${sel} .dp-name b`)).allTextContents();
+  const names = (sel) => page.locator(nflDialog(`.os-row.swap ${sel} .dp-name .name`)).allTextContents();
   // Alpha WR keeping WR with Gamma WR at FLEX adds up the same as swapping them, so nobody else moves.
   assert.deepEqual(await names('.os-p.in'), ['Gamma WR', 'Beta QB']);
   assert.deepEqual(await names('.os-p.out'), ['Beta RB', 'Beta WR']);
@@ -2586,7 +2586,7 @@ test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes a
   assert.match(await page.locator(nflDialog('.warn-banner')).textContent(), /Beta QB is Questionable/);
   const started = page.locator(nflDialog('.os-row.same')).filter({ hasText: 'Early RB' });
   assert.equal(await started.locator('.os-status').textContent(), 'Started');
-  assert.equal(await page.locator(nflDialog('.os-row.same button')).count(), 0, 'slots that stay have no button');
+  assert.equal(await page.locator(nflDialog('.os-row.same .os-act button')).count(), 0, 'slots that stay have no button');
   assert.equal(await page.locator(nflDialog('.lose-banner, [data-op-ack]')).count(), 0, 'no warnings to confirm');
   await page.locator(nflDialog('.how')).hover();
   assert.match(await page.locator(nflDialog('.how-tip')).innerText(), /^How it picks:\n1\. Every player gets a number: their projected points/);

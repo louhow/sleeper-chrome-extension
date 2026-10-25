@@ -4,7 +4,7 @@
 // and no Lock-In; players with an injury designation moving into the lineup
 // are flagged. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nfl = (() => {
-  const { esc, f2, CDN, dialog, dialogErrors } = globalThis.SNP.ui;
+  const { esc, f2, CDN, real, playerOf, playerName, teamTag, optimizeDialog, planSummary, applyAll, applyChange, slotPlayer, matchupPair } = globalThis.SNP.ui;
   const { applySlot } = globalThis.SNP.model;
 
   // Plain text for the "How it picks" tooltip.
@@ -55,37 +55,20 @@
     const m = s.modal;
     if (!m) return '';
     const { plan, lineup } = m;
-    const how = `<span class="how" tabindex="0" aria-describedby="how-tip">How it picks<span class="how-tip" id="how-tip" role="tooltip">${esc(HOW)}</span></span>`;
-    const name = (id) => lineup.players[id]?.name || `Player #${id}`;
     const watching = plan.changes.filter((c) => c.to !== 'BN' && WATCH.has(lineup.players[c.id]?.injury));
     const watchNote = watching.length ? `<div class="warn-banner" role="status"><p>${watching.map((c) =>
-      `<b>${esc(name(c.id))}</b> is ${esc(lineup.players[c.id].injury)}`).join(', ')}. Check the news before kickoff.</p></div>` : '';
-    const done = m.done ? `<p class="op-done" role="status">${esc(m.done)}</p>` : '';
-    const rows = `<div class="os-head nfl"><span>Slot</span><span>Starting</span><span>Replaces</span><span class="dp-pts" title="Projected points this week">Proj</span><span></span></div>
-      ${lineup.slots.map((slot, i) => slotRow(m, slot, i)).join('')}`;
-    const body = plan.changes.length ? `${summary(plan)}${done}${watchNote}${rows}`
-      : `${summary(plan)}${done}<p class="msg">This is already your best lineup for week ${esc(lineup.round)}.</p>${rows}`;
-    return dialog('Optimize Lineup', `Week ${lineup.round}`, `
-      <div class="dialog-body">
-        ${dialogErrors(m.errors)}
-        ${body}
-      </div>
-      <footer class="dialog-foot op-foot">
-        <button data-action="close-modal" ${m.saving ? 'disabled' : ''}>${plan.changes.length ? 'Cancel' : 'Close'}</button>
-        ${plan.changes.length ? `<button class="primary" data-action="apply-lineup" ${m.saving ? 'disabled' : ''}>${m.busy === 'all' ? 'Saving…' : 'Apply all'}</button>` : ''}
-      </footer>`, how);
+      `<b>${esc(playerName(lineup.players, c.id))}</b> is ${esc(lineup.players[c.id].injury)}`).join(', ')}. Check the news before kickoff.</p></div>` : '';
+    return optimizeDialog(m, {
+      week: lineup.round,
+      how: HOW,
+      summary: planSummary(plan, 'Lineup projection', 'Starters\' projected points'),
+      notes: watchNote,
+      rows: `<div class="os-head nfl"><span>Slot</span><span>Starting</span><span>Replaces</span><span class="dp-pts" title="Projected points this week">Proj</span><span></span></div>
+      ${lineup.slots.map((slot, i) => slotRow(m, slot, i)).join('')}`,
+      actionable: plan.changes.length > 0,
+      apply: applyAll(m, 'Apply all'),
+    });
   }
-
-  function summary(plan) {
-    const gain = plan.after - plan.before;
-    return `<div class="op-sum">
-      <span class="label">Lineup projection<span class="sub">Starters' projected points</span></span>
-      <span class="nums"><b>${f2(plan.before)}</b><span class="arrow">→</span><b class="after">${f2(plan.after)}</b>
-        ${plan.changes.length ? `<span class="gain${gain < 0 ? ' down' : ''}">${gain >= 0 ? '+' : ''}${f2(gain)}</span>` : ''}</span>
-    </div>`;
-  }
-
-  const real = (id) => id && id !== '0';
 
   function slotRow(m, slot, i) {
     const { plan, lineup } = m;
@@ -108,8 +91,7 @@
         ${player(lineup, cur, 'out', outSub)}
         <span class="dp-pts">${f2(m.proj[next] ?? 0)}</span>
         <span class="os-act">
-          <button class="os-apply" data-op-row="${i}" ${m.saving ? 'disabled' : ''} ${others.length ? `title="Also changes ${esc(others.join(', '))}"` : ''}>${m.busy === `row:${i}` ? 'Saving…' : 'Apply change'}</button>
-          ${others.length ? `<span class="os-with">with ${esc(others.join(', '))}</span>` : ''}
+          ${applyChange(m, i, others)}
         </span>
       </div>`;
     }
@@ -129,53 +111,26 @@
   }
 
   function player(lineup, id, kind, sub) {
-    if (!real(id)) return `<span class="os-p ${kind} empty"><span class="headshot blank"></span><span class="dp-info"><span class="dp-name">Empty</span></span></span>`;
-    const p = lineup.players[id] || { name: `Player #${id}`, positions: [] };
-    return `<span class="os-p ${kind}">
-      <span class="os-face"><img class="headshot" src="${headshot(id, p)}" alt="">${globalThis.SNP.optimize.subArrow(kind)}</span>
-      <span class="dp-info">
-        <span class="dp-name"><b>${esc(p.name)}</b> <span class="team">${esc(p.position || '')} - ${esc(p.team || 'FA')}</span>${injury(p)}</span>
-        ${sub}
-      </span>
-    </span>`;
+    const p = playerOf(lineup.players, id);
+    return slotPlayer(id, p, kind, sub, { photo: headshot(id, p), tags: `${teamTag(p)}${injury(p)}` });
   }
 
   // League tab: the week's matchups as the NBA League tab draws them, with
-  // Sleeper's own numbers (read from its cards, which stay hidden). Yours first.
+  // Sleeper's own numbers (text read off its cards, which stay hidden). Yours first.
   // `failed`: avatar URLs that didn't load, drawn as the plain circle.
-  function league(cards, failed = new Set()) {
+  function league(cards, failed) {
     if (!cards.length) return '';
     const order = cards.map((c, i) => ({ ...c, i })).sort((a, b) => b.own - a.own || a.i - b.i);
+    const team = (t) => t && { avatar: t.avatar, owner: t.owner, team: t.team, points: t.score, win: t.win ? parseFloat(t.win) / 100 : null, bar: t.bar, record: t.record, proj: t.proj };
     return `<div class="app league nfl-league"><div class="lg-list">${order.map((c) => {
       const [a, b] = c.sides;
       const label = `Open ${a?.team || 'matchup'}${b ? ` vs ${b.team}` : ''}`;
-      return `<div class="lg-match mu-head${c.own ? ' own' : ''}" role="button" tabindex="0" data-nfl-matchup="${c.i}" aria-label="${esc(label)}">
-        ${a ? side(a, 'mine', failed) : ''}
-        <span class="vs">VS</span>
-        ${b ? side(b, 'theirs', failed) : '<div class="mu-team theirs bye"><span class="sub">No opponent this week</span></div>'}
-      </div>`;
+      return matchupPair(team(a), team(b), {
+        cls: `lg-match${c.own ? ' own' : ''}`,
+        attrs: `role="button" tabindex="0" data-nfl-matchup="${c.i}" aria-label="${esc(label)}"`,
+        failed,
+      });
     }).join('')}</div></div>`;
-  }
-
-  // With `t.rosterId` (the Matchup tab), the avatar, owner and team name open that team on the Team tab.
-  function side(t, cls, failed) {
-    const pct = parseFloat(t.win);
-    const trend = Number.isNaN(pct) ? '' : pct >= 50 ? 'up' : 'down';
-    const link = t.rosterId != null ? ` team-link" data-open-team="${esc(t.rosterId)}" role="link" tabindex="0" title="${esc(`${t.team}'s team`)}` : '';
-    return `<div class="mu-team ${cls}">
-      ${t.avatar && !failed.has(t.avatar) ? `<img class="avatar${link}" src="${esc(t.avatar)}" alt="">` : `<div class="avatar${link}"></div>`}
-      <div class="mu-who">
-        <div class="sub">${link ? `<span class="${link.slice(1)}">@${esc(t.owner || 'unknown')}</span>` : `@${esc(t.owner || 'unknown')}`}</div>
-        <div class="team-name">${link ? `<span class="${link.slice(1)}">${esc(t.team)}</span>` : esc(t.team)}</div>
-      </div>
-      <div class="mu-pts">${esc(t.score || '–')}</div>
-      <div class="mu-bar"><span class="${trend}" style="width:${Math.max(0, Math.min(100, t.bar))}%"></span></div>
-      <div class="mu-meta">
-        ${t.win ? `<b class="${trend}">${esc(t.win)} WIN</b>` : ''}
-        <span>${esc(t.record)}</span>
-        <span class="proj">${esc(t.proj)}</span>
-      </div>
-    </div>`;
   }
 
   // The OPTIMIZE button, built from the classes of Sleeper's own WAIVER and TRADE buttons so it matches them.
@@ -183,5 +138,5 @@
       <path d="M7 4v16"/><path d="M3 8l4-4 4 4"/><path d="M17 20V4"/><path d="M13 16l4 4 4-4"/>
     </svg></div><div class="btn-text">OPTIMIZE</div>`;
 
-  return { render, league, side, slotBadge, headshot, injury, BUTTON, HOW };
+  return { render, league, slotBadge, headshot, injury, BUTTON };
 })();

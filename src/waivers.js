@@ -2,7 +2,7 @@
 // the owner's pending claims (edit a bid or cancel). Pure: state -> HTML.
 (globalThis.SNP ||= {}).waivers = (() => {
   const { playerDays, lockInDefault, rosterRoom, faabLeft, sortClaims, FAAB } = globalThis.SNP.model;
-  const { esc, f2, headshot, positions, injuryTag, slotBadge, lineup, nextGame, dialog, dialogErrors, owns } = globalThis.SNP.ui;
+  const { esc, f2, headshot, injuryTag, teamTag, slotBadge, lineup, nextGame, dialog, dialogErrors, owns, real, playerOf, loading } = globalThis.SNP.ui;
 
   function render(s) {
     const m = s.modal;
@@ -27,13 +27,13 @@
   }
 
   function playerRow(s, slot, id, { button = false, selected = false, disabled = false } = {}) {
-    const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+    const p = playerOf(s.players, id);
     const days = daysOf(s, id);
     const inner = `
       ${slotBadge(slot)}
       <img class="headshot" src="${headshot(id)}" alt="">
       <span class="dp-info">
-        <span class="dp-name"><b>${esc(p.name)}</b> ${positions(p)} <span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</span>
+        <span class="dp-name"><b>${esc(p.name)}</b> ${teamTag(p, { chips: true })}${injuryTag(p)}</span>
         <span class="sub">${esc(nextGame(days))}</span>
       </span>
       <span class="dp-pts">${f2(lockInDefault(days))}</span>
@@ -44,14 +44,14 @@
 
   function bidDialog(s, m) {
     const roster = myRoster(s);
-    const p = s.players?.[m.playerId] || { name: `Player #${m.playerId}` };
+    const p = playerOf(s.players, m.playerId);
     const settings = s.league?.settings || {};
     const waiver = m.status === 'waiver';
     const faab = settings.waiver_type === FAAB;
     const [title, description] = !waiver ? ['Add Player', `Add ${p.name} to your roster`]
       : faab ? ['Make Waiver Bid', `Bid for ${p.name}`]
       : ['Make Waiver Claim', `${p.name} will be added to your roster once waiver clears`];
-    if (!s.ready) return dialog(title, description, '<p class="msg">Loading…</p>');
+    if (!s.ready) return dialog(title, description, loading());
     if (!roster) return dialog(title, description, `<p class="msg">Log in to Sleeper with a team in this league to ${waiver ? 'bid' : 'add players'}.</p>`);
 
     const room = rosterRoom(s.league, roster);
@@ -74,7 +74,7 @@
       disabled: !waiver && !drops.has(id) && playedToday(s, daysOf(s, id)),
     });
     const list = [
-      ...l.starters.map((id, i) => (id && id !== '0' ? row(l.slots[i] ?? 'UTIL', id) : '')),
+      ...l.starters.map((id, i) => (real(id) ? row(l.slots[i] ?? 'UTIL', id) : '')),
       ...l.bench.map((id) => row('BN', id)),
       ...l.taxi.map((id) => row('TX', id)),
     ].join('');
@@ -100,11 +100,11 @@
     const description = roster && faab ? `$${faabLeft(s.league, roster)} remaining · waiver position ${roster.settings?.waiver_position ?? '–'}` : '';
     if (!roster) return dialog('Waiver Claims', '', '<p class="msg">Log in to Sleeper to see your claims.</p>');
     const player = (id, sign) => {
-      const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+      const p = playerOf(s.players, id);
       return `<div class="cp ${sign === '+' ? 'add' : 'drop'}">
         <span class="sign">${sign}</span>
         <img class="headshot" src="${headshot(id)}" alt="">
-        <span class="cp-name"><b>${esc(p.name)}</b> <span class="team">${esc(p.position || '')} - ${esc(p.team || 'FA')}</span></span>
+        <span class="cp-name"><b>${esc(p.name)}</b> ${teamTag(p)}</span>
       </div>`;
     };
     const items = claims.map((c, i) => `<li class="claim">
@@ -126,7 +126,7 @@
     return dialog('Waiver Claims', description, `
       <div class="dialog-body">
         ${dialogErrors(m.errors)}
-        ${s.claims == null ? '<p class="msg">Loading…</p>'
+        ${s.claims == null ? loading()
           : items ? `<ol class="claims">${items}</ol>`
           : '<p class="msg">No pending claims. Tap W next to a player on the Players tab to bid.</p>'}
       </div>`);

@@ -4,7 +4,8 @@
 // Nothing saves until the owner applies a row or all of them. Pure: state -> HTML.
 (globalThis.SNP ||= {}).optimize = (() => {
   const { playerDays, scoreTier, applySlot } = globalThis.SNP.model;
-  const { esc, f2, headshot, positions, injuryTag, slotBadge, weekday, gameTime, nextGame, lockIcon, dialog, dialogErrors, shortName } = globalThis.SNP.ui;
+  const { esc, f2, headshot, injuryTag, teamTag, slotBadge, weekday, gameTime, gameLabel, nextGame, lockIcon, shortName, real, playerOf, playerName,
+    optimizeDialog, planSummary, applyAll, applyChange, slotPlayer } = globalThis.SNP.ui;
 
   // Plain text for the "How it picks" tooltip.
   const HOW = [
@@ -14,17 +15,16 @@
     'Locks a finished game when it beats what keeping the slot open is likely to bring.',
     'Leaves locked-in and live players alone.',
   ].join('\n');
+  // Why Apply waits while a green score would be given up.
+  const BLOCKED = 'Tick the box above to confirm giving up that score';
 
-  const real = (id) => id && id !== '0';
   const games = (n) => `${n} game${n === 1 ? '' : 's'}`;
   const pts = (x) => (x == null ? '–' : f2(x));
-  const gameText = (d) => `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}`;
   const names = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0]);
 
   function render(s, m = s.modal) {
     const { plan } = m;
-    const name = (id) => s.players[id]?.name || `Player #${id}`;
-    const how = `<span class="how" tabindex="0" aria-describedby="how-tip">How it picks<span class="how-tip" id="how-tip" role="tooltip">${esc(HOW)}</span></span>`;
+    const name = (id) => playerName(s.players, id);
     // Giving up a green score stops you until you confirm; any smaller lockable score is a softer warning.
     const good = plan.changes.filter((c) => c.goodScore);
     const soft = plan.changes.filter((c) => c.lost && !c.goodScore);
@@ -47,28 +47,19 @@
         <div class="os-head"><span>Slot</span><span>Starting</span><span>Replaces</span>
           <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span><span class="dp-avg" title="Projected points per game left this week">Pts/G</span><span></span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
-    // What the last row saved, until the next save.
-    const done = m.done ? `<p class="op-done" role="status">${esc(m.done)}</p>` : '';
-    const body = actionable ? `
-        ${summary(plan)}
-        ${done}
-        ${warning}
-        ${rows}`
-      : `${summary(plan)}${done}<p class="msg">This is already your best lineup for week ${esc(s.week)}.</p>${rows}`;
     const lockText = `Lock ${on.length === 1 ? 'in 1 game' : `in ${on.length} games`}`;
     const apply = on.length && !plan.changes.length ? lockText
       : on.length ? `${lockText} and ${good.length ? `apply all, losing ${f2(goodTotal)} pts` : 'apply all'}`
       : good.length ? `Apply all and lose ${f2(goodTotal)} pts` : 'Apply all';
-    return dialog('Optimize Lineup', `Week ${s.week}`, `
-      <div class="dialog-body">
-        ${dialogErrors(m.errors)}
-        ${body}
-      </div>
-      <footer class="dialog-foot op-foot">
-        <button data-action="close-modal" ${m.saving ? 'disabled' : ''}>${actionable ? 'Cancel' : 'Close'}</button>
-        ${actionable ? `<button class="primary${good.length ? ' risky' : ''}" data-action="apply-lineup" ${m.saving || blocked ? 'disabled' : ''}
-          ${blocked ? 'title="Tick the box above to confirm giving up that score"' : ''}>${m.busy === 'all' ? 'Saving…' : esc(apply)}</button>` : ''}
-      </footer>`, how);
+    return optimizeDialog(m, {
+      week: s.week,
+      how: HOW,
+      summary: summary(plan),
+      notes: warning,
+      rows,
+      actionable,
+      apply: applyAll(m, apply, { risky: good.length > 0, held: blocked, title: blocked ? BLOCKED : '' }),
+    });
   }
 
   // The day the plan is for, e.g. "Fri".
@@ -76,13 +67,8 @@
 
   // The starters' projected points on that day now and after the changes.
   function summary(plan) {
-    const gain = plan.after - plan.before;
-    return `<div class="op-sum">
-      <span class="label">${plan.date ? `${esc(day(plan))} projection<span class="sub">Starters playing ${esc(day(plan))}</span>`
-        : 'Lineup projection<span class="sub">No games left this week</span>'}</span>
-      <span class="nums"><b>${f2(plan.before)}</b><span class="arrow">→</span><b class="after">${f2(plan.after)}</b>
-        ${plan.changes.length ? `<span class="gain${gain < 0 ? ' down' : ''}">${gain >= 0 ? '+' : ''}${f2(gain)}</span>` : ''}</span>
-    </div>`;
+    return plan.date ? planSummary(plan, `${day(plan)} projection`, `Starters playing ${day(plan)}`)
+      : planSummary(plan, 'Lineup projection', 'No games left this week');
   }
 
   // One starting slot, in lineup order: who starts there. When the plan
@@ -98,24 +84,21 @@
       // Giving up a green score waits for the tick box, here as in Apply all.
       const risky = blocked && plan.changes.some((c) => c.goodScore && !starters.includes(c.id));
       const others = slots.filter((k) => k !== i).map((k) => plan.slots[k]);
-      const busy = m.busy === `row:${i}`;
       const drops = change?.drops;
       const tone = change?.goodScore ? 'lose' : change?.lost ? 'warn' : '';
       const outToday = plan.info[cur]?.today;
       const outWhy = !real(cur) ? '' : ` · ${outToday == null ? `no game ${esc(day(plan))}` : `${esc(day(plan))} ${f2(outToday)}`} · ${f2(plan.info[cur]?.perGame ?? 0)}/g`;
       const outSub = `<span class="sub move">${moveText(plan, cur, 'out')}<span class="why">${outWhy}</span></span>${drops
-        ? `<span class="sub drops ${tone}"${change.dropsUnsure ? ' title="If they were starting when it tipped off; the extension didn\'t see your lineup then"' : ''}>${change.dropsUnsure ? 'May drop' : 'Drops'} lock-in ${score(s, drops.actual)} ${esc(gameText(drops))}</span>` : ''}`;
+        ? `<span class="sub drops ${tone}"${change.dropsUnsure ? ' title="If they were starting when it tipped off; the extension didn\'t see your lineup then"' : ''}>${change.dropsUnsure ? 'May drop' : 'Drops'} lock-in ${score(s, drops.actual)} ${esc(gameLabel(drops))}</span>` : ''}`;
       return `<div class="os-row swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
         <span class="os-slot">${slotBadge(slot)}</span>
         ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>`)}
         ${player(s, cur, 'out', outSub)}
         ${numbers(plan, next)}
         <span class="os-act">
-          <button class="os-apply" data-op-row="${i}" ${m.saving || risky ? 'disabled' : ''}
-            ${risky ? 'title="Tick the box above to confirm giving up that score"' : others.length ? `title="Also changes ${esc(others.join(', '))}"` : ''}>${busy ? 'Saving…' : 'Apply change'}</button>
-          ${others.length ? `<span class="os-with">with ${esc(others.join(', '))}</span>` : ''}
+          ${applyChange(m, i, others, { held: risky, title: risky ? BLOCKED : '' })}
           ${drops && plan.lockable ? `<button class="os-lock-current" data-op-lock-out="${esc(cur)}" ${m.saving ? 'disabled' : ''}
-            title="${esc(`Or keep ${s.players[cur]?.name || 'them'} and lock ${f2(drops.actual)} (${gameText(drops)}) instead. Locking is final${change.dropsUnsure ? '; Sleeper only allows it if they were starting at tip-off and haven\'t been benched since' : ''}.`)}">${m.busy === `lockout:${cur}` ? 'Locking…'
+            title="${esc(`Or keep ${s.players[cur]?.name || 'them'} and lock ${f2(drops.actual)} (${gameLabel(drops)}) instead. Locking is final${change.dropsUnsure ? '; Sleeper only allows it if they were starting at tip-off and haven\'t been benched since' : ''}.`)}">${m.busy === `lockout:${cur}` ? 'Locking…'
               : `${lockIcon()}Lock current`}</button>` : ''}
         </span>
       </div>`;
@@ -129,9 +112,9 @@
       : info.fixed === 'locked' ? `${lockIcon()}Locked`
       : info.fixed === 'live' ? 'Playing'
       : 'No change';
-    const sub = info.fixed === 'locked' ? `${score(s, info.locked.actual ?? 0)} ${esc(gameText(info.locked))}`
-      : notYet ? `${score(s, notYet.actual)} ${esc(gameText(notYet.game))} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
-      : maybe ? `<span title="Lockable only if they were starting when it tipped off; the extension didn't see your lineup then">${score(s, maybe.actual)} ${esc(gameText(maybe.game))} · lockable if started</span> · ${esc(upcoming(s, cur))}`
+    const sub = info.fixed === 'locked' ? `${score(s, info.locked.actual ?? 0)} ${esc(gameLabel(info.locked))}`
+      : notYet ? `${score(s, notYet.actual)} ${esc(gameLabel(notYet.game))} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
+      : maybe ? `<span title="Lockable only if they were starting when it tipped off; the extension didn't see your lineup then">${score(s, maybe.actual)} ${esc(gameLabel(maybe.game))} · lockable if started</span> · ${esc(upcoming(s, cur))}`
       : esc(upcoming(s, cur));
     return `<div class="os-row same${info.fixed === 'locked' ? ' locked' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>
@@ -144,12 +127,12 @@
   // A finished game worth locking in. "Keep open" leaves it out and plans
   // around it; it stays listed so it can come back.
   function lockRow(s, m, plan, slot, k) {
-    const until = k.until ? ` until ${new Date(k.until).toLocaleDateString(undefined, { weekday: 'short' })} ${gameTime(k.until)}` : '';
+    const until = k.until ? ` until ${weekday(k.until)} ${gameTime(k.until)}` : '';
     const busy = m.busy === `lock:${k.id}`;
     const toggle = k.on
       ? `<button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open</button>`
       : `<button class="os-link" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
-    const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameText(k.game))} · ${openText(s, k)}</span>
+    const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameLabel(k.game))} · ${openText(s, k)}</span>
       <span class="sub">${k.on ? `Lockable${esc(until)}` : 'Keeping open'} · ${toggle}</span>`;
     return `<div class="os-row lock${k.on ? '' : ' off'}">
       <span class="os-slot">${slotBadge(slot)}</span>
@@ -163,23 +146,8 @@
 
   // One player in a slot row: headshot, name and the sub lines given.
   function player(s, id, kind, sub) {
-    if (!real(id)) return `<span class="os-p ${kind} empty"><span class="headshot blank"></span><span class="dp-info"><span class="dp-name">Empty</span></span></span>`;
-    const p = s.players[id] || { name: `Player #${id}`, positions: [] };
-    return `<span class="os-p ${kind}">
-      <span class="os-face"><img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}">${subArrow(kind)}</span>
-      <span class="dp-info">
-        <span class="dp-name"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button> ${positions(p)} <span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</span>
-        ${sub}
-      </span>
-    </span>`;
-  }
-
-  // A substitution mark on the headshot, as soccer apps show them: a green arrow
-  // up for who comes in, a red arrow down for who goes out.
-  function subArrow(kind) {
-    if (kind !== 'in' && kind !== 'out') return '';
-    const path = kind === 'in' ? 'M6 2.5 10 7H7.6v3.5H4.4V7H2z' : 'M6 9.5 2 5h2.4V1.5h3.2V5H10z';
-    return `<span class="os-arrow ${kind}" aria-label="${kind === 'in' ? 'Coming in' : 'Going out'}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="${path}"/></svg></span>`;
+    const p = playerOf(s.players, id);
+    return slotPlayer(id, p, kind, sub, { photo: headshot(id), tags: `${teamTag(p, { chips: true })}${injuryTag(p)}` });
   }
 
   // What the player in the slot is projected to score: that day, and per game left.
@@ -213,5 +181,5 @@
     return `<span class="score ${scoreTier(points, s.tiers)}">${f2(points)}</span>`;
   }
 
-  return { render, HOW, subArrow };
+  return { render };
 })();
