@@ -10,6 +10,7 @@
   const INJURY_SEVERE = /^(out|ir|sus|na|dnr)/i;
   // Sleeper's apps list bench players by primary position in this order.
   const POSITION_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
+  // Avatar URLs that failed to load, when the state keeps none (see avatarImg).
   const NO_FAILED = new Set();
 
   // Lineups mark an open spot with '0' (or leave it empty).
@@ -18,7 +19,6 @@
   const playerName = (players, id) => playerOf(players, id).name;
   // Where `order` doesn't list a player's position, they sort last.
   const rankIn = (order) => (p) => (p && order.includes(p.position) ? order.indexOf(p.position) : order.length);
-  const positionRank = rankIn(POSITION_ORDER);
   // The ids, padded with open spots ('0') up to `count` (a league's IR or taxi slots).
   const padTo = (ids, count) => [...ids, ...Array(Math.max(0, (count || 0) - ids.length)).fill('0')];
   // A share of leagues, as Sleeper rounds it (up).
