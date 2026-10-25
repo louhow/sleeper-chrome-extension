@@ -91,7 +91,7 @@ const playersTab = (rows) => `<!doctype html><title>Sleeper</title>
     button.dataset.player = p.id;
     button.innerHTML = '<span class="button-text">' + (p.status === 'waiver' ? 'W' : 'ADD') + '</span>';
     // The action component's props sit two fibers up; the row's (with the player) three.
-    button.__reactInternalInstance$test = fiber({ playerId: p.id, waiverStatus: { status: p.status, clearTime: 0 } }, 2);
+    button.__reactInternalInstance$test = fiber({ playerId: p.id, waiverStatus: { status: p.status } }, 2);
     const meta = document.createElement('div');
     meta.className = p.trend ? 'player-details' : 'player-meta-container';
     meta.textContent = p.name;
@@ -2398,6 +2398,10 @@ const nflPanel = (sel = '') => `#sleeper-nfl-panel ${sel}`;
 test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from the picker, and Sleeper\'s own view a click away', async () => {
   documentBody = nflTeamTab({ wrapped: true });
   await page.goto(NFL_TEAM_URL);
+  // Out of sight as soon as the league is known to be NFL, while ours is still loading, so nothing shifts.
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-snp-hide-nfl-tab'), null, { timeout: 30000 });
+  assert.equal(await page.locator('.postdraft-panel > .scrollbar-container').isVisible(), false);
+  assert.equal(await page.locator('#sleeper-nfl-panel').count(), 1, 'ours holds its place');
   await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
   assert.equal(await page.locator('.postdraft-panel > .scrollbar-container').isVisible(), false, "Sleeper's own tab is hidden, still on the page");
   assert.equal(await page.locator('.team-roster').count(), 1);
@@ -2458,7 +2462,13 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
   documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: 8, token: true });
   await page.goto(NFL_TEAM_URL);
   await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
-  assert.match(await page.locator(nflPanel('.team-card .team-name')).textContent(), new RegExp(me.metadata?.team_name || me.display_name));
+  // The team last picked from the picker (in the test before) comes back, as on NBA; the arrow keys' was just for then.
+  const nameOf = (r) => { const u = users.find((x) => x.user_id === r.owner_id); return (u?.metadata?.team_name || u?.display_name || '').trim(); };
+  const picked = rosters.map(nameOf).sort((a, b) => a.localeCompare(b))[2];
+  await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: picked }).waitFor();
+  // "My team" goes back to yours.
+  if (picked !== nameOf(mine)) await page.locator(nflPanel('.my-team')).click();
+  await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: me.metadata?.team_name || me.display_name }).waitFor();
   // Week 7 isn't the one Sleeper's Team tab shows, so it can't be edited from here.
   assert.equal(await page.locator(nflPanel('button.slot')).count(), 0);
   await page.locator(nflPanel('.week-nav [data-action="next"]')).click();
@@ -2479,6 +2489,10 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
   const before = await page.evaluate(() => window.__nflSaves.length);
   await page.locator(nflPanel('.card.nfl.target button.slot')).first().click();
   await page.locator(nflPanel('.notice.ok')).waitFor({ timeout: 30000 });
+  const notices = await page.evaluate(() => ['sleeper-nfl-panel', 'sleeper-nfl-dialog']
+    .flatMap((id) => [...(document.getElementById(id)?.shadowRoot.querySelectorAll('.notice') || [])])
+    .filter((n) => n.checkVisibility()).length);
+  assert.equal(notices, 1, 'the save says so once, in the tab');
   const saves = await page.evaluate(() => window.__nflSaves);
   assert.equal(saves.length, before + 1);
   const [leagueId, rosterId, round] = saves.at(-1);
