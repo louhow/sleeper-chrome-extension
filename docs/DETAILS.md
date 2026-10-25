@@ -109,6 +109,8 @@ Rank comes from `roster_standings`; before any games are played, it falls back t
 
 Sleeper's own NBA Players table, with these additions:
 
+- No layout shift: the table stays hidden (its space kept) until the view you had is restored and loaded and the added columns, their sizes and the week's data are in, then shows once. Other sports show right away; after 5 seconds it shows whatever happens.
+
 - It opens on the view you last had on, per league: Projection or Stats, the season or week, Avg / Best / Worst, Shooting and the team picked (kept in the page's storage).
   A week that was the current one comes back as the current one, so when a new week starts it opens on that; any other week, or the season, comes back as it was.
   The first time, it opens on Projection for the current week (Sleeper's own current week).

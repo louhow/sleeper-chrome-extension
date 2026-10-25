@@ -1726,9 +1726,30 @@ test('players tab opens on Projection for the current week, then on whatever you
   await page.locator('.snp-week-pick button', { hasText: 'Worst' }).click();
   await page.locator('.snp-shot-toggle').click();
   await page.waitForFunction(() => panel.state.statKeys.includes('fta'));
+  // From the first frame: the table is never seen until it's the view you had, with our columns in.
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('snp-test-frames')) return;
+    window.__frames = [];
+    const sample = () => {
+      const el = document.querySelector('.integration-players-panel');
+      // The stand-in's panel is a top-level const: reachable by name, not on window.
+      // eslint-disable-next-line no-undef
+      if (el && typeof panel !== 'undefined') {
+        window.__frames.push({ visible: getComputedStyle(el).visibility === 'visible', type: panel.state.statType, interval: panel.state.statInterval, keys: panel.state.statKeys.join() });
+      }
+      if (window.__frames.length < 600) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.evaluate(() => localStorage.setItem('snp-test-frames', '1'));
   await page.goto(PLAYERS_URL);
   await page.waitForFunction(() => panel.state.statType === 'stat' && panel.state.statInterval === 2, null, { timeout: 30000 });
   await page.locator('.snp-week-pick [aria-checked="true"]', { hasText: 'Worst' }).waitFor();
+  await page.waitForFunction(() => window.__frames.some((f) => f.visible));
+  const frames = await page.evaluate(() => { localStorage.removeItem('snp-test-frames'); return window.__frames; });
+  const early = frames.filter((f) => f.visible && !(f.type === 'stat' && f.interval === 2 && f.keys.includes('Week') && f.keys.includes('fta')));
+  assert.deepEqual(early, [], 'shown only once settled');
+  assert.ok(frames.some((f) => !f.visible), 'hidden while it settled');
   await page.waitForFunction(() => panel.state.statKeys.includes('fta'));
   assert.equal(await page.locator('.snp-shot-toggle').getAttribute('aria-pressed'), 'true');
   // That was the current week, so when the next one starts, it opens on that one.

@@ -463,6 +463,8 @@
     async function loadLeague(force = false) {
       state.error = null;
       const league = await api.get(`/v1/league/${leagueId}`);
+      // Tells page-hook.js which sport this is, so it only waits on NBA tables.
+      if (!destroyed) document.documentElement.dataset.snpLeagueSport = `${leagueId}:${league.sport}`;
       if (league.sport !== 'nba') {
         disabled = true;
         teardown();

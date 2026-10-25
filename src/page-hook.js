@@ -384,6 +384,11 @@
     }
     watchRows();
     decorateRows();
+    // Shown once it's all in: the view restored and loaded, our columns on and
+    // sized, and the week's data the columns need.
+    const settled = !panel.state.loading && !panel.snpWant && Boolean(keys) && keys.join() === (panel.state.statKeys || []).join() &&
+      (!shownWeek || schedule) && (!gpOn || played) && (mode === 'avg' || picked);
+    if (settled) reveal();
   }
 
   // The Avg / Best / Worst switch, in the empty corner of the table's header
@@ -752,7 +757,58 @@
     if (el) rowWatcher.observe(el, { childList: true, subtree: true, characterData: true });
   }
 
+  // No layout shift: on the NBA Players tab, Sleeper's table stays hidden (its
+  // space kept) until the view you had is restored and our columns, sizes and
+  // week data are in, then shows once. Any players route starts hidden; it shows
+  // right away for other sports, and after 5s whatever happens.
+  const PLAYERS_ROUTE = /^\/leagues\/(\d+)\/players(?:\/|$)/;
+  const PENDING = 'data-snp-players-pending';
+  const PENDING_MS = 5000;
+  let pendingSince = 0;
+  let routePath = null;
+  function routeChanged() {
+    if (location.pathname === routePath) return;
+    routePath = location.pathname;
+    const on = PLAYERS_ROUTE.test(routePath);
+    document.documentElement.toggleAttribute(PENDING, on);
+    pendingSince = on ? Date.now() : 0;
+    if (on) appear.observe(document.documentElement, { childList: true, subtree: true });
+    else appear.disconnect();
+  }
+  function reveal() {
+    if (!pendingSince) return;
+    pendingSince = 0;
+    document.documentElement.removeAttribute(PENDING);
+    appear.disconnect();
+  }
+  // While hidden, patch as soon as Sleeper's table shows up, not on the next tick.
+  let appearFrame = 0;
+  const appear = new MutationObserver(() => {
+    appearFrame ||= requestAnimationFrame(() => {
+      appearFrame = 0;
+      checkPending();
+    });
+  });
+  function checkPending() {
+    if (!pendingSince) return;
+    const id = location.pathname.match(PLAYERS_ROUTE)?.[1];
+    const [league, sport] = (document.documentElement.dataset.snpLeagueSport || '').split(':');
+    if (Date.now() - pendingSince > PENDING_MS || (league === id && sport !== 'nba')) return reveal();
+    if (document.documentElement.dataset.snpNbaLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
+  }
+  for (const method of ['pushState', 'replaceState']) {
+    const original = history[method];
+    history[method] = function (...args) {
+      const out = original.apply(this, args);
+      routeChanged();
+      return out;
+    };
+  }
+  addEventListener('popstate', routeChanged);
+  routeChanged();
+
   setInterval(() => {
+    checkPending();
     if (document.documentElement.dataset.snpNbaLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
   }, 500);
 
@@ -816,6 +872,7 @@
     }
     html[data-snp-admin-changed] ${PLAYERS_PANEL} .stat-key-header > ${ours} span,
     html[data-snp-admin-changed] ${PLAYERS_PANEL} .player-list-item > :nth-child(2 of .cell) { color: #b69cff !important; }
+    html[data-snp-players-pending] ${PLAYERS_PANEL} { visibility: hidden !important; }
     ${PLAYERS_PANEL} [data-snp-cell] { font-size: 0 !important; }
     ${PLAYERS_PANEL} .snp-value { font-size: 12px; }
     ${PLAYERS_PANEL} [data-snp-delta] { flex-direction: column; gap: 2px; }
