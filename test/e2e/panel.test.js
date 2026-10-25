@@ -107,16 +107,29 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   .cell { justify-content: center; }
   .stat-key-header { gap: 0; padding-top: 0; padding-bottom: 0; }
   .label span { text-transform: uppercase; }
+  /* Sleeper's labels are 25px: 16px of text over 9px of padding. */
+  .stat-key-header > .label { height: 16px; padding-bottom: 9px; line-height: 16px; }
   .name { width: 160px; }
   .filters button { margin: 0 4px 8px 24px; }
   .filter-row { display: flex; align-items: center; gap: 8px; margin: 0 0 8px 24px; }
+  .header-top { display: flex; align-items: center; width: 750px; height: 48px; margin-left: 24px; }
+  .header-top button { margin: 0 4px 0 0; }
+  .player-search-wrapper { margin-left: 8px; }
+  .player-search { width: 160px; height: 32px; border-radius: 20px; background: rgb(32, 38, 53); }
+  .player-search input { width: 120px; height: 32px; padding-left: 8px; border: 0; background: none; color: #fff; }
+  .name { font-weight: 700; }
+  .owner { display: flex; gap: 4px; font-size: 9px; }
+  .owner i { color: rgb(88, 167, 255); }
+  .custom-checkbox-item { display: flex; align-items: center; }
+  .custom-checkbox-item .meta { width: 0; margin-left: 10px; }
   .filter-item { display: flex; align-items: center; gap: 6px; }
   .custom-checkbox { width: 14px; height: 14px; border: 1px solid #888; border-radius: 3px; }
   .custom-checkbox.checked { background: #f5b469; }
   /* Sleeper's header is 42px, its labels the bottom 25px. */
   .table-header { height: 42px; padding-top: 16px; box-sizing: border-box; }
 </style>
-<div class="integration-players-panel"><div class="filters"><button data-pos="ALL">ALL</button><button data-pos="PG">PG</button>
+<div class="integration-players-panel"><div class="filters"><div class="header-top"><button data-pos="ALL">ALL</button><button data-pos="PG">PG</button>
+    <div class="player-search-wrapper"><div class="player-search"><input placeholder="Find player"></div></div></div>
   <div class="filter-panel open"><div class="filter-row"><div class="filter-dropdown"><div class="app-dropdown"></div></div>
     <div class="filter-item"><div class="custom-checkbox-item"><div class="custom-checkbox checked nba"><span class="checkmark"></span></div></div><div class="filter-label">Free agents</div></div>
   </div></div></div>
@@ -127,15 +140,24 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
     fgm: 'Fgm', fga: 'Fga', tpa: '3pa', ftm: 'Ftm', fta: 'Fta', GP: 'GP', Week: 'Week' };
   const PLAYERS = ${JSON.stringify(players)};
   // Rostered players show their owner under the name, which makes the name area wider.
+  // Owners are league users (a team name each); ownedPlayers maps player -> owner, as Sleeper's props do.
   const OWNERS = Object.fromEntries(PLAYERS.filter((p) => p.owner).map((p) => [p.id, p.owner]));
+  const USERS = Object.fromEntries([...new Set(Object.values(OWNERS))].map((name, i) =>
+    ['u' + i, { user_id: 'u' + i, display_name: name.split(' ')[0].toLowerCase(), avatar: null, metadata: { team_name: name } }]));
+  const userOf = (name) => Object.values(USERS).find((u) => u.metadata.team_name === name);
   const fiberOf = (props, depth = 0) => (depth ? { memoizedProps: {}, return: fiberOf(props, depth - 1) } : { memoizedProps: props });
   const panel = {
-    props: { leagueId: '${LEAGUE}', sport: 'nba', scoringSettings: { pts: 1, reb: 1 }, ...${JSON.stringify(props)} },
+    props: { leagueId: '${LEAGUE}', sport: 'nba', scoringSettings: { pts: 1, reb: 1 },
+      usersInLeagueMap: USERS,
+      rostersInLeague: Object.values(USERS).map((u, i) => ({ roster_id: i + 1, owner_id: u.user_id, players: Object.keys(OWNERS).filter((id) => OWNERS[id] === u.metadata.team_name) })),
+      ownedPlayers: Object.fromEntries(Object.entries(OWNERS).map(([id, name]) => [id, userOf(name)])),
+      ...${JSON.stringify(props)} },
     state: {
       playerStatsMap: Object.fromEntries(PLAYERS.map((p) => [p.id, p.stats])),
       // Sleeper's NBA projection columns; the ones a test doesn't set print "-".
       statKeys: ['fpts_proj', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'], statType: 'proj', sort: 'fpts_proj', positionFilter: 'ALL',
       season: '2026', statInterval: 'season',
+      hideOwned: false, filterByUser: false, filterByUserMap: Object.fromEntries(Object.keys(USERS).map((id) => [id, false])),
       ...${JSON.stringify(state)},
     },
     setState(update, then) {
@@ -166,13 +188,17 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   renderDropdown();
   document.querySelector('.app-dropdown').__reactInternalInstance$test = { memoizedProps: { className: 'app-dropdown' }, return: { memoizedProps: { options: OPTIONS }, stateNode: dropdown } };
   function render() {
-    const { playerStatsMap: map, statKeys, sort, positionFilter } = panel.state;
+    const { playerStatsMap: map, statKeys, sort, positionFilter, hideOwned, filterByUser, filterByUserMap } = panel.state;
+    const owned = panel.props.ownedPlayers;
     document.querySelector('.stat-key-header').innerHTML = statKeys.map((k) => '<div class="label nba" data-key="' + k + '"><span>' + (LABELS[k] || k) + '</span></div>').join('');
-    const view = PLAYERS.filter((p) => positionFilter === 'ALL' || p.pos === positionFilter).map((p) => ({ player_id: p.id, team: p.team }));
+    const view = PLAYERS.filter((p) => positionFilter === 'ALL' || p.pos === positionFilter)
+      .filter((p) => !(hideOwned && owned[p.id]) && !(filterByUser && !filterByUserMap[owned[p.id]?.user_id]))
+      .map((p) => ({ player_id: p.id, team: p.team }));
     if (sort) view.sort((a, b) => (map[b.player_id][sort] || -1) - (map[a.player_id][sort] || -1));
     const grid = document.querySelector('.ReactVirtualized__Grid');
     grid.__reactInternalInstance$test = fiberOf({ players: view, playerStatsMap: map }, 3);
-    grid.innerHTML = view.map(({ player_id: id }) => '<div class="player-list-item" data-id="' + id + '"><div class="owner-cell"></div><div class="player-meta-container">' + id + (OWNERS[id] ? ' → ' + OWNERS[id] : '') + '</div>' +
+    grid.innerHTML = view.map(({ player_id: id }) => '<div class="player-list-item" data-id="' + id + '"><div class="owner-cell"></div><div class="player-meta-container"><div class="name-container"><div class="name">' + id + '</div>' +
+      (OWNERS[id] ? '<div class="owner"><i class="fa fa-arrow-right">→</i><div>' + USERS[owned[id].user_id].display_name + '</div></div>' : '') + '</div></div>' +
       statKeys.map((k) => '<div class="cell nba">' + (map[id][k] == null ? '-' : (map[id][k] / (k === 'sp' ? 60 : 1) / (map[id].gp || 1)).toFixed(1)) + '</div>').join('') + '</div>').join('');
     for (const row of grid.children) row.__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: { player: { player_id: row.dataset.id } } } };
   }
@@ -1649,12 +1675,21 @@ test('players tab opens on Projection for the current week, then on whatever you
   documentBody = LOGGED_OUT;
 });
 test('players tab in Stats: games played, games left, shooting at the end, and a week\'s best or worst game', async () => {
+  // Each team's first game is final; the shooter's big game and the steady one are those.
+  await startMidWeek();
+  const { data } = await (await fetch('https://sleeper.com/graphql', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query: 'query scores { scores(sport: "nba", season_type: "regular", season: "2026", week: 1) { game_id date status start_time metadata } }' }),
+  })).json();
+  fakeMidWeek(data.scores);
+  const plays = (team) => (g) => [g.metadata?.home_team?.team, g.metadata?.away_team?.team].includes(team);
+  const first = (team) => data.scores.find((g) => plays(team)(g) && sleeper.finished.has(g.game_id)).game_id;
   sleeper.weekStats = [
-    { player_id: 'shooter', game_id: 'g1', stats: { sp: 2000, pts: 30, fgm: 12, fga: 20, tpa: 6, ftm: 4, fta: 5 } },
+    { player_id: 'shooter', game_id: first('LAL'), stats: { sp: 2000, pts: 30, fgm: 12, fga: 20, tpa: 6, ftm: 4, fta: 5 } },
     { player_id: 'shooter', game_id: 'g2', stats: { sp: 1500, pts: 6, fgm: 3, fga: 14, tpa: 2 } },
     // A game sat out comes back with no stats, and is nobody's worst (and not a game played).
     { player_id: 'shooter', game_id: 'g3', stats: {} },
-    { player_id: 'steady', game_id: 'g4', stats: { sp: 1800, pts: 20, fgm: 8, fga: 15, tpa: 1, ftm: 4, fta: 4 } },
+    { player_id: 'steady', game_id: first('BOS'), stats: { sp: 1800, pts: 20, fgm: 8, fga: 15, tpa: 1, ftm: 4, fta: 4 } },
   ];
   const STAT_KEYS = ['fpts', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'];
   documentBody = playersTable([
@@ -1680,19 +1715,42 @@ test('players tab in Stats: games played, games left, shooting at the end, and a
   // The week at a glance: a mark a day, played, on now, still to play, from each team's schedule.
   const strip = (id) => page.evaluate((i) => {
     const el = document.querySelectorAll(`.player-list-item[data-id="${i}"] .cell`)[panel.state.statKeys.indexOf('Week')]?.querySelector('.snp-week');
-    return el && { marks: [...el.children].map((m) => m.className), title: el.title };
+    return el && { marks: [...el.children].map((m) => m.className), count: el.getAttribute('aria-label') };
   }, id);
   await page.waitForFunction(() => document.querySelectorAll('.snp-week i').length === 14, null, { timeout: 30000 });
-  const { data } = await (await fetch('https://sleeper.com/graphql', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query: 'query scores { scores(sport: "nba", season_type: "regular", season: "2026", week: 1) { date status start_time metadata } }' }),
-  })).json();
-  const lal = data.scores.filter((g) => [g.metadata?.home_team?.team, g.metadata?.away_team?.team].includes('LAL'));
+  // The strip's week: Monday of the first game day, for seven days (later games the fake moved past it drop out).
+  const firstDay = data.scores.map((g) => g.date).sort()[0];
+  const monday = Date.parse(`${firstDay}T12:00:00Z`) - ((new Date(`${firstDay}T12:00:00Z`).getUTCDay() + 6) % 7) * 864e5;
+  const inWeek = (g) => Date.parse(`${g.date}T12:00:00Z`) < monday + 7 * 864e5;
+  const lal = data.scores.filter((g) => plays('LAL')(g) && inWeek(g));
+  // A game played wears its score's color, by the league's scoring.
+  const league = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}`)).json();
+  const fpts = (stats) => Object.entries(stats).reduce((sum, [k, v]) => sum + v * (league.scoring_settings[k] ?? 0), 0);
+  const tier = (points) => (points >= 24 ? 'green' : points >= 15 ? 'yellow' : 'red');
+  const big = fpts(sleeper.weekStats[0].stats);
+  await page.waitForFunction((t) => document.querySelector('.player-list-item[data-id="shooter"] .snp-week i.done')?.classList.contains(t), tier(big), { timeout: 30000 });
   const marks = (await strip('shooter')).marks;
   assert.equal(marks.length, 7);
   assert.equal(marks.filter((m) => m !== 'none').length, lal.length, 'one mark per Lakers game');
+  assert.deepEqual(marks.filter((m) => m.startsWith('done')), [`done ${tier(big)}`], 'their one game played, in its color');
+  assert.ok((await strip('steady')).marks.includes(`done ${tier(fpts(sleeper.weekStats[3].stats))}`));
   const left = marks.filter((m) => m === 'left').length;
-  assert.match((await strip('shooter')).title, new RegExp(`^${left} games? left this week\\n`));
+  assert.equal((await strip('shooter')).count, `${left} game${left === 1 ? '' : 's'} left this week`);
+  // Hovering a mark says the game and its score; one still to play, its tip-off.
+  const cardOf = async (selector) => {
+    await page.locator(selector).first().hover();
+    const card = page.locator('.snp-week-tip');
+    await card.waitFor();
+    return card.innerText();
+  };
+  const whole = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+  const played = await cardOf('.player-list-item[data-id="shooter"] .snp-week i.done');
+  assert.match(played, new RegExp(`^\\w{3} (vs|@) \\w+\\s+${whole(big).replace('.', '\\.')}\\n${left} games? left this week$`));
+  assert.equal(await page.locator('.snp-week-tip .snp-tip-score').getAttribute('class'), `snp-tip-score ${tier(big)}`);
+  await page.screenshot({ path: `${OUT}players-week-hover.png` });
+  if (left) assert.match(await cardOf('.player-list-item[data-id="shooter"] .snp-week i.left'), /^\w{3} (vs|@) \w+\s+\d{1,2}:\d\d\s?[AP]M\n/);
+  await page.mouse.move(0, 0);
+  await page.locator('.snp-week-tip').waitFor({ state: 'hidden' });
   assert.equal(await page.evaluate(() => panel.state.playerStatsMap.shooter.Week), left, 'sorts by games left');
   // Shooting: shot volume, which doesn't score, at the end of the table and dimmed.
   const shootingBox = page.locator('.filter-row .snp-shooting');
@@ -1746,6 +1804,15 @@ test('players tab in Stats: games played, games left, shooting at the end, and a
   const pick = page.locator('.table-header .snp-week-pick');
   assert.deepEqual(await pick.locator('button').allTextContents(), ['Avg', 'Best', 'Worst']);
   assert.equal(await pick.locator('[aria-checked="true"]').textContent(), 'Avg');
+  // Centered on the labels' text, not their padded box, and inside the header.
+  const centers = await page.evaluate(() => {
+    const mid = (el) => { const b = el.getBoundingClientRect(); return b.top + b.height / 2; };
+    const header = document.querySelector('.table-header').getBoundingClientRect();
+    const box = document.querySelector('.snp-week-pick').getBoundingClientRect();
+    return { pick: mid(document.querySelector('.snp-week-pick')), text: mid(document.querySelector('.stat-key-header > .label > span')), inside: box.top >= header.top && box.bottom <= header.bottom };
+  });
+  assert.ok(Math.abs(centers.pick - centers.text) <= 1, `centered on the labels (${centers.pick} vs ${centers.text})`);
+  assert.ok(centers.inside, 'within the header');
   await page.screenshot({ path: `${OUT}players-stats-week.png` });
   await pick.locator('button', { hasText: 'Best' }).click();
   await cellIs('shooter', 'pts', '30');
@@ -1796,6 +1863,59 @@ test('players tab in Stats: games played, games left, shooting at the end, and a
   await page.screenshot({ path: `${OUT}players-proj-week.png` });
   await forgetPlayersView();
   sleeper.weekStats = null;
+  sleeper.midWeek = false;
+  documentBody = LOGGED_OUT;
+});
+
+test('players tab: a team picker beside the search, and rostered players show their team', async () => {
+  const STAT_KEYS = ['fpts', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'];
+  documentBody = playersTable([
+    { id: 'mine', pos: 'PG', team: 'LAL', owner: 'Cookie Monster', stats: { fpts: 30, pts: 30 } },
+    { id: 'theirs', pos: 'SG', team: 'BOS', owner: 'Cling Kong', stats: { fpts: 25, pts: 25 } },
+    { id: 'alsoTheirs', pos: 'C', team: 'MIA', owner: 'Cling Kong', stats: { fpts: 20, pts: 20 } },
+    { id: 'free', pos: 'SF', team: 'NYK', stats: { fpts: 15, pts: 15 } },
+  ], { statType: 'stat', statInterval: 1, statKeys: STAT_KEYS, sort: 'fpts' });
+  await forgetPlayersView();
+  await page.goto(PLAYERS_URL);
+  const rows = () => page.locator('.player-list-item').evaluateAll((els) => els.map((r) => r.dataset.id));
+  const picker = page.locator('.header-top .snp-team-pick');
+  await picker.waitFor({ timeout: 30000 });
+  await page.waitForFunction(() => panel.state.statKeys.includes('Week'));
+  assert.equal(await page.evaluate(() => document.querySelector('.snp-team-pick').previousElementSibling.className), 'player-search-wrapper', 'right after Find player');
+  assert.equal(await picker.locator('.snp-team-button').innerText(), 'All teams');
+  // Rostered players carry their team: its avatar (or initial) and name, in place of Sleeper's arrow and username.
+  const owner = page.locator('.player-list-item[data-id="theirs"] .owner');
+  await owner.locator('.snp-owner').waitFor();
+  assert.equal(await owner.locator('.snp-owner > span:last-child').textContent(), 'Cling Kong');
+  assert.equal(await owner.locator('.snp-owner .snp-owner-avatar').count(), 1);
+  assert.equal(await owner.locator('i.fa-arrow-right').isVisible(), false);
+  assert.equal(await page.locator('.player-list-item[data-id="free"] .snp-owner').count(), 0, 'free agents have none');
+  // Picking a team narrows the list to its players, through Sleeper's own owner filter.
+  await picker.locator('.snp-team-button').click();
+  assert.deepEqual(await picker.locator('.snp-team-menu button b').allTextContents(), ['All teams', 'Cling Kong', 'Cookie Monster']);
+  await page.screenshot({ path: `${OUT}players-team-menu.png` });
+  await picker.locator('.snp-team-menu button', { hasText: 'Cling Kong' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.player-list-item').length === 2);
+  assert.deepEqual(await rows(), ['theirs', 'alsoTheirs']);
+  assert.equal(await picker.locator('.snp-team-button .snp-team-name').textContent(), 'Cling Kong');
+  assert.equal(await picker.locator('.snp-team-menu').isVisible(), false, 'the menu closes');
+  assert.deepEqual(await page.evaluate(() => [panel.state.filterByUser, panel.state.hideOwned]), [true, false]);
+  await page.screenshot({ path: `${OUT}players-team-picked.png` });
+  // It comes back next time, with the rest of the view.
+  await page.waitForTimeout(700);
+  await page.goto(PLAYERS_URL);
+  await page.waitForFunction(() => document.querySelectorAll('.player-list-item').length === 2, null, { timeout: 30000 });
+  assert.equal(await picker.locator('.snp-team-button .snp-team-name').textContent(), 'Cling Kong');
+  // Free agents (Sleeper's hideOwned) and a team can't both hold: the team pick lets go.
+  await page.evaluate(() => panel.setState({ hideOwned: true }));
+  await page.waitForFunction(() => document.querySelector('.snp-team-button .snp-team-name')?.textContent === 'All teams');
+  assert.deepEqual(await rows(), ['free']);
+  // All teams again.
+  await page.evaluate(() => panel.setState({ hideOwned: false }));
+  await picker.locator('.snp-team-button').click();
+  await picker.locator('.snp-team-menu button', { hasText: 'All teams' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.player-list-item').length === 4);
+  await forgetPlayersView();
   documentBody = LOGGED_OUT;
 });
 

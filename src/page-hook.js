@@ -161,7 +161,8 @@
     document.addEventListener('snp:week-schedule', take);
     send('snp:week-schedule-request', { season, week });
     document.removeEventListener('snp:week-schedule', take);
-    if (value) schedules[key] = { at: Date.now(), value };
+    // Not kept until the points are in, so they show as soon as they load.
+    if (value?.pointsReady) schedules[key] = { at: Date.now(), value };
     return value ?? hit?.value ?? null;
   }
 
@@ -183,7 +184,7 @@
     const want = panel.snpWant;
     if (want && Date.now() < want.until && !(statType === want.statType && String(statInterval) === String(want.statInterval))) return;
     panel.snpWant = null;
-    const view = { statType, season, interval: statInterval, current: leg > 0 && String(statInterval) === String(leg), pick: weekPick, shooting };
+    const view = { statType, season, interval: statInterval, current: leg > 0 && String(statInterval) === String(leg), pick: weekPick, shooting, team: pickedTeam(panel) };
     const text = JSON.stringify(view);
     if (panel.snpSaved === text) return;
     panel.snpSaved = text;
@@ -226,6 +227,10 @@
     const saved = savedView(leagueId);
     weekPick = PICKS.some(([mode]) => mode === saved?.pick) ? saved.pick : 'avg';
     shooting = Boolean(saved?.shooting);
+    if (saved?.team && panel.props.usersInLeagueMap?.[saved.team]) {
+      panel.snpTeamPicked = true;
+      pickTeam(panel, saved.team);
+    }
     const want = saved && (saved.statType === 'proj' || saved.statType === 'stat')
       ? { statType: saved.statType, season: saved.current ? panel.state.season : String(saved.season || panel.state.season),
         statInterval: saved.current && leg > 0 ? +leg : saved.interval === 'season' ? 'season' : +saved.interval }
@@ -290,6 +295,7 @@
     const week = statType === 'stat' ? shownWeek : null;
     weekSwitch(week);
     shootingBox(statType === 'stat');
+    teamPicker(panel);
     const fetched = shownWeek ? weekSchedule(season, shownWeek) : null;
     // Teams from the extension's players, else from Sleeper's own list.
     const schedule = fetched && { ...fetched, teamOf: { ...Object.fromEntries(listPlayers().map((p) => [String(p.player_id), p.team])), ...fetched.teamOf } };
@@ -380,16 +386,121 @@
       });
       header.append(el);
     }
-    // Centered on the header's labels, wherever Sleeper's layout puts them.
-    const label = header.querySelector('.stat-key-header > .label');
-    if (label) {
-      const top = `${Math.round(label.getBoundingClientRect().top - header.getBoundingClientRect().top + (label.offsetHeight - el.offsetHeight) / 2)}px`;
+    // Centered on the header labels' text (each label box has padding under it),
+    // wherever Sleeper's layout puts them.
+    const text = header.querySelector('.stat-key-header > .label > span');
+    if (text) {
+      const box = text.getBoundingClientRect();
+      const top = `${Math.round(box.top - header.getBoundingClientRect().top + (box.height - el.offsetHeight) / 2)}px`;
       if (el.style.top !== top) el.style.top = top;
     }
     for (const button of el.children) {
       const on = button.dataset.snpPick === weekPick;
       if (button.getAttribute('aria-checked') !== String(on)) button.setAttribute('aria-checked', String(on));
     }
+  }
+
+  // League teams by owner: avatar, team name and owner, A to Z.
+  const avatarUrl = (user) => user?.metadata?.avatar || (user?.avatar ? `https://sleepercdn.com/avatars/thumbs/${user.avatar}` : '');
+  const teamName = (user) => user?.metadata?.team_name || user?.display_name || 'Team';
+  function leagueTeams(panel) {
+    const users = panel.props.usersInLeagueMap || {};
+    return (panel.props.rostersInLeague || []).filter((r) => users[r.owner_id])
+      .map((r) => ({ id: r.owner_id, user: users[r.owner_id] }))
+      .sort((a, b) => teamName(a.user).localeCompare(teamName(b.user)));
+  }
+
+  // The team the list is narrowed to: Sleeper's own owner filter (in its
+  // filter section) with exactly one owner on, else null for all players.
+  function pickedTeam(panel) {
+    const { filterByUser, filterByUserMap = {} } = panel.state;
+    const on = Object.keys(filterByUserMap).filter((id) => filterByUserMap[id]);
+    return filterByUser && on.length === 1 ? on[0] : null;
+  }
+  function pickTeam(panel, id) {
+    const map = Object.fromEntries(Object.keys(panel.state.filterByUserMap || panel.props.usersInLeagueMap || {}).map((k) => [k, k === id]));
+    // A team's players are rostered, so the free-agents filter comes off with it.
+    panel.setState(id ? { hideOwned: false, filterByUser: true, filterByUserMap: map } : { filterByUser: false, filterByUserMap: map });
+  }
+
+  const esc = (text) => String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const avatar = (user, cls) => {
+    const url = avatarUrl(user);
+    return url ? `<img class="${cls}" src="${esc(url)}" alt="">` : `<span class="${cls} snp-blank">${esc(teamName(user).slice(0, 1).toUpperCase())}</span>`;
+  };
+
+  // A team picker beside Sleeper's player search, to scan one team's players.
+  function teamPicker(panel) {
+    const top = document.querySelector(`${PLAYERS_PANEL} .header-top`);
+    const search = top?.querySelector(':scope > .player-search-wrapper');
+    let el = document.querySelector(`${PLAYERS_PANEL} .snp-team-pick`);
+    if (!search) {
+      el?.remove();
+      return;
+    }
+    // Ticking Free agents hides every rostered player: the team pick goes with it.
+    if (panel.state.hideOwned && pickedTeam(panel) && panel.snpTeamPicked) {
+      panel.snpTeamPicked = false;
+      pickTeam(panel, null);
+    }
+    const teams = leagueTeams(panel);
+    const picked = pickedTeam(panel);
+    const sig = `${picked}|${teams.map((t) => t.id).join()}`;
+    if (!el || el.previousElementSibling !== search) {
+      el?.remove();
+      el = document.createElement('div');
+      el.className = 'snp-team-pick';
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const item = e.target.closest('[data-snp-team]');
+        if (item) {
+          const p = playersPanel();
+          if (p) {
+            p.snpTeamPicked = Boolean(item.dataset.snpTeam);
+            pickTeam(p, item.dataset.snpTeam || null);
+          }
+          el.classList.remove('open');
+        } else if (e.target.closest('.snp-team-button')) el.classList.toggle('open');
+        el.querySelector('.snp-team-button').setAttribute('aria-expanded', String(el.classList.contains('open')));
+      });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') el.classList.remove('open');
+      });
+      search.after(el);
+    }
+    if (el.dataset.sig === sig) return;
+    el.dataset.sig = sig;
+    const current = teams.find((t) => t.id === picked);
+    el.innerHTML = `<button type="button" class="snp-team-button" aria-haspopup="listbox" aria-expanded="false">
+        ${current ? avatar(current.user, 'snp-team-avatar') : '<span class="snp-team-avatar snp-all"></span>'}
+        <span class="snp-team-name">${current ? esc(teamName(current.user)) : 'All teams'}</span><i class="fa fa-chevron-down"></i></button>
+      <div class="snp-team-menu" role="listbox">
+        <button type="button" role="option" data-snp-team="" aria-selected="${!current}"><span class="snp-team-avatar snp-all"></span><span class="snp-team-label"><b>All teams</b></span></button>
+        ${teams.map((t) => `<button type="button" role="option" data-snp-team="${esc(t.id)}" aria-selected="${t.id === picked}">${avatar(t.user, 'snp-team-avatar')}
+          <span class="snp-team-label"><b>${esc(teamName(t.user))}</b><small>@${esc(t.user.display_name || '')}</small></span></button>`).join('')}
+      </div>`;
+  }
+  document.addEventListener('click', () => document.querySelector(`${PLAYERS_PANEL} .snp-team-pick.open`)?.classList.remove('open'));
+
+  // A rostered player's owner line: the team's avatar and name, in place of Sleeper's arrow and username.
+  function ownerLine(row, id, panel) {
+    const owner = row.querySelector('.player-meta-container .owner');
+    const user = owner && panel.props.ownedPlayers?.[id];
+    if (!owner) return;
+    if (!user) {
+      owner.removeAttribute('data-snp-owner');
+      owner.querySelector(':scope > .snp-owner')?.remove();
+      return;
+    }
+    const sig = `${user.user_id}|${teamName(user)}|${avatarUrl(user)}`;
+    if (owner.dataset.snpOwner === sig) return;
+    owner.dataset.snpOwner = sig;
+    owner.querySelector(':scope > .snp-owner')?.remove();
+    const line = document.createElement('span');
+    line.className = 'snp-owner';
+    line.title = `${teamName(user)} (@${user.display_name})`;
+    line.innerHTML = `${avatar(user, 'snp-owner-avatar')}<span>${esc(teamName(user))}</span>`;
+    owner.append(line);
   }
 
   // "Shooting" in Sleeper's filter row, after its own checkboxes and in their
@@ -408,7 +519,7 @@
       el.setAttribute('role', 'checkbox');
       el.tabIndex = 0;
       el.title = 'Shot volume (FGM, FGA, 3PA, FTM, FTA): it doesn\'t score, but shows who shoots';
-      el.innerHTML = '<div class="custom-checkbox-item"><div class="custom-checkbox nba"><span class="checkmark"></span></div></div><div class="filter-label">Shooting</div>';
+      el.innerHTML = '<div class="custom-checkbox-item"><div class="custom-checkbox nba"><span class="checkmark"></span></div><div class="meta"><div class="name"></div></div></div><div class="filter-label">Shooting</div>';
       const toggle = (e) => {
         e.stopPropagation();
         shooting = !shooting;
@@ -423,9 +534,10 @@
     if (el.getAttribute('aria-checked') !== String(shooting)) el.setAttribute('aria-checked', String(shooting));
   }
 
-  // The week strip for a player's team: one mark a day, Monday to Sunday.
-  const DAY_WORDS = { done: 'played', live: 'on now', left: 'to play' };
-  function weekStrip(cell, schedule, team) {
+  // The week strip for a player's team: one mark a day, Monday to Sunday. A
+  // game played wears its score's color (green, yellow, red, as on the Team
+  // tab); hovering a mark says the game and its score or tip-off.
+  function weekStrip(cell, schedule, team, id) {
     const states = schedule?.teams[team];
     if (!cell.hasAttribute('data-snp-cell')) cell.setAttribute('data-snp-cell', '');
     cell.querySelector(':scope > .snp-value')?.remove();
@@ -435,7 +547,9 @@
       el.className = 'snp-week';
       cell.append(el);
     }
-    const sig = states ? `${team}|${states.join()}` : '';
+    const games = schedule?.games?.[team] || [];
+    const scores = schedule?.points?.[id] || {};
+    const sig = states ? `${team}|${states.join()}|${JSON.stringify(games.map((g) => g && scores[g.id]))}` : '';
     if (el.dataset.sig === sig) return;
     el.dataset.sig = sig;
     if (!states) {
@@ -445,9 +559,53 @@
     }
     const left = states.filter((d) => d === 'left').length;
     const weekday = (date) => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' });
-    el.innerHTML = states.map((d) => `<i class="${d || 'none'}"></i>`).join('');
-    el.title = `${left} game${left === 1 ? '' : 's'} left this week\n${states.map((d, i) => d && `${weekday(schedule.days[i])}: ${DAY_WORDS[d]}`).filter(Boolean).join('\n')}`;
+    const time = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const count = `${left} game${left === 1 ? '' : 's'} left this week`;
+    el.textContent = '';
+    states.forEach((d, i) => {
+      const mark = document.createElement('i');
+      const g = games[i];
+      const score = d === 'done' && g ? scores[g.id] : null;
+      mark.className = d ? `${d}${d === 'done' ? ` ${score ? score.tier : 'dnp'}` : ''}` : 'none';
+      if (g) {
+        mark.dataset.tip = `${weekday(schedule.days[i])} ${g.home ? 'vs' : '@'} ${g.opponent}`;
+        mark.dataset.note = d === 'done' ? (score ? whole(score.fpts) : 'Didn\'t play') : d === 'live' ? 'On now' : g.start ? time(g.start) : '';
+        if (score) mark.dataset.tier = score.tier;
+        mark.dataset.count = count;
+      }
+      el.append(mark);
+    });
+    el.setAttribute('aria-label', count);
   }
+
+  // The strip's hover card, on the page so the row doesn't clip it.
+  let tip = null;
+  function showTip(mark) {
+    tip ||= Object.assign(document.createElement('div'), { className: 'snp-week-tip' });
+    if (!tip.isConnected) document.body.append(tip);
+    tip.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'snp-tip-head';
+    const name = document.createElement('b');
+    name.textContent = mark.dataset.tip;
+    const note = document.createElement('span');
+    note.textContent = mark.dataset.note;
+    if (mark.dataset.tier) note.className = `snp-tip-score ${mark.dataset.tier}`;
+    head.append(name, note);
+    const foot = document.createElement('div');
+    foot.className = 'snp-tip-foot';
+    foot.textContent = mark.dataset.count;
+    tip.append(head, foot);
+    const box = mark.getBoundingClientRect();
+    tip.style.display = 'block';
+    tip.style.left = `${Math.round(box.left + box.width / 2 - tip.offsetWidth / 2 + scrollX)}px`;
+    tip.style.top = `${Math.round(box.top - tip.offsetHeight - 8 + scrollY)}px`;
+  }
+  document.addEventListener('mouseover', (e) => {
+    const mark = e.target.closest?.(`${PLAYERS_PANEL} .snp-week i[data-tip]`);
+    if (mark) showTip(mark);
+    else if (tip?.style.display === 'block') tip.style.display = 'none';
+  });
 
   // A span of ours over a cell whose own text (Sleeper's, hidden) can't say what we mean.
   function overlay(cell, cls) {
@@ -504,11 +662,12 @@
       const id = fiber(row, (x) => x.player?.player_id)?.memoizedProps.player.player_id;
       if (id == null) continue;
       const s = map[id];
+      ownerLine(row, id, panel);
       keys.forEach((key, i) => {
         if (key === DELTA_KEY || !cells[i]) return;
         if (key === WEEK_KEY) {
           const schedule = panel.snpSchedule;
-          weekStrip(cells[i], schedule, schedule?.teamOf[id]);
+          weekStrip(cells[i], schedule, schedule?.teamOf[id], id);
           return;
         }
         const text = cellText(key, s);
@@ -637,10 +796,58 @@
     }
     ${PLAYERS_PANEL} .snp-week { display: flex; gap: 2px; height: 14px; align-items: stretch; font-size: 12px; }
     ${PLAYERS_PANEL} .snp-week i { flex: 0 0 5px; border-radius: 1.5px; background: rgba(255, 255, 255, 0.06); }
-    ${PLAYERS_PANEL} .snp-week i.done { background: rgba(185, 196, 212, 0.6); }
     ${PLAYERS_PANEL} .snp-week i.live { background: #ff5b6e; }
     ${PLAYERS_PANEL} .snp-week i.left { background: #00ceb8; }
     ${PLAYERS_PANEL} .snp-shooting { cursor: pointer; }
+    ${PLAYERS_PANEL} .snp-week i.done { background: rgba(185, 196, 212, 0.6); }
+    ${PLAYERS_PANEL} .snp-week i.done.green { background: #4caf74; }
+    ${PLAYERS_PANEL} .snp-week i.done.yellow { background: #d8b73e; }
+    ${PLAYERS_PANEL} .snp-week i.done.red { background: #d85a74; }
+    ${PLAYERS_PANEL} .snp-week i.done.dnp { background: rgba(185, 196, 212, 0.3); }
+    ${PLAYERS_PANEL} .snp-week i[data-tip] { cursor: default; }
+    ${PLAYERS_PANEL} .snp-week i[data-tip]:hover { outline: 1px solid rgba(255, 255, 255, 0.8); outline-offset: 1px; }
+    .snp-week-tip {
+      position: absolute; z-index: 10000; display: none; padding: 7px 10px; border-radius: 8px; pointer-events: none;
+      background: #0d1421; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); color: #fff; font: 12px/16px Poppins, sans-serif; white-space: nowrap;
+    }
+    .snp-week-tip .snp-tip-head { display: flex; align-items: center; gap: 8px; }
+    .snp-week-tip .snp-tip-head span { color: rgb(185, 196, 212); }
+    .snp-week-tip .snp-tip-score { padding: 0 5px; border-radius: 4px; color: #fff !important; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .snp-week-tip .snp-tip-score.green { background: rgba(84, 132, 100, 0.95); }
+    .snp-week-tip .snp-tip-score.yellow { background: rgba(128, 122, 78, 0.95); }
+    .snp-week-tip .snp-tip-score.red { background: rgba(150, 72, 96, 0.95); }
+    .snp-week-tip .snp-tip-foot { margin-top: 2px; color: rgb(120, 134, 156); font-size: 10px; line-height: 14px; }
+    ${PLAYERS_PANEL} .snp-team-pick { position: relative; flex: 0 1 200px; min-width: 0; margin-left: 8px; }
+    ${PLAYERS_PANEL} .snp-team-button {
+      display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0 12px 0 5px; border: 0; border-radius: 20px;
+      background: rgb(32, 38, 53); color: #fff; font: 600 13px Poppins, sans-serif; cursor: pointer; text-align: left;
+    }
+    ${PLAYERS_PANEL} .snp-team-button:hover { background: rgb(40, 47, 65); }
+    ${PLAYERS_PANEL} .snp-team-button .snp-team-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    ${PLAYERS_PANEL} .snp-team-button .fa { color: rgb(120, 134, 156); font-size: 11px; }
+    ${PLAYERS_PANEL} .snp-team-avatar { flex: none; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: rgb(52, 61, 82); }
+    ${PLAYERS_PANEL} .snp-team-avatar.snp-all { background: conic-gradient(#00ceb8 0 25%, #59a7ff 0 50%, #f78c3c 0 75%, #c48df1 0); }
+    ${PLAYERS_PANEL} .snp-blank { display: inline-grid; place-items: center; color: #fff; font: 700 11px Poppins, sans-serif; }
+    ${PLAYERS_PANEL} .snp-team-menu {
+      position: absolute; z-index: 1000; top: 38px; left: 0; width: max(100%, 240px); max-height: 360px; overflow-y: auto; padding: 6px;
+      border-radius: 12px; background: rgb(24, 29, 42); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); display: none;
+    }
+    ${PLAYERS_PANEL} .snp-team-pick.open .snp-team-menu { display: block; }
+    ${PLAYERS_PANEL} .snp-team-menu button {
+      display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px;
+      background: none; color: #fff; font: 13px Poppins, sans-serif; text-align: left; cursor: pointer;
+    }
+    ${PLAYERS_PANEL} .snp-team-menu button:hover { background: rgb(40, 47, 65); }
+    ${PLAYERS_PANEL} .snp-team-menu button[aria-selected="true"] { background: rgba(0, 206, 184, 0.14); }
+    ${PLAYERS_PANEL} .snp-team-menu .snp-team-avatar { width: 26px; height: 26px; }
+    ${PLAYERS_PANEL} .snp-team-label { display: flex; flex-direction: column; min-width: 0; }
+    ${PLAYERS_PANEL} .snp-team-label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+    ${PLAYERS_PANEL} .snp-team-label small { color: rgb(120, 134, 156); font-size: 11px; line-height: 14px; }
+    ${PLAYERS_PANEL} .owner[data-snp-owner] > :not(.snp-owner) { display: none !important; }
+    ${PLAYERS_PANEL} .snp-owner { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; color: rgb(185, 196, 212); }
+    ${PLAYERS_PANEL} .snp-owner > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    ${PLAYERS_PANEL} .snp-owner-avatar { flex: none; width: 12px; height: 12px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15); }
+    ${PLAYERS_PANEL} .snp-owner .snp-blank { background: rgb(52, 61, 82); font-size: 7px; }
     ${PLAYERS_PANEL} .snp-week-pick button:hover { color: #fff; }
     ${PLAYERS_PANEL} .snp-week-pick button[aria-checked="true"] { background: rgb(196, 213, 230); color: rgb(2, 32, 71); }
     ${PLAYERS_PANEL} .snp-delta {

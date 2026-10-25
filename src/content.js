@@ -317,8 +317,9 @@
     // Sleeper's FPTS is). Answers before dispatchEvent returns, or with null
     // while the week loads ('snp:week-games-ready' follows).
     const weekGames = {}; // `${season}|${week}` -> stat rows, or the load in flight
-    function pickWeekGames(e) {
-      const { season, week, mode } = JSON.parse(e.detail);
+    // A week's per-game stat rows, once per page load; null while they load
+    // (then 'snp:week-games-ready').
+    function weekStatRows(season, week) {
       const key = `${season}|${week}`;
       if (!weekGames[key]) {
         const type = season === state.league?.season ? state.league.season_type || 'regular' : 'regular';
@@ -327,7 +328,12 @@
           .catch(() => { weekGames[key] = []; })
           .finally(() => document.dispatchEvent(new CustomEvent('snp:week-games-ready')));
       }
-      const rows = Array.isArray(weekGames[key]) ? weekGames[key] : null;
+      return Array.isArray(weekGames[key]) ? weekGames[key] : null;
+    }
+
+    function pickWeekGames(e) {
+      const { season, week, mode } = JSON.parse(e.detail);
+      const rows = weekStatRows(season, week);
       let games = null;
       if (rows) {
         const settings = state.league?.scoring_settings || {};
@@ -348,8 +354,10 @@
     document.addEventListener('snp:week-games-request', pickWeekGames);
 
     // A week's schedule for the Players tab's strip, per team and day: '' (no
-    // game), 'done', 'live' or 'left'. Null while it loads (then
-    // 'snp:week-games-ready'). Read from a loaded week, else one scores query.
+    // game), 'done', 'live' or 'left', with each game (id, opponent, home, tip-off),
+    // and each player's fantasy points and score tier per finished game (league scoring).
+    // Null while it loads (then 'snp:week-games-ready'). Read from a loaded
+    // week, else one scores query; the points come from the week's stat rows.
     const weekSchedules = {};
     function weekSchedule(e) {
       const { season, week } = JSON.parse(e.detail);
@@ -375,8 +383,22 @@
         const stateOf = (g) => (!g ? '' : g.status === 'complete' ? 'done'
           : g.status === 'in_game' || (g.start != null && g.start <= now) ? 'live' : 'left');
         const teamOf = Object.fromEntries(Object.entries(state.players || {}).filter(([, pl]) => pl.team).map(([id, pl]) => [id, pl.team]));
-        out = { days, teamOf,
-          teams: Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => stateOf(games[d]))])) };
+        const settings = state.league?.scoring_settings || {};
+        const points = {};
+        const rows = weekStatRows(season, week);
+        for (const { player_id: id, game_id: game, stats } of rows || []) {
+          // A game sat out comes back with no stats.
+          if (!(stats?.sp > 0 || stats?.min > 0)) continue;
+          const fpts = scoring.scoreStats(settings, stats);
+          // With its color, as the Team tab and game log show it.
+          (points[id] ||= {})[game] = { fpts, tier: model.scoreTier(fpts) };
+        }
+        out = { days, teamOf, points, pointsReady: Boolean(rows),
+          teams: Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => stateOf(games[d]))])),
+          games: Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => {
+            const g = games[d];
+            return g ? { id: g.id, home: g.home === team, opponent: g.home === team ? g.away : g.home, start: g.start } : null;
+          })])) };
       }
       document.dispatchEvent(new CustomEvent('snp:week-schedule', { detail: JSON.stringify(out) }));
     }

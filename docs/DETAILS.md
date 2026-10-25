@@ -103,18 +103,21 @@ Rank comes from `roster_standings`; before any games are played, it falls back t
 
 Sleeper's own NBA Players table, with these additions:
 
-- It opens on the view you last had on, per league: Projection or Stats, the season or week, Avg / Best / Worst, and Shooting (kept in the page's storage).
+- It opens on the view you last had on, per league: Projection or Stats, the season or week, Avg / Best / Worst, Shooting and the team picked (kept in the page's storage).
   A week that was the current one comes back as the current one, so when a new week starts it opens on that; any other week, or the season, comes back as it was.
   The first time, it opens on Projection for the current week (Sleeper's own current week).
   It loads the view the way Sleeper's own dropdowns do.
 - Sleeper's week dropdown reads the week shown: on its own it shows the season ("2026") on load even with a week picked, because its option values are numbers and the value it starts with is a string.
-- Week: with a week picked (Projection or Stats, not the season), a column after FPTS (and GP) with a mark a day, Monday to Sunday, from each team's schedule: gray for a game played, red for one on now, teal for one still to play, faint for no game.
-  Its tooltip says how many games are left and which days; sorting by it sorts by games left.
-  The schedule is the week's GraphQL `scores` (already loaded for the Team tab's week, else one query per week).
+- Week: with a week picked (Projection or Stats, not the season), a column after FPTS (and GP) with a mark a day, Monday to Sunday, from each team's schedule.
+  A game played wears its score's color by the league's scoring (green 24+, yellow 15+, red below, as on the Team tab; dim gray when they didn't play); bright red is a game on now, teal one still to play, faint no game.
+  Hovering a mark shows a card: the game, its score (or tip-off time), and how many games are left; sorting by the column sorts by games left.
+  The schedule is the week's GraphQL `scores` (already loaded for the Team tab's week, else one query per week); the scores come from the week's stat rows, which Best and Worst already load.
+- Team picker: beside Find player, every league team with its avatar and name (All teams first); picking one narrows the list to that team's players through Sleeper's own owner filter (the one in its filter section), so the Week strip scans a whole roster. Ticking Free agents lets the pick go. It's remembered with the rest of the view.
+- Rostered players' owner line shows the team's avatar (or initial) and team name, in place of Sleeper's arrow and username.
 - Shooting: a checkbox in Sleeper's filter row (after Free agents, Watchlist and Rookies), in Stats only, off until ticked: FGM, FGA, 3PA, FTM and FTA at the end of the table.
   They don't score in the league, so they're dimmed.
   Sleeper's stats already carry them; they go into its table component as stat keys, so they sort from their headers like its own columns.
-- Avg / Best / Worst: in Stats with a week picked (not the season), a switch in the table's top-left corner, centered on the header's labels. The pick stays when you switch to Projection and back.
+- Avg / Best / Worst: in Stats with a week picked (not the season), a switch in the table's top-left corner, centered on the header labels' text. The pick stays when you switch to Projection and back.
   Avg is Sleeper's own numbers, each player's average over the week's games, plus a GP column (games played, after FPTS); Sleeper's week stats are per game and carry no count.
   Best and Worst show each player's single best or worst game that week, by the league's scoring, in whole numbers (minutes rounded; fantasy points keep a half when they score one); games a player sat out don't count.
   The per-game stats come from `/stats/nba/<season>/<week>`, once per week per page load.
