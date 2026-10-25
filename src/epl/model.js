@@ -3,7 +3,7 @@
 (globalThis.SEP ||= {}).model = (() => {
   // The same rules as NBA and NFL, from the core model (loaded before this entry).
   const core = globalThis.SNP.model;
-  const { cheapestAssignment, winProbability, standingsRanks, FAAB, rosterRoom, faabLeft, claimError, sortClaims } = core;
+  const { cheapestAssignment, winProbability, lineupOnLeg, standingsRanks, FAAB, rosterRoom, faabLeft, claimError, sortClaims } = core;
 
   // GraphQL `scores` rows (or /schedule rows) -> games, earliest first.
   function gamesFromScores(rows) {
@@ -365,7 +365,7 @@
     gamesFromScores, gamesByTeam, pointsByGame, playerGames, weekTotals, started, finished,
     slotAccepts, fits, reserveEligible, spotOf, spotRefs, swapTargets, applyMove, describeMove,
     parseFormation, savedFormation, slotLabels, formationOf, FORMATION_ORDER,
-    cheapestAssignment, bestLineup, winProbability,
+    cheapestAssignment, bestLineup, winProbability, lineupOnLeg,
     standings, standingsRanks, pointsFor, pointsAgainst, streak,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims, waiverGuess,
   };

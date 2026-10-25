@@ -1,6 +1,6 @@
 // Rendering helpers shared by every view. Pure: data in, HTML strings out.
 (globalThis.SEP ||= {}).ui = (() => {
-  const { playerGames, weekTotals, started, finished, slotAccepts, savedFormation, slotLabels, formationOf } = globalThis.SEP.model;
+  const { playerGames, weekTotals, started, finished, slotAccepts, savedFormation, slotLabels, formationOf, lineupOnLeg } = globalThis.SEP.model;
   // The same helpers as NBA and NFL; the rest differ by sport.
   const { esc, f2, CDN, teamName, ownerName, avatar, record, owns, weekday, shortName, gameTime, dialogErrors, notice } = globalThis.SNP.ui;
   const f1 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(1));
@@ -137,10 +137,11 @@
     const bench = (roster.players || [])
       .filter((id) => !placed.has(id))
       .sort((a, b) => positionRank(s.players[a]) - positionRank(s.players[b]));
-    const inSeason = s.league.status === 'in_season';
+    // A lineup that saves to the week's matchup leg can only change once that leg has loaded.
+    const onLeg = lineupOnLeg(s.league);
     const current = Boolean(week) && s.week >= (s.currentWeek ?? s.week);
     const mine = owns(s, roster);
-    const editable = mine && current && (!inSeason || Boolean(leg));
+    const editable = mine && current && (!onLeg || Boolean(leg));
     const settings = s.league.settings || {};
     const active = (roster.players || []).length - reserve.length;
     // Players whose club has kicked off this week can't move (Sleeper locks them).

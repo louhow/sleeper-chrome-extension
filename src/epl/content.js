@@ -497,7 +497,8 @@
 
     async function saveStarters(starters) {
       const { league, rosterId } = state;
-      if (league.status === 'in_season') {
+      // Where Sleeper's own Team component saves it (model.lineupOnLeg): the week's leg, else the roster.
+      if (model.lineupOnLeg(league)) {
         await saveLeg(rosterId, starters);
       } else {
         const data = await api.graphql('roster_update_starters', `mutation roster_update_starters {

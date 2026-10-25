@@ -42,6 +42,9 @@ test('lineup: without a leg in season it is read-only, from the public matchup, 
   s.weeks[1].legs = [];
   const l = pick(ui.lineup(s));
   assert.deepEqual([l.starters, l.editable, l.locks], [['b', 'a', '0'], false, {}]);
+  const playoffs = { ...s, league: { ...s.league, status: 'post_season' } };
+  assert.equal(ui.lineup(playoffs).editable, false, 'playoff lineups save to the leg too (model.lineupOnLeg)');
+  assert.equal(ui.lineup({ ...s, league: { ...s.league, status: 'complete' } }).editable, true, 'off season: the roster');
   const noWeek = pick(ui.lineup({ ...league(), me: 'u1', weeks: undefined }));
   assert.deepEqual([noWeek.starters, noWeek.editable], [['a', 'b', '0'], false]);
   assert.equal(ui.lineup({ ...league(), players: null }), null, 'waits for the players');

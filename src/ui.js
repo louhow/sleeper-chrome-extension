@@ -175,10 +175,11 @@
     const parts = s.players ? rosterParts(s, rosterId) : null;
     if (!parts) return null;
     const { roster, week, leg, taxi, reserve } = parts;
-    const inSeason = s.league.status === 'in_season';
+    // A lineup that saves to the week's matchup leg can only change once that leg has loaded.
+    const onLeg = globalThis.SNP.model.lineupOnLeg(s.league);
     const current = Boolean(week) && s.week >= (s.currentWeek ?? s.week);
     const mine = owns(s, roster);
-    const editable = mine && current && (!inSeason || Boolean(leg));
+    const editable = mine && current && (!onLeg || Boolean(leg));
     const settings = s.league.settings || {};
     // Active roster = everyone not on IR or taxi; it can hold one player per roster position.
     const active = (roster.players || []).length - reserve.length - taxi.length;
@@ -192,7 +193,7 @@
       mine,
       editable,
       // Locks only exist on an in-season matchup leg. A lock is real points, so not under what-if scoring.
-      lockable: mine && current && inSeason && Boolean(leg) && !whatIfOn(s),
+      lockable: mine && current && onLeg && Boolean(leg) && !whatIfOn(s),
       // Taxi belongs to the roster, not a week, so it's edited from the current week.
       taxiEditable: editable && (settings.taxi_slots || 0) > 0 && s.week === s.currentWeek,
       taxiOpen: globalThis.SNP.model.taxiOpen(settings, s.seasonType, s.currentWeek, weekStarted(s)),
