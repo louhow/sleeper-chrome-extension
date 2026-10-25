@@ -28,9 +28,9 @@ It reads off `SNP` where the rule or helper is the same for every sport:
 
 - the API client (`src/api.js`);
 - the lineup solver, win probability, game state, where a lineup saves, claim checks and standings ranks (`SNP.model`);
-- escaping, number, team, date and player helpers, the player card's stat-table helpers, and the loading and error messages (`SNP.ui`);
-- the API tab and the log-back-in message (`SNP.ui`);
-- save notices (`SNP.shared.flasher`) and league users (`SNP.loaders.usersById`).
+- escaping, number, team, date and player helpers, the player card's stat-table helpers, the loading and error messages, the API tab and the log-back-in message (`SNP.ui`);
+- loading players, rosters, who is logged in and matchup legs, and league users (`SNP.loaders`);
+- save notices (`SNP.shared.flasher`).
 
 It never changes `SNP` or the NBA and NFL pages.
 
@@ -45,7 +45,7 @@ The panel waits for that attribute to name the league as `clubsoccer:epl` before
   The optimizer is `SNP.model.solveLineup` given soccer's slot rules; like NBA and NFL it never leaves a slot empty to dodge a negative projection.
   Sleeper's win-probability formula and the FAAB and roster-room checks for claims come from `SNP.model` too.
 - `src/epl/ui.js`: shared render helpers and the resolved lineup for a roster and week.
-- `src/epl/team.js`, `matchup.js`, `league.js`, `players.js`, `card.js`, `dialogs.js`, `view.js`: pure state -> HTML render functions.
+- `src/epl/team-view.js`, `matchup-view.js`, `league-view.js`, `players-view.js`, `card-view.js`, `dialogs-view.js`, `panel-view.js` (the shell and tab switch): pure state -> HTML render functions, as in `src/nba/` and `src/nfl/`.
 - `src/epl/content.js`: one session per league (survives Sleeper's in-page navigation), data loading, saves and events.
   Renders into a shadow root in place of Sleeper's placeholder; dialogs render in a separate page-level host.
 - `src/epl/panel.css`: the panel's own styles, inlined into each shadow root after `src/base.css` (the tokens and widgets it shares with the NBA and NFL panel, such as dialogs, notices, the bid form and the API calls tab).
