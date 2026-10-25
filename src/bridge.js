@@ -1,17 +1,25 @@
-// The extension's half of its messages with page-hook.js, which runs in the
-// page's own world (it has the same helper, the other way round). The two
-// worlds share only the DOM, so every message is a CustomEvent on `document`
-// with its payload as JSON in `detail`. Every name starts with `snp:`.
+// Messages between the extension's content scripts and page-hook.js, which
+// runs in the page's own world. The two worlds share only the DOM, so every
+// message is a CustomEvent on `document` with its payload as JSON in `detail`.
+// Every name starts with `snp:`.
 //   ask(name, detail): sends `<name>-request`; the other side answers with
 //     `<name>` before dispatchEvent returns, so the parsed reply comes straight
 //     back (null when nobody answered).
 //   answer(name, fn): answers each `<name>-request` with fn(detail), there and then.
 //   call(name, detail): for answers that take a while (an NFL lineup save): the
-//     request carries an `id`, the answer echoes it, and the Promise resolves
-//     with that answer, so concurrent calls never take each other's.
+//     request carries an `id`, and the Promise resolves with the answer that
+//     echoes it, so concurrent calls never take each other's.
+//   answerLater(name, fn): call's other side; answers with what fn's Promise
+//     resolves to, plus the request's `id`.
 //   tell(name, detail): a one-way message; on(name, fn) listens for them.
-// answer and on return a function that stops listening.
+// answer, answerLater and on return a function that stops listening. A message
+// whose JSON doesn't parse is logged and dropped.
+// Chrome injects a file once per frame, whichever world asks first, so this
+// one can't be listed in both manifest entries: page-hook.js carries the same
+// code between its "bridge.js copy" markers, and test/unit/bridge.test.js
+// fails the moment the two differ. Change both together. No chrome.* here.
 (globalThis.SNP ||= {}).bridge = (() => {
+  // bridge.js copy: start
   function tell(name, detail) {
     document.dispatchEvent(new CustomEvent(name, { detail: detail === undefined ? null : JSON.stringify(detail) }));
   }
@@ -56,5 +64,8 @@
     });
   }
 
-  return { ask, answer, call, tell, on };
+  const answerLater = (name, fn) => on(`${name}-request`, async (detail) => tell(name, { ...(await fn(detail)), id: detail?.id ?? null }));
+
+  return { ask, answer, call, answerLater, tell, on };
+  // bridge.js copy: end
 })();

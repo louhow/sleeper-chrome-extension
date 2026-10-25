@@ -279,7 +279,8 @@ How it hooks in: `src/page-hook.js` reads the lineup from Sleeper's Team compone
 
 `src/page-hook.js` runs in the page's own world (only there can it read React props); the rest runs in the extension's.
 They share only the DOM, so every message is a `CustomEvent` on `document`, named `snp:*`, with JSON in `detail`.
-Both sides use the same small helper (`src/bridge.js`, and its twin at the top of `page-hook.js`):
+Both sides use the same small helper, `src/bridge.js`.
+Chrome injects a file once per frame, so `page-hook.js` carries a copy of its code, and `test/unit/bridge.test.js` fails if the two differ:
 
 | Helper | How | Used for |
 | --- | --- | --- |

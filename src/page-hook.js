@@ -27,19 +27,29 @@
 
   const props = (el, match) => fiber(el, match)?.memoizedProps ?? null;
 
-  // The page's half of its messages with the extension, the same protocol as
-  // src/bridge.js has (that's where it's written down): CustomEvents on
-  // `document` with JSON in `detail`. ask(name, detail) sends `<name>-request`
-  // and gets the reply the extension sends back before dispatchEvent returns;
-  // answer(name, fn) replies there and then; answerLater(name, fn) replies when
-  // fn's Promise settles, echoing the request's `id`; tell and on are one-way.
+  // The page's half of its messages with the extension: the same code as
+  // src/bridge.js, where the protocol is written down (and why it's a copy).
   const bridge = (() => {
-    const tell = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail: detail === undefined ? null : JSON.stringify(detail) }));
+    // bridge.js copy: start
+    function tell(name, detail) {
+      document.dispatchEvent(new CustomEvent(name, { detail: detail === undefined ? null : JSON.stringify(detail) }));
+    }
+
     function on(name, fn) {
-      const listener = (e) => fn(e.detail == null ? null : JSON.parse(e.detail));
+      const listener = (e) => {
+        let detail;
+        try {
+          detail = e.detail == null ? null : JSON.parse(e.detail);
+        } catch (err) {
+          console.error(`[snp] bad ${name} message`, err);
+          return;
+        }
+        fn(detail);
+      };
       document.addEventListener(name, listener);
       return () => document.removeEventListener(name, listener);
     }
+
     function ask(name, detail) {
       let reply = null;
       const off = on(name, (x) => {
@@ -49,9 +59,26 @@
       off();
       return reply;
     }
+
     const answer = (name, fn) => on(`${name}-request`, (detail) => tell(name, fn(detail)));
+
+    let nextId = 1;
+    function call(name, detail) {
+      const id = nextId++;
+      return new Promise((resolve) => {
+        const off = on(name, (reply) => {
+          if (reply?.id !== id) return;
+          off();
+          resolve(reply);
+        });
+        tell(`${name}-request`, { ...detail, id });
+      });
+    }
+
     const answerLater = (name, fn) => on(`${name}-request`, async (detail) => tell(name, { ...(await fn(detail)), id: detail?.id ?? null }));
-    return { tell, on, ask, answer, answerLater };
+
+    return { ask, answer, call, answerLater, tell, on };
+    // bridge.js copy: end
   })();
 
   // The page's storage, which can be switched off: reads give null and writes
