@@ -1539,7 +1539,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   // A small lockable score given up is a soft warning: yellow, and Apply still works.
   const victimRow = page.locator(dialog('.os-row.swap.warning')).filter({ hasText: players[victim].full_name });
   assert.match(await victimRow.locator('.sub.drops.warn').textContent(), /^Drops lock-in 3\.00 \w{3} (vs|@) \w+$/, 'what benching gives up');
-  assert.equal(await victimRow.locator('.score.red').textContent(), '3.00', 'the score shows in its tier color');
+  assert.equal(await victimRow.locator('.score-chip.tier-red').textContent(), '3.00', 'the score shows in its tier color');
   // Substitution marks, as soccer apps show them: green up coming in, red down going out.
   assert.equal(await victimRow.locator('.os-p.in .os-arrow.in').getAttribute('aria-label'), 'Coming in');
   assert.equal(await victimRow.locator('.os-p.out .os-arrow.out').getAttribute('aria-label'), 'Going out');
@@ -1560,7 +1560,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.equal(await lockRow.count(), 1, 'one game worth locking');
   assert.equal(await lockRow.locator('.os-p [data-player]').first().getAttribute('data-player'), locker);
   assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
-  assert.ok(Number(await lockRow.locator('.score.green').textContent()) >= 70, 'the score, in its tier color');
+  assert.ok(Number(await lockRow.locator('.score-chip.tier-green').textContent()) >= 70, 'the score, in its tier color');
   assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < 20, 'keeping it open is worth far less');
   assert.equal(await lockRow.locator('[data-op-lock-row]').textContent(), 'Lock');
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
@@ -2417,7 +2417,7 @@ test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from
   await page.locator(nflPanel('.week-label b')).filter({ hasText: 'Week 6' }).waitFor({ timeout: 30000 });
   await page.locator(nflPanel('.nfl-game.done')).first().waitFor({ timeout: 30000 });
   assert.match(await page.locator(nflPanel('.nfl-game.done b')).first().textContent(), /· Final [WLT] \d+-\d+$/);
-  assert.ok(await page.locator(nflPanel('.week-pts b[class^="tier-"]')).count() > 0, 'finished games in their score colors');
+  assert.ok(await page.locator(nflPanel('.week-pts b.tier')).count() > 0, 'finished games in their score colors');
   // Any team from the picker, with its avatar and name, A to Z; arrow keys go through them.
   const name = (r) => users.find((u) => u.user_id === r.owner_id)?.metadata?.team_name || users.find((u) => u.user_id === r.owner_id)?.display_name;
   const teams = rosters.map(name).sort((a, b) => a.localeCompare(b)).map((x) => x.trim());

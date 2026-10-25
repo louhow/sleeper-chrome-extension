@@ -306,9 +306,9 @@
     };
   }
 
-  // Fantasy points filled with their score tier's color (model.scoreTier: 'green',
-  // 'yellow', 'red' or '' for none), as the game logs show them.
-  const tierClass = (tier) => (tier ? ` tier ${tier}` : '');
+  // Classes for fantasy points filled with their score tier's color, as the game
+  // logs show them; `tier` from model.scoreTier ('green', 'yellow', 'red', '' for none).
+  const tierClass = (tier) => (tier ? ` tier tier-${tier}` : '');
 
   // ---- Teams ----
 

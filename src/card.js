@@ -2,7 +2,7 @@
 // (bio, rankings), then game logs, career and transaction history on the left
 // and latest news and the depth chart on the right. Pure: state -> HTML.
 (globalThis.SNP ||= {}).card = (() => {
-  const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, pct: share,
+  const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, pct: share, tierClass,
     dash, num, height, ago, heat, scaler } = globalThis.SNP.ui;
   const { scoreStats } = globalThis.SNP.scoring;
   const { scoreTier } = globalThis.SNP.model;
@@ -179,8 +179,8 @@
         return `<tr>
           <td class="dim">${dash(r.week)}</td><td class="dim">${md(r.date)}</td><td class="opp">${r.away ? '@' : ''}${esc(r.opp || '')}</td>
           <td class="dim">${r.proj != null ? f2(r.proj) : '-'}</td>
-          <td class="fpts${r.played ? ` ${scoreTier(r.fpts, s.tiers)}` : ''}">${r.played ? f2(r.fpts) : '-'}</td>
-          ${admin ? `<td class="fpts admin${r.played ? ` ${scoreTier(r.adminFpts, s.tiers)}` : ''}">${r.played ? f2(r.adminFpts) : '-'}</td>` : ''}
+          <td class="fpts${r.played ? tierClass(scoreTier(r.fpts, s.tiers)) : ''}">${r.played ? f2(r.fpts) : '-'}</td>
+          ${admin ? `<td class="fpts admin${r.played ? tierClass(scoreTier(r.adminFpts, s.tiers)) : ''}">${r.played ? f2(r.adminFpts) : '-'}</td>` : ''}
           ${cell('min')}${cell('pts')}${cell('reb')}${cell('ast')}${cell('stl')}${cell('blk')}${cell('to')}
           ${ratio('fgm', 'fga', 'fg')}${ratio('tpm', 'tpa', 'tp')}${ratio('ftm', 'fta', 'ft')}
         </tr>`;

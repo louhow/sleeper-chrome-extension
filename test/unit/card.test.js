@@ -52,7 +52,7 @@ test('game log colors fantasy points by score tier', () => {
     players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } },
     cards: { p1: { seasons: [2026], logs: { 2026: { stats: { 1: [game('a', '2026-10-21', 30), game('b', '2026-10-22', 18), game('c', '2026-10-23', 9)] } } } } },
   };
-  const tiers = [...card.render(s).matchAll(/<td class="fpts ([a-z]+)">([\d.]+)</g)].map((m) => [m[2], m[1]]);
+  const tiers = [...card.render(s).matchAll(/<td class="fpts tier tier-([a-z]+)">([\d.]+)</g)].map((m) => [m[2], m[1]]);
   assert.deepEqual(tiers, [['30.00', 'green'], ['18.00', 'yellow'], ['9.00', 'red']]);
 });
 
@@ -66,7 +66,7 @@ test('with admin tools on, the game log shows league Fpts and what-if adminFPTS 
     cards: { p1: { seasons: [2026], logs: { 2026: { stats: { 1: [game('a', '2026-10-21', 20), game('b', '2026-10-22', 10)] } } } } },
     whatIf: { overrides: { pts: 1.5 }, drafts: {}, ...whatIf },
   });
-  const cells = (html) => [...html.matchAll(/<td class="fpts( admin)? ([a-z]+)">([\d.]+)</g)].map((m) => `${m[1] ? 'admin' : 'league'} ${m[3]} ${m[2]}`);
+  const cells = (html) => [...html.matchAll(/<td class="fpts( admin)? tier tier-([a-z]+)">([\d.]+)</g)].map((m) => `${m[1] ? 'admin' : 'league'} ${m[3]} ${m[2]}`);
 
   const off = card.render(s({ enabled: false, on: true }));
   assert.doesNotMatch(off, /adminFPTS/, 'hidden without ?snp-admin=1');

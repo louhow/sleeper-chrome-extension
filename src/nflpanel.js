@@ -3,7 +3,7 @@
 // player, any team or matchup from the picker. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflpanel = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
-    shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
+    shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
   const { scoreTier, spotRefs, swapTargets, winProbability } = globalThis.SNP.model;
   const nfl = globalThis.SNP.nfl;
   const view = globalThis.SNP.view;
@@ -116,7 +116,7 @@
   // Points once the game kicks off (– until then), a finished game's in its score color.
   function points(s, p, { g, actual }) {
     const tier = g.state === 'done' && actual != null ? scoreTier(actual, s.tiers, p.positions?.[0] || p.position) : '';
-    return `<b class="${tier ? `tier-${tier}` : ''}">${kickedOff(g) ? f2(actual ?? 0) : '–'}</b>`;
+    return `<b${tier ? ` class="${tierClass(tier).trim()}"` : ''}>${kickedOff(g) ? f2(actual ?? 0) : '–'}</b>`;
   }
 
   const photo = (id, p) => `<img class="headshot${p.position === 'DEF' ? ' logo' : ''}" src="${nfl.headshot(id, p)}" alt="" data-player="${esc(id)}">`;

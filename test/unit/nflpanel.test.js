@@ -26,7 +26,7 @@ test('rows: game state, box score, research and points in their score color', ()
   assert.match(out, /QB Patrick Mahomes QB - KC 89% Start \| 100% Rostered vs BUF · Final W 27-20 21\/30 CMP, 260 YD, 2 TD 24\.50 proj 21\.20/);
   assert.match(out, /RB CeeDee Lamb RB - DAL Q .* vs PHI · Q2 4:12 · 7-10 · RZ 8 CAR, 41 YD 6\.00 proj 14\.00/);
   assert.match(out, /WR Brandon Aiyuk WR - SF .* @ SEA · Sun 4:25pm – proj 11\.50/);
-  assert.match(html, /<b class="tier-green">24\.50<\/b>/, 'a finished game in its tier color');
+  assert.match(html, /<b class="tier tier-green">24\.50<\/b>/, 'a finished game in its tier color');
   assert.match(out, /W R T Empty Bench/, 'an open FLEX');
 });
 

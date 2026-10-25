@@ -1,5 +1,39 @@
 /* Lives inside a shadow root, so Sleeper's styles can't leak in and ours can't leak out. */
 :host {
+  --text: #ffffff;
+  --muted: #8f9bb3;
+  --line: rgba(255, 255, 255, 0.08);
+  /* Dark ink: text on bright fills, and the darkest surface. */
+  --ink: #0d1421;
+  --card: color-mix(in srgb, var(--ink) 55%, transparent);
+  --cell: rgba(255, 255, 255, 0.05);
+  /* Dialogs, popovers and the floating panel. */
+  --surface: #18202f;
+  --surface-line: #2c3850;
+  --accent: #00ceb8;
+  /* Solid buttons (Apply, Add Player). */
+  --primary: #5ac8b4;
+  --primary-hover: #4bb6a3;
+  --danger: #ff5b6e;
+  --warn: #f8d24b;
+  --pg: #f2738c;
+  --sg: #f78c3c;
+  --sf: #9ff0cb;
+  --pf: #a79df5;
+  --c: #c48df1;
+  /* Score tiers (model.scoreTier), in the stat tables' heat colors. */
+  --score-green: rgba(84, 132, 100, 0.85);
+  --score-yellow: rgba(128, 122, 78, 0.85);
+  --score-red: rgba(150, 72, 96, 0.85);
+  /* Lock-In: the gold of a locked game, and a locked game's fill by score tier. */
+  --lock: #ffcf3a;
+  --lock-text: #ffe07a;
+  --locked-green: #2f8f58;
+  --locked-yellow: #977a17;
+  --locked-red: #b03f59;
+  /* What-if scoring: everything scored with it wears this color. */
+  --whatif: #b69cff;
+  --whatif-bg: color-mix(in srgb, var(--whatif) 14%, transparent);
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -13,34 +47,14 @@
   width: min(820px, calc(100vw - 32px));
   z-index: 2147483000;
   padding-top: 16px;
-  background: #18202f;
-  border: 1px solid #2c3850;
+  background: var(--surface);
+  border: 1px solid var(--surface-line);
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   overflow: hidden;
 }
 
 .root {
-  --text: #ffffff;
-  --muted: #8f9bb3;
-  --line: rgba(255, 255, 255, 0.08);
-  --card: rgba(13, 20, 33, 0.55);
-  --cell: rgba(255, 255, 255, 0.05);
-  --accent: #00ceb8;
-  --danger: #ff5b6e;
-  --warn: #f8d24b;
-  --pg: #f2738c;
-  --sg: #f78c3c;
-  --sf: #9ff0cb;
-  --pf: #a79df5;
-  --c: #c48df1;
-  /* Score tiers (model.scoreTier), in the stat tables' heat colors. */
-  --score-green: rgba(84, 132, 100, 0.85);
-  --score-yellow: rgba(128, 122, 78, 0.85);
-  --score-red: rgba(150, 72, 96, 0.85);
-  /* What-if scoring: everything scored with it wears this color. */
-  --whatif: #b69cff;
-  --whatif-bg: rgba(182, 156, 255, 0.14);
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -119,9 +133,6 @@ button.icon {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-.toolbar select {
-  max-width: 240px;
-}
 
 .body {
   flex: 1;
@@ -139,9 +150,9 @@ button.icon {
   max-width: 420px;
   margin: 32px auto;
   padding: 18px 20px;
-  border: 1px solid rgba(255, 91, 110, 0.4);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
   border-radius: 12px;
-  background: rgba(255, 91, 110, 0.08);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
   text-align: center;
 }
 .session-expired h3 {
@@ -172,7 +183,7 @@ pre.error {
   padding: 8px 12px;
   border: 1px solid rgba(120, 140, 255, 0.35);
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(40, 52, 96, 0.6), rgba(13, 20, 33, 0.6));
+  background: linear-gradient(135deg, rgba(40, 52, 96, 0.6), color-mix(in srgb, var(--ink) 60%, transparent));
 }
 .avatar {
   flex: none;
@@ -185,6 +196,9 @@ pre.error {
 .team-card .avatar {
   width: 36px;
   height: 36px;
+}
+:is(.avatar, .tp-avatar).missing {
+  content: linear-gradient(transparent, transparent);
 }
 .who {
   flex: 1;
@@ -226,7 +240,7 @@ button.waivers {
 button.waivers .count {
   margin-left: 2px;
   background: var(--accent);
-  color: #0d1421;
+  color: var(--ink);
 }
 
 h3 {
@@ -346,7 +360,7 @@ h3 {
   place-items: center;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.1);
-  color: #0d1421;
+  color: var(--ink);
   font-size: 13px;
   font-weight: 900;
 }
@@ -400,12 +414,12 @@ button.slot:hover {
 }
 .notice.ok {
   background: #0f3b3a;
-  border: 1px solid rgba(0, 206, 184, 0.5);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
   color: var(--accent);
 }
 .notice.error {
   background: #3d1820;
-  border: 1px solid rgba(255, 91, 110, 0.5);
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
   color: var(--danger);
 }
 .card {
@@ -419,7 +433,7 @@ button.slot:hover {
   box-shadow: 0 0 0 3px var(--accent);
 }
 .card.target {
-  border-color: rgba(0, 206, 184, 0.45);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .card.target .slot {
   box-shadow: 0 0 0 2px var(--accent);
@@ -432,7 +446,7 @@ button.slot:hover {
   cursor: default;
 }
 @keyframes pulse {
-  50% { box-shadow: 0 0 0 4px rgba(0, 206, 184, 0.35); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   .card.target .slot { animation: none; }
@@ -449,7 +463,8 @@ button.slot:hover {
   width: 30px;
   height: 30px;
 }
-.card.empty .headshot {
+.card.empty .headshot,
+.mp.empty .headshot {
   background: none;
 }
 .headshot.missing {
@@ -582,7 +597,7 @@ button.slot:hover {
 }
 .day.live .cell {
   border-color: var(--danger);
-  background: rgba(255, 91, 110, 0.12);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 .day.live .v {
   color: var(--text);
@@ -605,7 +620,7 @@ button.slot:hover {
 /* Finished and still lockable: the one to act on. */
 .day.lockable .cell {
   border-color: var(--accent);
-  background: rgba(0, 206, 184, 0.16);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .day.lockable .v {
@@ -625,10 +640,10 @@ button.slot:hover {
 /* Locked in: a bright gold frame around the score's color (gold on dark when
    there's no score). The fill stays inside the frame, so nothing shows past it. */
 .day.locked .cell {
-  border: 2px solid #ffcf3a;
+  border: 2px solid var(--lock);
   background: #2a3142;
   background-clip: padding-box;
-  box-shadow: inset 0 0 0 1px rgba(13, 20, 33, 0.55);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 55%, transparent);
   color: var(--text);
 }
 .day.locked .v {
@@ -636,7 +651,7 @@ button.slot:hover {
   font-weight: 800;
 }
 .day.locked .time {
-  color: #ffe07a;
+  color: var(--lock-text);
   font-weight: 700;
 }
 /* A game played, tinted by its score, muted so the week still reads at a glance.
@@ -645,9 +660,9 @@ button.slot:hover {
 .day.past.tier-yellow .cell, .day.lockable.tier-yellow .cell { background: rgba(216, 183, 62, 0.15); }
 .day.past.tier-red .cell, .day.lockable.tier-red .cell { background: rgba(216, 90, 116, 0.16); }
 .day.lockable.maybe[class*="tier-"] .cell { box-shadow: none; }
-.day.locked.tier-green .cell { background-color: #2f8f58; }
-.day.locked.tier-yellow .cell { background-color: #977a17; }
-.day.locked.tier-red .cell { background-color: #b03f59; }
+.day.locked.tier-green .cell { background-color: var(--locked-green); }
+.day.locked.tier-yellow .cell { background-color: var(--locked-yellow); }
+.day.locked.tier-red .cell { background-color: var(--locked-red); }
 /* Your own lockable game is a button: hovering asks "Lock?", clicking confirms in the cell. */
 button.cell {
   width: 100%;
@@ -664,7 +679,7 @@ button.cell:disabled {
   display: none;
 }
 .day.lockable button.cell:is(:hover, :focus-visible):not(:disabled) {
-  background: rgba(0, 206, 184, 0.3);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .day.lockable button.cell:is(:hover, :focus-visible):not(:disabled) .when {
   display: none;
@@ -705,7 +720,7 @@ button.cell:disabled {
 }
 .yes-no .yes {
   background: var(--accent);
-  color: #0d1421;
+  color: var(--ink);
 }
 .yes-no .no {
   background: rgba(255, 255, 255, 0.14);
@@ -734,7 +749,6 @@ button.cell:disabled {
   width: 8px;
   height: 8px;
 }
-/* A locked-in score reads as banked. */
 /* A locked score: boxed like its locked day cell (same height, padlock under the
    score), its score's color in a gold frame. */
 .week-pts.locked b {
@@ -747,23 +761,23 @@ button.cell:disabled {
   height: 38px;
   min-width: 50px;
   padding: 0 4px;
-  border: 2px solid #ffcf3a;
+  border: 2px solid var(--lock);
   border-radius: 6px;
   font-size: 13px;
   line-height: 14px;
   background: #2a3142;
   background-clip: padding-box;
-  box-shadow: inset 0 0 0 1px rgba(13, 20, 33, 0.55);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 55%, transparent);
   color: var(--text);
 }
-.week-pts.locked b.tier-green { background-color: #2f8f58; }
-.week-pts.locked b.tier-yellow { background-color: #977a17; }
-.week-pts.locked b.tier-red { background-color: #b03f59; }
+.week-pts.locked b.tier-green { background-color: var(--locked-green); }
+.week-pts.locked b.tier-yellow { background-color: var(--locked-yellow); }
+.week-pts.locked b.tier-red { background-color: var(--locked-red); }
 .week-pts.locked b .lock-icon {
   order: 1;
   width: 10px;
   height: 10px;
-  color: #ffe07a;
+  color: var(--lock-text);
 }
 
 /* Narrow panels: the week drops under the player. */
@@ -854,10 +868,10 @@ ol.calls {
   text-align: center;
   text-transform: uppercase;
 }
-.status.ok { background: rgba(0, 206, 184, 0.16); color: var(--accent); }
+.status.ok { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .status.cache { background: rgba(255, 255, 255, 0.08); color: var(--muted); }
-.status.pending { background: rgba(248, 210, 75, 0.14); color: var(--warn); }
-.status.bad { background: rgba(255, 91, 110, 0.16); color: var(--danger); }
+.status.pending { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.status.bad { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
 .calls pre {
   max-height: 320px;
   margin: 0 0 8px;
@@ -1081,7 +1095,7 @@ button.tp-button:hover:not(:disabled) {
   background: rgb(40, 47, 65);
 }
 .tp-menu button[aria-selected="true"] {
-  background: rgba(0, 206, 184, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .tp-menu .tp-avatar {
   width: 26px;
@@ -1231,7 +1245,7 @@ span.team-link:hover {
   margin: -13px 0 0 -13px;
   font-size: 10px;
 }
-.lg-match {
+.lg-match[role="button"] {
   cursor: pointer;
 }
 .lg-match:focus-visible {
@@ -1239,15 +1253,12 @@ span.team-link:hover {
   outline-offset: 2px;
   border-radius: 12px;
 }
-.lg-match:hover .mu-team {
+.lg-match[role="button"]:hover .mu-team {
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.04);
 }
 .lg-match.own .mu-team {
-  border-color: rgba(0, 206, 184, 0.45);
-}
-.lg-match .mu-team.theirs {
-  text-align: right;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .mu-starters {
   display: flex;
@@ -1310,9 +1321,6 @@ h3.mu-title {
   width: 26px;
   height: 26px;
 }
-.mp.empty .headshot {
-  background: none;
-}
 .mp.empty {
   color: var(--muted);
   font-weight: 700;
@@ -1321,7 +1329,7 @@ h3.mu-title {
   color: var(--muted);
 }
 .mp.is-locked {
-  border-color: rgba(248, 210, 75, 0.45);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
 }
 .mp-id {
   grid-area: id;
@@ -1408,7 +1416,7 @@ button.lk {
   background: rgba(255, 255, 255, 0.06);
 }
 button.lk.open {
-  background: rgba(0, 206, 184, 0.16);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent);
 }
 button.lk.open.maybe {
@@ -1416,7 +1424,7 @@ button.lk.open.maybe {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 button.lk.open:hover:not(:disabled) {
-  background: rgba(0, 206, 184, 0.28);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .lk.locked {
   padding: 0;
@@ -1550,7 +1558,7 @@ button.lk.cancel {
   margin-bottom: 10px;
   padding: 8px 12px;
   border-radius: 8px;
-  background: rgba(255, 91, 110, 0.14);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: var(--danger);
   font-size: 13px;
   font-weight: 700;
@@ -1693,7 +1701,7 @@ button.dp-row.selected:hover {
 button.primary {
   min-width: 240px;
   padding: 12px 20px;
-  background: #5ac8b4;
+  background: var(--primary);
   color: #fff;
   font-size: 13px;
   font-weight: 900;
@@ -1701,7 +1709,7 @@ button.primary {
   text-transform: uppercase;
 }
 button.primary:hover:not(:disabled) {
-  background: #4bb6a3;
+  background: var(--primary-hover);
 }
 button.danger {
   color: var(--danger);
@@ -1772,16 +1780,15 @@ ol.claims {
 
 /* Optimize Lineup: the toolbar button and its confirmation dialog. */
 button.optimize {
-  background: rgba(0, 206, 184, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--accent);
   font-weight: 700;
 }
 button.optimize:hover:not(:disabled) {
-  background: rgba(0, 206, 184, 0.24);
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
 }
 .how {
   margin-left: 10px;
-  font-weight: 700;
   padding: 2px 8px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.08);
@@ -1873,13 +1880,13 @@ button.optimize:hover:not(:disabled) {
 .op-sum .gain {
   padding: 2px 8px;
   border-radius: 10px;
-  background: rgba(0, 206, 184, 0.16);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent);
   font-size: 13px;
   font-weight: 900;
 }
 .op-sum .gain.down {
-  background: rgba(255, 91, 110, 0.16);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
   color: var(--danger);
 }
 .ack {
@@ -1888,7 +1895,7 @@ button.optimize:hover:not(:disabled) {
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 91, 110, 0.3);
+  border-top: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
   color: var(--text);
   font-weight: 700;
   cursor: pointer;
@@ -1907,14 +1914,11 @@ button.optimize:hover:not(:disabled) {
   font-weight: 700;
   vertical-align: baseline;
 }
-.op-row img.headshot[data-player] {
-  cursor: pointer;
-}
 .lose-banner {
   margin: 4px 0 8px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(255, 91, 110, 0.14);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: #ffc2c9;
   font-size: 13px;
 }
@@ -1928,7 +1932,7 @@ button.optimize:hover:not(:disabled) {
   margin: 4px 0 8px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(248, 210, 75, 0.1);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
   color: #f5e3a3;
   font-size: 13px;
 }
@@ -1945,8 +1949,8 @@ button.optimize:hover:not(:disabled) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A finished game's fantasy points in its score tier color, as in the game log. */
-.score {
+/* A finished game's fantasy points, filled with its score tier's color (see .tier). */
+.score-chip {
   display: inline-block;
   padding: 0 5px;
   border-radius: 4px;
@@ -1955,57 +1959,8 @@ button.optimize:hover:not(:disabled) {
   font-variant-numeric: tabular-nums;
   line-height: 1.45;
 }
-.score.green { background: var(--score-green); }
-.score.yellow { background: var(--score-yellow); }
-.score.red { background: var(--score-red); }
 .lose-banner b {
   color: var(--text);
-}
-.op-head,
-.op-row {
-  display: grid;
-  grid-template-columns: 112px 30px minmax(0, 1fr) 52px 44px;
-  align-items: center;
-  column-gap: 10px;
-}
-.op-head {
-  padding: 12px 12px 6px;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-.op-head span:nth-child(2) {
-  grid-column: 2 / 4;
-}
-.op-row {
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-bottom-color: var(--line);
-}
-.op-row .headshot {
-  width: 30px;
-  height: 30px;
-}
-.op-row .dp-pts {
-  font-weight: 700;
-}
-.op-row.out .dp-pts,
-.op-row.out .dp-avg {
-  color: var(--muted);
-}
-.op-move {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.op-move .slot {
-  width: 44px;
-  height: 30px;
-  font-size: 12px;
-}
-.op-move .arrow {
-  color: var(--muted);
-  font-size: 12px;
 }
 .sub.lose {
   overflow: hidden;
@@ -2101,15 +2056,15 @@ button.optimize:hover:not(:disabled) {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  background: #0d1421;
-  box-shadow: 0 0 0 1.5px #0d1421;
+  background: var(--ink);
+  box-shadow: 0 0 0 1.5px var(--ink);
 }
 .os-arrow svg {
   width: 11px;
   height: 11px;
 }
 .os-arrow.in svg { fill: #3ddc84; }
-.os-arrow.out svg { fill: #ff5b6e; }
+.os-arrow.out svg { fill: var(--danger); }
 .os-p.out .os-arrow {
   opacity: 1;
 }
@@ -2120,18 +2075,18 @@ button.optimize:hover:not(:disabled) {
   justify-content: center;
   gap: 4px;
   padding: 5px 0;
-  border: 1px solid rgba(255, 207, 58, 0.6);
+  border: 1px solid color-mix(in srgb, var(--lock) 60%, transparent);
   border-radius: 8px;
   background: none;
-  color: #ffcf3a;
+  color: var(--lock);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 .os-act .os-lock-current:hover:not(:disabled) {
-  border-color: #ffcf3a;
-  background: rgba(255, 207, 58, 0.1);
+  border-color: var(--lock);
+  background: color-mix(in srgb, var(--lock) 10%, transparent);
 }
 /* A change: who comes in first, then who they replace (faded, past a divider). */
 .os-p.in .dp-name button.name,
@@ -2148,12 +2103,12 @@ button.optimize:hover:not(:disabled) {
   background: rgba(89, 167, 255, 0.06);
 }
 .os-row.swap.warning {
-  border-color: rgba(248, 210, 75, 0.45);
-  background: rgba(248, 210, 75, 0.05);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 5%, transparent);
 }
 .os-row.swap.losing {
-  border-color: rgba(255, 91, 110, 0.5);
-  background: rgba(255, 91, 110, 0.06);
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
 }
 .os-p.out .headshot,
 .os-p.out .dp-name {
@@ -2187,8 +2142,8 @@ button.optimize:hover:not(:disabled) {
 }
 /* A finished game worth locking in. */
 .os-row.lock {
-  border-color: rgba(0, 206, 184, 0.45);
-  background: rgba(0, 206, 184, 0.06);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .os-row.lock.off {
   border-color: var(--line);
@@ -2225,7 +2180,7 @@ button.optimize:hover:not(:disabled) {
   justify-content: center;
   gap: 4px;
   padding: 7px 0;
-  background: #5ac8b4;
+  background: var(--primary);
   color: #fff;
   font-size: 11px;
   font-weight: 900;
@@ -2233,7 +2188,7 @@ button.optimize:hover:not(:disabled) {
   text-transform: uppercase;
 }
 button.os-apply:hover:not(:disabled) {
-  background: #4bb6a3;
+  background: var(--primary-hover);
 }
 .os-with {
   color: var(--muted);
@@ -2257,15 +2212,10 @@ button.os-apply:hover:not(:disabled) {
   margin: 0 0 10px;
   padding: 8px 14px;
   border-radius: 10px;
-  background: rgba(0, 206, 184, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
   font-size: 13px;
   font-weight: 700;
-}
-.op-fixed {
-  margin: 12px 4px 0;
-  color: var(--muted);
-  font-size: 12px;
 }
 .op-foot {
   display: flex;
@@ -2312,21 +2262,12 @@ button.primary.risky:hover:not(:disabled) {
   height: 100%;
   font-style: normal;
 }
-.op-head.nfl,
-.op-row.nfl {
-  grid-template-columns: 112px 30px minmax(0, 1fr) 52px;
-}
-.op-row.watch {
-  border: 1px solid rgba(248, 210, 75, 0.4);
-  border-radius: 10px;
-  background: rgba(248, 210, 75, 0.04);
-}
 .nfl-inj {
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 4px;
   background: var(--danger);
-  color: #0d1421;
+  color: var(--ink);
   font-size: 10px;
   font-weight: 900;
 }
@@ -2601,7 +2542,7 @@ h2.pc-name {
 .pc-seasons button.on,
 .pc-seasons button.on:hover {
   background: var(--accent);
-  color: #0d1421;
+  color: var(--ink);
 }
 .pc-table {
   width: 100%;
@@ -2640,10 +2581,13 @@ h2.pc-name {
   background: rgba(255, 255, 255, 0.07);
   font-weight: 800;
 }
-/* Fantasy points by score tier. */
-.pc-table td.fpts.green { background: var(--score-green); }
-.pc-table td.fpts.yellow { background: var(--score-yellow); }
-.pc-table td.fpts.red { background: var(--score-red); }
+/* Fantasy points filled with their score tier's color (ui.tierClass): the game
+   log's Fpts, Optimize's scores and the NFL rows. After the tables, so a scored
+   Fpts cell trades its gray for the tier's color. The Team tab's day cells and
+   locked scores tint by tier their own way (.day.tier-*, .week-pts.locked). */
+.tier.tier-green { background: var(--score-green); }
+.tier.tier-yellow { background: var(--score-yellow); }
+.tier.tier-red { background: var(--score-red); }
 .pc-table td.dim {
   color: var(--muted);
 }
@@ -2766,14 +2710,14 @@ button.danger.solid:hover:not(:disabled) {
   align-items: center;
   gap: 2px;
   padding: 3px;
-  background: rgba(24, 32, 47, 0.94);
-  border: 1px solid #2c3850;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 1px solid var(--surface-line);
   border-radius: 999px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 .wi.on .wi-dock {
   border-color: var(--whatif);
-  box-shadow: 0 0 0 3px rgba(182, 156, 255, 0.25), 0 4px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--whatif) 25%, transparent), 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 .wi-dock button {
   display: inline-flex;
@@ -2835,8 +2779,8 @@ button.danger.solid:hover:not(:disabled) {
   flex-direction: column;
   width: 320px;
   max-height: min(600px, calc(100vh - 72px));
-  background: #18202f;
-  border: 1px solid #2c3850;
+  background: var(--surface);
+  border: 1px solid var(--surface-line);
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
@@ -2908,7 +2852,7 @@ button.danger.solid:hover:not(:disabled) {
   font-weight: 700;
 }
 .wi-row.changed input {
-  border-color: rgba(182, 156, 255, 0.6);
+  border-color: color-mix(in srgb, var(--whatif) 60%, transparent);
 }
 .wi-was {
   grid-area: was;
@@ -2961,7 +2905,7 @@ button.danger.solid:hover:not(:disabled) {
   margin: 0 24px 12px;
   padding: 8px 8px 8px 10px;
   background: var(--whatif-bg);
-  border: 1px solid rgba(182, 156, 255, 0.45);
+  border: 1px solid color-mix(in srgb, var(--whatif) 45%, transparent);
   border-radius: 10px;
   font-size: 12px;
 }
@@ -2984,7 +2928,7 @@ button.danger.solid:hover:not(:disabled) {
   margin-left: auto;
   padding: 4px 10px;
   font-size: 12px;
-  border: 1px solid rgba(182, 156, 255, 0.45);
+  border: 1px solid color-mix(in srgb, var(--whatif) 45%, transparent);
 }
 .pc-panel > .whatif-banner {
   flex: none;
@@ -2994,7 +2938,9 @@ button.danger.solid:hover:not(:disabled) {
 .app.whatif .week-pts b,
 .app.whatif .team-card .score .pts,
 .app.whatif .mu-pts,
-.app.whatif .mp-pts b,
+.app.whatif .mp-pts b {
+  color: var(--whatif);
+}
 /* The game log's adminFPTS header reads as named, in the what-if color. */
 .pc-table thead tr:not(.group) th.admin {
   color: var(--whatif);
@@ -3007,7 +2953,7 @@ button.danger.solid:hover:not(:disabled) {
 .app.whatif .team-card .score .sub,
 .app.whatif .mu-meta .proj,
 .app.whatif .mp-pts span {
-  color: rgba(182, 156, 255, 0.75);
+  color: color-mix(in srgb, var(--whatif) 75%, transparent);
 }
 .pc.whatif .pc-panel,
 .page-layer.whatif .dialog {
@@ -3062,28 +3008,16 @@ button.danger.solid:hover:not(:disabled) {
   font-weight: 400;
 }
 /* A finished game's points in its score color, as in the game log. */
-.nfl-panel :is(.week-pts, .mp-pts) b[class^="tier-"] {
+.nfl-panel :is(.week-pts, .mp-pts) b.tier {
   padding: 0 4px;
   border-radius: 4px;
-}
-.nfl-panel b.tier-green { background: var(--score-green); }
-.nfl-panel b.tier-yellow { background: var(--score-yellow); }
-.nfl-panel b.tier-red { background: var(--score-red); }
-.nfl-panel .msg.quiet {
-  margin: 6px 0 0 8px;
-  font-size: 12px;
-  text-align: left;
 }
 .nfl-panel .team-card {
   margin-top: 4px;
 }
-.nfl-panel .team-card .week-nav {
-  flex: none;
-}
 /* The Matchup tab: the League tab's card on top, rows without a lock column. */
 .nfl-mu-head {
   margin: 4px 0 0;
-  cursor: default;
 }
 .mp.nfl {
   grid-template-columns: 26px minmax(0, 1fr) 84px 52px;

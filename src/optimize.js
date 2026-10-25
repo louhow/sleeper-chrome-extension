@@ -5,7 +5,7 @@
 (globalThis.SNP ||= {}).optimize = (() => {
   const { playerDays, scoreTier, applySlot } = globalThis.SNP.model;
   const { esc, f2, headshot, injuryTag, teamTag, slotBadge, weekday, gameTime, gameLabel, nextGame, lockIcon, shortName, real, playerOf, playerName,
-    optimizeDialog, planSummary, applyAll, applyChange, slotPlayer } = globalThis.SNP.ui;
+    optimizeDialog, planSummary, applyAll, applyChange, slotPlayer, tierClass } = globalThis.SNP.ui;
 
   // Plain text for the "How it picks" tooltip.
   const HOW = [
@@ -178,7 +178,7 @@
 
   // A finished game's fantasy points in its score color (see model.scoreTier).
   function score(s, points) {
-    return `<span class="score ${scoreTier(points, s.tiers)}">${f2(points)}</span>`;
+    return `<span class="score-chip${tierClass(scoreTier(points, s.tiers))}">${f2(points)}</span>`;
   }
 
   return { render };
