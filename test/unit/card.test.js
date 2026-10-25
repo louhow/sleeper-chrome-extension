@@ -47,6 +47,7 @@ test('game log colors fantasy points by score tier', () => {
   const game = (id, date, pts) => ({ game_id: id, date, week: 1, opponent: 'GSW', stats: { pts } });
   const s = {
     modal: { kind: 'player', playerId: 'p1', season: 2026 },
+    tiers: { all: [15, 24], positions: {} },
     league: { season: '2026', scoring_settings: { pts: 1 } },
     players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } },
     cards: { p1: { seasons: [2026], logs: { 2026: { stats: { 1: [game('a', '2026-10-21', 30), game('b', '2026-10-22', 18), game('c', '2026-10-23', 9)] } } } } },
@@ -59,6 +60,7 @@ test('with admin tools on, the game log shows league Fpts and what-if adminFPTS 
   const game = (id, date, pts) => ({ game_id: id, date, week: 1, opponent: 'GSW', stats: { pts } });
   const s = (whatIf) => ({
     modal: { kind: 'player', playerId: 'p1', season: 2026 },
+    tiers: { all: [15, 24], positions: {} },
     league: { season: '2026', scoring_settings: { pts: 1 } },
     players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } },
     cards: { p1: { seasons: [2026], logs: { 2026: { stats: { 1: [game('a', '2026-10-21', 20), game('b', '2026-10-22', 10)] } } } } },

@@ -21,7 +21,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
   | Today, still to tip off | Bright outline, bold time |
   | Later in the week | Quiet outline, projection muted |
 
-- A game played is tinted, muted, by its score's color (green 24+, yellow 15+, red below, as in the game log); a locked one is filled bright in that color inside its gold frame.
+- A game played is tinted, muted, by its score's color (see [Score colors](#score-colors)); a locked one is filled bright in that color inside its gold frame.
 - The points column shows a locked-in score once, boxed like its day cell (the same height, its score's color in a gold frame, a padlock under the score), in yellow, so it reads apart from a score still in play.
 - Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
 - Lock-In needs the player starting when the game tipped off and never benched since. Sleeper's own wording (in its app's strings): "Player was not in starting lineup OR was moved to bench since game began". A game played on the bench can't be locked after moving them in, nor one whose player was benched and started again.
@@ -82,7 +82,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - Lineup: tries every way to fit the movable players into the starting slots and keeps the highest total, so scarce slots go to the players who can only fill them. Ties keep the most players where they are, then put players in their most specific slot.
 - Locked-in players and players in a game right now stay put.
 - Losses: benching a starter whose finished game was worth locking (or green) gives that score up (bench players can't lock in). The row turns yellow ("Drops lock-in 12.42 Tue vs OKC") with a yellow note at the top; Apply still works.
-- Green scores (24+): giving one up turns the row red, explains it at the top, and keeps that row's Apply and Apply all ("Apply all and lose N pts") disabled until you tick "Bench … anyway".
+- Green scores (see [Score colors](#score-colors)): giving one up turns the row red, explains it at the top, and keeps that row's Apply and Apply all ("Apply all and lose N pts") disabled until you tick "Bench … anyway".
 - Scores in the dialog are colored by tier, like the game log.
 - Every apply works the plan out again first; if a game tipped off meanwhile and the plan changed, it shows the new plan instead of saving.
 - Apply all: with locks, the lineup and the locks save together in one `update_matchup_leg` (the button says "Lock in N games and apply all"); locks are final.
@@ -90,6 +90,29 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - The top of the dialog shows the starters' projected points for that day now and after the changes; each row shows that day's projection and points per game left.
 - The dialog's "How it picks" label sums these rules up in a few lines on hover or focus.
 - Clicking a player in the dialog opens their player card over it; closing the card returns to the dialog.
+
+### Score colors
+
+Every fantasy score the extension colors (day cells, game logs, the Players tab's marks, Optimize) is green, yellow or red by the league's own games, not fixed numbers:
+
+- The samples: the games the league's starters played in the weeks just finished (latest first), scored with the league's settings. Early in a season, last season's weeks (`previous_league_id`) fill in, rescored with this season's settings.
+- The lines: the top third of those games is green, the bottom third red, the rest yellow.
+- How many: weeks are added until there are at least 300 games (NFL: and 40 at every position), at most 8 weeks.
+- NFL: each position gets its own thirds (a tight end's 10 is a good game, a quarterback's isn't); NBA leagues pool everyone, as Sleeper's app does.
+- Worked out once a week per league (kept in the extension's storage until a week finishes or the scoring changes), from `/v1/league/<id>/matchups/<week>` (who started) and `/stats/<sport>/<season>/<week>` (their games).
+- What-if scoring doesn't move the lines: they stay the league's.
+
+Why thirds: Sleeper's apps use fixed numbers, and the thirds land on them for leagues scored the way Sleeper assumed.
+
+| Where | Sleeper's numbers | Thirds of a real league's starters |
+| --- | --- | --- |
+| NBA, every game (mobile app score log) | 15 / 24 | 16.5 / 24.0 |
+| NFL QB, half-PPR (web game log, standard and PPR only) | 13 / 19 | 13.1 / 20.6 |
+| NFL RB | 8-10 / 13-14 | 7.1 / 14.7 |
+| NFL WR | 8-10 / 13-15 | 6.0 / 12.3 |
+| NFL TE | 5-6 / 8-9 | 4.3 / 10.5 |
+
+Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `pts_ppr`), so a half-PPR or custom league's fantasy points get no color there; thirds work for any scoring.
 
 ### Matchup
 
@@ -127,7 +150,7 @@ Sleeper's own NBA Players table, with these additions:
   It loads the view the way Sleeper's own dropdowns do.
 - Sleeper's week dropdown reads the week shown: on its own it shows the season ("2026") on load even with a week picked, because its option values are numbers and the value it starts with is a string.
 - Week: with a week picked (Projection or Stats, not the season), a column after FPTS (and GP) with a mark a day, Monday to Sunday, from each team's schedule.
-  A game played wears its score's color by the league's scoring (green 24+, yellow 15+, red below, as on the Team tab; dim gray when they didn't play); in the game log's muted tones; bright red is a game on now, light gray one still to play, faint no game.
+  A game played wears its score's color (see [Score colors](#score-colors); dim gray when they didn't play); in the game log's muted tones; bright red is a game on now, light gray one still to play, faint no game.
   Hovering a mark shows a card: the game, its score (or tip-off time), and how many games are left; sorting by the column sorts by games left.
   The schedule is the week's GraphQL `scores` (already loaded for the Team tab's week, else one query per week); the scores come from the week's stat rows, which Best and Worst already load.
 - Team picker: beside Find player, every league team with its avatar and name (All teams first); picking one narrows the list to that team's players through Sleeper's own owner filter (the one in its filter section), so the Week strip scans a whole roster. With a team picked, arrow up and down go through the teams, round and round (not while typing in Find player). Ticking Free agents lets the pick go. It's remembered with the rest of the view.
@@ -151,7 +174,7 @@ Sleeper's own NBA Players table, with these additions:
 Clicking a player's name or headshot on the Team or Matchup tab, or a player on the Players or Trend tab (instead of Sleeper's own NBA card), opens a card laid out like Sleeper's NFL player card:
 
 - Hero in team colors: owner, age, height, weight, experience, college, and rankings (position and overall rank from the latest season with stats, plus rostered and started %).
-- Game logs per season (tabs): projected and actual fantasy points with the league's scoring, minutes, box score and shooting, shaded like Sleeper's tables. Fantasy points are colored like the mobile app's score log: green 24+, yellow 15+, red below (thresholds observed in the app, not from the API). The current season lists upcoming games with projections.
+- Game logs per season (tabs): projected and actual fantasy points with the league's scoring, minutes, box score and shooting, shaded like Sleeper's tables. Fantasy points are colored by [score tier](#score-colors). The current season lists upcoming games with projections.
 - Career: one row per season with fantasy points, position rank, per-game averages and shooting.
 - Transaction history in this league (logged in), latest news, and the team's depth chart.
 

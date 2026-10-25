@@ -24,6 +24,7 @@ const week = {
 };
 const state = (overrides = {}) => ({
   tab: 'team',
+  tiers: { all: [15, 24], positions: {} },
   openCalls: new Set(),
   today: '2026-10-19',
   week: 1,

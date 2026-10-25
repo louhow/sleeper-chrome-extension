@@ -591,6 +591,8 @@ before(async () => {
   await context.route('https://api.sleeper.app/stats/nba/**', async (route) => {
     // Only the weekly stats are doctored; the player card's own stats go through.
     if (!/\/stats\/nba\/\d+\/\d+/.test(route.request().url())) return route.fallback();
+    // The doctored weeks are week 1; the weeks before (last season's, for score colors) are Sleeper's.
+    if (!/\/stats\/nba\/\d+\/1(\?|$)/.test(route.request().url())) return route.continue();
     if (sleeper.weekStats) return route.fulfill({ json: sleeper.weekStats });
     if (sleeper.beforeTipoff) return route.fulfill({ json: [] });
     if (!sleeper.midWeek) return route.continue();
@@ -1558,7 +1560,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   leg.starters_games = { ...existing };
   const beforeGreen = sleeper.mutations.length;
 
-  // Now the UTIL starter's finished game was green (24+) and every bench player is a must-start,
+  // Now the UTIL starter's finished game was green (30, over the league's green line) and every bench player is a must-start,
   // the star most of all, so ties among the bench can't leave them out.
   sleeper.projections = (rows) => rows.map((r) => {
     if (r.player_id === star) return { ...r, stats: { pts: statPts(60) } };
@@ -1949,7 +1951,17 @@ test('players tab in Stats: games played, games left, shooting at the end, and a
   // A game played wears its score's color, by the league's scoring.
   const league = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}`)).json();
   const fpts = (stats) => Object.entries(stats).reduce((sum, [k, v]) => sum + v * (league.scoring_settings[k] ?? 0), 0);
-  const tier = (points) => (points >= 24 ? 'green' : points >= 15 ? 'yellow' : 'red');
+  // Score colors are the league's own (the thirds of its starters' recent games), as the extension worked them out.
+  const tiers = await page.evaluate(() => {
+    let out = null;
+    const take = (e) => { out = JSON.parse(e.detail)?.tiers; };
+    document.addEventListener('snp:week-schedule', take);
+    document.dispatchEvent(new CustomEvent('snp:week-schedule-request', { detail: JSON.stringify({ season: '2026', week: 1 }) }));
+    document.removeEventListener('snp:week-schedule', take);
+    return out;
+  });
+  assert.ok(tiers?.all[0] > 5 && tiers.all[1] > tiers.all[0], `score colors from the league's games: ${JSON.stringify(tiers)}`);
+  const tier = (points) => (points >= tiers.all[1] ? 'green' : points >= tiers.all[0] ? 'yellow' : 'red');
   const big = fpts(sleeper.weekStats[0].stats);
   await page.waitForFunction((t) => document.querySelector('.player-list-item[data-id="shooter"] .snp-week i.done')?.classList.contains(t), tier(big), { timeout: 30000 });
   const marks = (await strip('shooter')).marks;

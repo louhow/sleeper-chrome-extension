@@ -225,7 +225,7 @@
       }).join('')}</div>
       ${lockedDay
         // Locked: the score that counts, boxed like its day cell (its score's color in a gold frame).
-        ? `<div class="week-pts locked"><b class="tier-${scoreTier(lockedDay.actual ?? lockedDay.proj ?? 0)}">${lockIcon()}${f2(lockedDay.actual ?? lockedDay.proj ?? 0)}</b></div>`
+        ? `<div class="week-pts locked"><b class="tier-${scoreTier(lockedDay.actual ?? lockedDay.proj ?? 0, s.tiers)}">${lockIcon()}${f2(lockedDay.actual ?? lockedDay.proj ?? 0)}</b></div>`
         : `<div class="week-pts">
         <b>${f2(points ? points[id] : st.points)}</b>
         <span>proj ${f2(lockInDefault(days))}</span>
@@ -251,7 +251,7 @@
     const live = !done && (d.game.status === 'in_game' || (d.game.start != null && d.game.start <= s.now));
     const state = d.locked ? 'locked' : mark === 'lockable' ? 'lockable' : mark === 'maybe' ? 'lockable maybe'
       : done ? 'past' : live ? 'live' : d.date === s.today ? 'today' : 'future';
-    const kind = done && d.actual != null ? `${state} tier-${scoreTier(d.actual)}` : state;
+    const kind = done && d.actual != null ? `${state} tier-${scoreTier(d.actual, s.tiers)}` : state;
     const value = done || d.actual != null ? d.actual : d.proj;
     const time = done ? 'Final' : live ? 'Live' : d.game.start ? gameTime(d.game.start) : '';
     const note = mark === 'benched' ? 'played on your bench, so it can\'t be locked in'

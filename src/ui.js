@@ -135,6 +135,7 @@
     const active = (roster.players || []).length - reserve.length - taxi.length;
     return {
       roster, week, slots, leg, matchup, starters, bench, taxi, reserve, players: s.players, settings,
+      tiers: s.tiers,
       locks: leg?.starters_games || {},
       // Your own lineup: whether a player was starting at a game's tip-off, from
       // the lineups the extension has seen (Sleeper keeps no history). Others: unknown, assumed so.

@@ -318,10 +318,52 @@
   }
   const MAX_SPANS = 100;
 
-  // Score colors as Sleeper's mobile app shows a game's fantasy points
-  // (green 24+, yellow 15+, red below). Thresholds observed, not from the API.
-  const SCORE_TIERS = [[24, 'green'], [15, 'yellow'], [-Infinity, 'red']];
-  const scoreTier = (points) => SCORE_TIERS.find(([min]) => points >= min)[1];
+  // Score colors, worked out from the league itself rather than fixed numbers:
+  // a game's fantasy points are green when they'd be in the top third of the
+  // games the league's starters have played lately (scored with its settings),
+  // red in the bottom third, yellow between. Sleeper's apps use fixed numbers
+  // (NBA 24 and 15, as its mobile app shows; NFL per position, and only for
+  // standard and PPR scoring), and the thirds land on them for leagues scored
+  // like that: NBA 16.5 and 24, NFL quarterbacks 13 and 20.6 (Sleeper's 13 and 19).
+  // `samples`: [{ position, points }], a starter's game each. `byPosition`
+  // gives each position its own thirds (NFL, where a TE's 10 is a QB's 20);
+  // positions with fewer than `min` games use everyone's.
+  const TIER_MIN_GAMES = 40;
+  function scoreTiers(samples, { byPosition = false, min = TIER_MIN_GAMES } = {}) {
+    if (!samples.length) return null;
+    const thirds = (points) => [quantile(points, 1 / 3), quantile(points, 2 / 3)];
+    const groups = {};
+    if (byPosition) for (const s of samples) if (s.position) (groups[s.position] ||= []).push(s.points);
+    const positions = Object.fromEntries(Object.entries(groups).filter(([, points]) => points.length >= min)
+      .map(([position, points]) => [position, thirds(points)]));
+    return { all: thirds(samples.map((s) => s.points)), positions, games: samples.length };
+  }
+  // Linear between the two nearest values, as spreadsheets do.
+  function quantile(values, q) {
+    const sorted = [...values].sort((a, b) => a - b);
+    const at = (sorted.length - 1) * q;
+    const lo = Math.floor(at);
+    const hi = Math.min(lo + 1, sorted.length - 1);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (at - lo);
+  }
+  // 'green', 'yellow' or 'red'; '' without tiers (a league with no games yet).
+  function scoreTier(points, tiers, position) {
+    const range = tiers && (tiers.positions[position] || tiers.all);
+    if (!range || points == null) return '';
+    return points >= range[1] ? 'green' : points >= range[0] ? 'yellow' : 'red';
+  }
+  // Whether a stat line is a game played (NFL: games played; NBA: time on court).
+  const playedGame = (stats) => stats?.gp > 0 || stats?.sp > 0 || stats?.min > 0;
+  // The starters' games in a week's stat rows, scored, for scoreTiers.
+  // `starters`: player ids; `positionOf(id, row)`: the position to group by.
+  function tierSamples(rows, starters, settings, score, positionOf) {
+    const out = [];
+    for (const row of rows || []) {
+      if (!starters.has(String(row.player_id)) || !playedGame(row.stats)) continue;
+      out.push({ position: positionOf(String(row.player_id), row), points: score(settings, row.stats) });
+    }
+    return out;
+  }
 
   // Lineup optimizer. Under Lock-In a lineup can change every day, so it picks
   // for the next day of games: a starter with no game that day can sit and come
@@ -553,7 +595,7 @@
       const o = look[c.id];
       const { perGame, gamesLeft, banked } = o;
       // Benching a starter whose finished game could still be locked throws that score away.
-      const lost = c.to === 'BN' && banked?.actual > 0 && (worthy(o) || scoreTier(banked.actual) === 'green') ? banked : null;
+      const lost = c.to === 'BN' && banked?.actual > 0 && (worthy(o) || scoreTier(banked.actual, l.tiers) === 'green') ? banked : null;
       return {
         ...c,
         // Any finished game a benched starter could (or may) still lock, worth it or not.
@@ -564,7 +606,7 @@
         today: o.left.find((d) => d.date === date)?.proj ?? null,
         lost,
         // A green score is worth stopping for; anything less is a softer warning.
-        goodScore: Boolean(lost) && scoreTier(lost.actual) === 'green',
+        goodScore: Boolean(lost) && scoreTier(lost.actual, l.tiers) === 'green',
       };
     });
     // The lineup the plan starts from, slot by slot, and what each player in it is worth.
@@ -733,7 +775,7 @@
     ranks, rankShift, shiftTint,
     weekDays, gamesByTeam, pointsByGame, playerDays, lockInDefault, ownedPicks, spotRefs, swapTargets, applyMove, describeMove,
     taxiEligible, taxiOpen, reserveEligible,
-    lockedGameId, lockState, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, openValue, bestLineup, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
+    lockedGameId, lockState, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, playedGame, TIER_MIN_GAMES, openValue, bestLineup, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
   };
 })();

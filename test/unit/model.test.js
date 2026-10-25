@@ -272,8 +272,10 @@ function optimizerWeek(games) {
     actual: model.pointsByGame(rows(4), { pts: 1 }, scoring.scoreStats),
   };
 }
+// Score colors as in an NBA league like the extension's: green from 24, yellow from 15.
+const NBA_TIERS = { all: [15, 24], positions: {} };
 const optimizerLineup = (slots, starters, bench, positions, games, locks = {}) => ({
-  slots, starters, bench, locks,
+  slots, starters, bench, locks, tiers: NBA_TIERS,
   players: Object.fromEntries(Object.entries(positions).map(([id, pos]) => [id, { team: id, positions: pos }])),
   week: optimizerWeek(games),
 });
@@ -538,8 +540,39 @@ test('best lineup: ties keep players where they are, then fill empty slots', () 
   assert.deepEqual(plain(plan.changes.map((c) => [c.id, c.from, c.to])), [['c', 'BN', 'C']]);
 });
 
-test('score tiers: green from 24, yellow from 15, red below', () => {
-  assert.deepEqual([24, 30, 23.99, 15, 14.99, 0, -2].map(model.scoreTier), ['green', 'green', 'yellow', 'yellow', 'red', 'red', 'red']);
+test('score tiers: the league starters\' games in thirds, green from the top third, red under the bottom one', () => {
+  const tiers = model.scoreTiers([0, 10, 20, 30, 40, 50, 60].map((points) => ({ points })));
+  assert.deepEqual(plain(tiers.all), [20, 40]);
+  assert.deepEqual([40, 55, 39.99, 20, 19.99, -2].map((x) => model.scoreTier(x, tiers)), ['green', 'green', 'yellow', 'yellow', 'red', 'red']);
+  // Between two games, a third falls in proportion, as spreadsheets do it.
+  assert.deepEqual(plain(model.scoreTiers([0, 10, 20, 30].map((points) => ({ points }))).all.map((x) => +x.toFixed(4))), [10, 20]);
+  assert.equal(model.scoreTier(30, null), '', 'no games yet: no color');
+  assert.equal(model.scoreTiers([]), null);
+});
+
+test('score tiers by position: each position its own thirds, with enough games; the rest use everyone\'s', () => {
+  const games = [
+    ...Array.from({ length: 40 }, (_, i) => ({ position: 'QB', points: 10 + i })),
+    ...Array.from({ length: 40 }, (_, i) => ({ position: 'TE', points: i / 2 })),
+    ...Array.from({ length: 5 }, () => ({ position: 'K', points: 8 })),
+  ];
+  const tiers = model.scoreTiers(games, { byPosition: true });
+  assert.deepEqual(Object.keys(tiers.positions).sort(), ['QB', 'TE']);
+  assert.equal(model.scoreTier(15, tiers, 'TE'), 'green', 'a TE\'s 15 is a great game');
+  assert.equal(model.scoreTier(15, tiers, 'QB'), 'red', 'a QB\'s 15 is not');
+  assert.equal(model.scoreTier(8, tiers, 'K'), model.scoreTier(8, { ...tiers, positions: {} }), 'too few kickers: everyone\'s thirds');
+  assert.equal(tiers.games, 85);
+});
+
+test('tier samples: only the week\'s starters, only games played, scored with the league\'s settings', () => {
+  const rows = [
+    { player_id: 'a', stats: { gp: 1, pts: 10 } },
+    { player_id: 'b', stats: { gp: 1, pts: 30 } },
+    { player_id: 'c', stats: { pts: 0 } },
+    { player_id: 'd', stats: { sp: 600, pts: 4 } },
+  ];
+  const out = model.tierSamples(rows, new Set(['a', 'c', 'd']), { pts: 2 }, scoring.scoreStats, (id) => id.toUpperCase());
+  assert.deepEqual(plain(out), [{ position: 'A', points: 20 }, { position: 'D', points: 8 }]);
 });
 
 test('cheapest assignment matches brute force on random matrices', () => {

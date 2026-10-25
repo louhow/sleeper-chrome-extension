@@ -140,6 +140,7 @@
       sessionExpired: false,
       claims: null, // the logged-in owner's pending waiver claims
       cards: {}, // player card data by player id, kept for the session
+      tiers: null, // score colors from the league's own games (see model.scoreTiers)
       // { kind: 'bid', playerId, status, bid, drops, errors, saving } | { kind: 'claims', errors, saving } | { kind: 'player', playerId, season }
       // | { kind: 'optimize', plan, noLock, ack, errors, saving, busy } (noLock: locks kept open; busy: 'all', 'row:<slot>' or 'lock:<player>' while it saves; done: what the last row saved); a player card can open over it (`back`).
       modal: null,
@@ -405,9 +406,9 @@
           if (!(stats?.sp > 0 || stats?.min > 0)) continue;
           const fpts = scoring.scoreStats(settings, stats);
           // With its color, as the Team tab and game log show it.
-          (points[id] ||= {})[game] = { fpts, tier: model.scoreTier(fpts) };
+          (points[id] ||= {})[game] = { fpts, tier: model.scoreTier(fpts, state.tiers) };
         }
-        out = { days, teamOf, points, pointsReady: Boolean(rows),
+        out = { days, teamOf, points, pointsReady: Boolean(rows), tiers: state.tiers,
           teams: Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => stateOf(games[d]))])),
           games: Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => {
             const g = games[d];
@@ -517,7 +518,12 @@
       // Lineups recorded for earlier weeks are no longer needed.
       const oldWeeks = Array.from({ length: Math.max(0, state.currentWeek - state.minWeek) }, (_, i) => `lineups:${leagueId}:${state.minWeek + i}`);
       if (oldWeeks.length) chrome.storage.local.remove(oldWeeks);
+      const tiers = loadTiers(api, league, state.currentWeek).catch((err) => {
+        console.warn('[sleeper-nba-panel] score colors unavailable', err);
+        return null;
+      });
       await loadWeek(state.week);
+      state.tiers = await tiers;
       if (state.currentWeek !== state.week) loadWeek(state.currentWeek).catch(fail);
       state.ready = true;
       sendAdminScoring();
@@ -1781,6 +1787,62 @@
 
     attach();
     return { attach, show, destroy };
+  }
+
+  // Score colors from the league itself (see model.scoreTiers): its starters'
+  // games in the weeks just finished, latest first, this season and then the
+  // last (the league's previous_league_id), scored with the league's settings,
+  // until there are enough games (NFL: enough at every position), at most
+  // TIER_WEEKS weeks. Kept in the extension's storage until a week finishes or
+  // the scoring changes, so it's one load a week.
+  const TIER_WEEKS = 8;
+  const TIER_GAMES = 300;
+  const TIER_VERSION = 1;
+  async function loadTiers(api, league, currentWeek) {
+    const sport = league.sport;
+    const byPosition = sport === 'nfl';
+    const settings = league.scoring_settings || {};
+    const key = `tiers:${league.league_id}`;
+    const sig = JSON.stringify([TIER_VERSION, league.season, currentWeek, Object.entries(settings).filter(([, v]) => v).sort()]);
+    const { [key]: hit } = await chrome.storage.local.get(key);
+    if (hit?.sig === sig) return hit.tiers;
+    // Finished weeks, latest first: this season's, then the last regular season's.
+    const weeks = [];
+    for (let w = currentWeek - 1; w >= (league.settings?.start_week || 1); w--) weeks.push({ league, week: w });
+    if (weeks.length < TIER_WEEKS && league.previous_league_id) {
+      const prev = await api.get(`/v1/league/${league.previous_league_id}`).catch(() => null);
+      const last = (prev?.settings?.playoff_week_start || 1) - 1;
+      for (let w = last; w >= (prev?.settings?.start_week || 1) && weeks.length < TIER_WEEKS; w--) weeks.push({ league: prev, week: w });
+    }
+    const positionOf = (id, row) => row.player?.fantasy_positions?.[0] || row.player?.position || null;
+    const enough = (samples) => {
+      if (samples.length < TIER_GAMES) return false;
+      if (!byPosition) return true;
+      const counts = {};
+      for (const x of samples) counts[x.position] = (counts[x.position] || 0) + 1;
+      return Object.values(counts).every((n) => n >= model.TIER_MIN_GAMES);
+    };
+    const samples = [];
+    let failed = false;
+    // NBA weeks hold hundreds of games each; NFL weeks one a starter, so a few at a time.
+    const batch = byPosition ? 4 : 1;
+    for (let i = 0; i < weeks.length && !enough(samples); i += batch) {
+      const loads = await Promise.all(weeks.slice(i, i + batch).map(({ league: l, week }) => Promise.all([
+        api.get(`/v1/league/${l.league_id}/matchups/${week}`),
+        api.get(`/stats/${sport}/${l.season}/${week}?season_type=regular`),
+      ]).catch(() => {
+        failed = true;
+        return [[], []];
+      })));
+      for (const [matchups, rows] of loads) {
+        const starters = new Set((matchups || []).flatMap((m) => m.starters || []).filter((id) => id && id !== '0'));
+        samples.push(...model.tierSamples(rows, starters, settings, scoring.scoreStats, positionOf));
+      }
+    }
+    const tiers = model.scoreTiers(samples, { byPosition });
+    // A week that didn't load is tried again next time, not kept for a week.
+    if (tiers && !failed) chrome.storage.local.set({ [key]: { sig, tiers } });
+    return tiers;
   }
 
   // The season ends when the league's playoff bracket does. Round count comes

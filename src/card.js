@@ -217,8 +217,8 @@
         return `<tr>
           <td class="dim">${dash(r.week)}</td><td class="dim">${md(r.date)}</td><td class="opp">${r.away ? '@' : ''}${esc(r.opp || '')}</td>
           <td class="dim">${r.proj != null ? f2(r.proj) : '-'}</td>
-          <td class="fpts${r.played ? ` ${scoreTier(r.fpts)}` : ''}">${r.played ? f2(r.fpts) : '-'}</td>
-          ${admin ? `<td class="fpts admin${r.played ? ` ${scoreTier(r.adminFpts)}` : ''}">${r.played ? f2(r.adminFpts) : '-'}</td>` : ''}
+          <td class="fpts${r.played ? ` ${scoreTier(r.fpts, s.tiers)}` : ''}">${r.played ? f2(r.fpts) : '-'}</td>
+          ${admin ? `<td class="fpts admin${r.played ? ` ${scoreTier(r.adminFpts, s.tiers)}` : ''}">${r.played ? f2(r.adminFpts) : '-'}</td>` : ''}
           ${cell('min')}${cell('pts')}${cell('reb')}${cell('ast')}${cell('stl')}${cell('blk')}${cell('to')}
           ${ratio('fgm', 'fga', 'fg')}${ratio('tpm', 'tpa', 'tp')}${ratio('ftm', 'fta', 'ft')}
         </tr>`;

@@ -30,7 +30,7 @@
     const soft = plan.changes.filter((c) => c.lost && !c.goodScore);
     const goodTotal = good.reduce((sum, c) => sum + c.lost.actual, 0);
     const blocked = good.length > 0 && !m.ack;
-    const who = (list) => names(list.map((c) => `<b>${esc(name(c.id))}</b> ${score(c.lost.actual)}`));
+    const who = (list) => names(list.map((c) => `<b>${esc(name(c.id))}</b> ${score(s, c.lost.actual)}`));
     const warning = (good.length ? `<div class="lose-banner" role="alert">
         <p>${who(good)} ${good.length > 1 ? 'have green games' : 'has a green game'} you could still lock in.
         Bench players can't lock in, so benching them gives up ${f2(goodTotal)} pts.</p>
@@ -104,7 +104,7 @@
       const outToday = plan.info[cur]?.today;
       const outWhy = !real(cur) ? '' : ` · ${outToday == null ? `no game ${esc(day(plan))}` : `${esc(day(plan))} ${f2(outToday)}`} · ${f2(plan.info[cur]?.perGame ?? 0)}/g`;
       const outSub = `<span class="sub move">${moveText(plan, cur, 'out')}<span class="why">${outWhy}</span></span>${drops
-        ? `<span class="sub drops ${tone}"${change.dropsUnsure ? ' title="If they were starting when it tipped off; the extension didn\'t see your lineup then"' : ''}>${change.dropsUnsure ? 'May drop' : 'Drops'} lock-in ${score(drops.actual)} ${esc(gameText(drops))}</span>` : ''}`;
+        ? `<span class="sub drops ${tone}"${change.dropsUnsure ? ' title="If they were starting when it tipped off; the extension didn\'t see your lineup then"' : ''}>${change.dropsUnsure ? 'May drop' : 'Drops'} lock-in ${score(s, drops.actual)} ${esc(gameText(drops))}</span>` : ''}`;
       return `<div class="os-row swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
         <span class="os-slot">${slotBadge(slot)}</span>
         ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>`)}
@@ -129,9 +129,9 @@
       : info.fixed === 'locked' ? `${lockIcon()}Locked`
       : info.fixed === 'live' ? 'Playing'
       : 'No change';
-    const sub = info.fixed === 'locked' ? `${score(info.locked.actual ?? 0)} ${esc(gameText(info.locked))}`
-      : notYet ? `${score(notYet.actual)} ${esc(gameText(notYet.game))} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
-      : maybe ? `<span title="Lockable only if they were starting when it tipped off; the extension didn't see your lineup then">${score(maybe.actual)} ${esc(gameText(maybe.game))} · lockable if started</span> · ${esc(upcoming(s, cur))}`
+    const sub = info.fixed === 'locked' ? `${score(s, info.locked.actual ?? 0)} ${esc(gameText(info.locked))}`
+      : notYet ? `${score(s, notYet.actual)} ${esc(gameText(notYet.game))} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
+      : maybe ? `<span title="Lockable only if they were starting when it tipped off; the extension didn't see your lineup then">${score(s, maybe.actual)} ${esc(gameText(maybe.game))} · lockable if started</span> · ${esc(upcoming(s, cur))}`
       : esc(upcoming(s, cur));
     return `<div class="os-row same${info.fixed === 'locked' ? ' locked' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>
@@ -149,7 +149,7 @@
     const toggle = k.on
       ? `<button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open</button>`
       : `<button class="os-link" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
-    const sub = `<span class="sub">${score(k.actual)} ${esc(gameText(k.game))} · ${openText(s, k)}</span>
+    const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameText(k.game))} · ${openText(s, k)}</span>
       <span class="sub">${k.on ? `Lockable${esc(until)}` : 'Keeping open'} · ${toggle}</span>`;
     return `<div class="os-row lock${k.on ? '' : ' off'}">
       <span class="os-slot">${slotBadge(slot)}</span>
@@ -209,8 +209,8 @@
   }
 
   // A finished game's fantasy points in its score color (see model.scoreTier).
-  function score(points) {
-    return `<span class="score ${scoreTier(points)}">${f2(points)}</span>`;
+  function score(s, points) {
+    return `<span class="score ${scoreTier(points, s.tiers)}">${f2(points)}</span>`;
   }
 
   return { render, HOW, subArrow };
