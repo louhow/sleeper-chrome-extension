@@ -221,7 +221,8 @@ The extension's own Team and Matchup tabs take the place of Sleeper's, laid out 
 Sleeper's own tab stays on the page, hidden: its Team component saves lineups and feeds Optimize lineup.
 The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), and "⇄ Compact view" beside Sleeper's tab row comes back.
 
-- Team: the team card (avatar, record, opponent, points, live projection, week picker), then starters slot by slot, bench, IR and taxi.
+- Team: the team card (avatar, record, opponent, points, live projection, week picker), then starters slot by slot, bench (by position), IR and taxi.
+  Points read – until a starter's game kicks off, as on NBA; IR and taxi keep a row per league slot, open ones included, so the page holds its shape.
   Each row: slot, headshot, name, position and team, injury, start and rostered %; the game (opponent, kickoff, or the clock and score while it's on, or the final), the stat line; points, in their [score color](#score-colors) once the game is over, and the projection.
 - Any team from the picker (A to Z, with avatars); the arrow keys go through them and stop at the ends.
 - Your own lineup, for the week Sleeper's Team tab shows: tap a slot badge, then one of the highlighted players. Players whose game has kicked off stay put, as Sleeper locks them. Saves go through Sleeper's own Team component (`updateMatchupLeg`), as Optimize's do.
@@ -231,7 +232,7 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
   A Matchup row knows only that matchup's players, so the extension sends the player's name, position and team along; Sleeper's card loads the rest.
 - On the Matchup tab, a team's avatar, owner or name opens it on the Team tab (just for now: the picker's choice stays), as on NBA.
 - Live games show Sleeper's RZ mark when the player's team has the ball inside the 20.
-- Matchup: the League tab's matchup card on top (avatars, scores, win chance and bar, record, projection), then both lineups slot by slot, bench, IR and taxi. The picker picks a matchup (both teams), as on the NBA Matchup tab.
+- Matchup: the League tab's matchup card on top (avatars, scores, win chance and bar, record, projection), then both lineups slot by slot, bench, IR and taxi (as many rows as the league has slots). The picker picks a matchup (both teams), as on the NBA Matchup tab.
 - Points are Sleeper's stats scored with the league's settings; the live projection is what's scored plus the projection for the game time left. Win chance is Sleeper's own formula (see the League tab).
 - The data: `/v1/league/<id>/matchups/<week>` (logged in, `matchup_legs`) for who's starting, `/projections/nfl/<season>/<week>` and `/stats/nfl/<season>/<week>` for players, projections and points, GraphQL `scores` for each game, `/players/nfl/research/...` for start and rostered %.
   While a game of the current week is on, stats and games are read again every 90 seconds (only while the tab is visible); otherwise once the next kickoff comes.

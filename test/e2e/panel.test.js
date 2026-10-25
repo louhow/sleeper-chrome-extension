@@ -1391,7 +1391,7 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
   const moves = await page.evaluate(() => { const m = window.__careerMoves; window.__careerMoves = null; return m; });
   assert.deepEqual(moves, [], 'nothing on screen moves while game logs load');
 
-  await page.locator(dialog('.pc-news h3')).first().waitFor({ timeout: 15000 });
+  await page.locator(dialog('.pc-news:not(.skeleton) h3')).first().waitFor({ timeout: 15000 });
   await page.locator(dialog('.pc-depth-row li.me')).waitFor({ timeout: 15000 });
   assert.equal(await page.locator(dialog('.pc-depth-row li.me')).textContent(), playerName);
   assert.match(await page.locator(dialog('.pc-main')).textContent(), /Transaction History\s*Log in to Sleeper/);
@@ -1539,7 +1539,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   // A small lockable score given up is a soft warning: yellow, and Apply still works.
   const victimRow = page.locator(dialog('.os-row.swap.warning')).filter({ hasText: players[victim].full_name });
   assert.match(await victimRow.locator('.sub.drops.warn').textContent(), /^Drops lock-in 3\.00 \w{3} (vs|@) \w+$/, 'what benching gives up');
-  assert.equal(await victimRow.locator('.score.red').textContent(), '3.00', 'the score shows in its tier color');
+  assert.equal(await victimRow.locator('.score-chip.tier-red').textContent(), '3.00', 'the score shows in its tier color');
   // Substitution marks, as soccer apps show them: green up coming in, red down going out.
   assert.equal(await victimRow.locator('.os-p.in .os-arrow.in').getAttribute('aria-label'), 'Coming in');
   assert.equal(await victimRow.locator('.os-p.out .os-arrow.out').getAttribute('aria-label'), 'Going out');
@@ -1560,7 +1560,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.equal(await lockRow.count(), 1, 'one game worth locking');
   assert.equal(await lockRow.locator('.os-p [data-player]').first().getAttribute('data-player'), locker);
   assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
-  assert.ok(Number(await lockRow.locator('.score.green').textContent()) >= 70, 'the score, in its tier color');
+  assert.ok(Number(await lockRow.locator('.score-chip.tier-green').textContent()) >= 70, 'the score, in its tier color');
   assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < 20, 'keeping it open is worth far less');
   assert.equal(await lockRow.locator('[data-op-lock-row]').textContent(), 'Lock');
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
@@ -2417,7 +2417,7 @@ test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from
   await page.locator(nflPanel('.week-label b')).filter({ hasText: 'Week 6' }).waitFor({ timeout: 30000 });
   await page.locator(nflPanel('.nfl-game.done')).first().waitFor({ timeout: 30000 });
   assert.match(await page.locator(nflPanel('.nfl-game.done b')).first().textContent(), /· Final [WLT] \d+-\d+$/);
-  assert.ok(await page.locator(nflPanel('.week-pts b[class^="tier-"]')).count() > 0, 'finished games in their score colors');
+  assert.ok(await page.locator(nflPanel('.week-pts b.tier')).count() > 0, 'finished games in their score colors');
   // Any team from the picker, with its avatar and name, A to Z; arrow keys go through them.
   const name = (r) => users.find((u) => u.user_id === r.owner_id)?.metadata?.team_name || users.find((u) => u.user_id === r.owner_id)?.display_name;
   const teams = rosters.map(name).sort((a, b) => a.localeCompare(b)).map((x) => x.trim());
@@ -2575,7 +2575,7 @@ test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes a
   assert.match(await page.locator(nflDialog('.op-sum')).textContent(), /51\.00\s*→\s*68\.00\s*\+17\.00/);
   // One row per slot, in lineup order, like the NBA dialog: who comes in leads, beside who they replace.
   assert.equal(await page.locator(nflDialog('.os-row')).count(), 5);
-  const names = (sel) => page.locator(nflDialog(`.os-row.swap ${sel} .dp-name b`)).allTextContents();
+  const names = (sel) => page.locator(nflDialog(`.os-row.swap ${sel} .dp-name .name`)).allTextContents();
   // Alpha WR keeping WR with Gamma WR at FLEX adds up the same as swapping them, so nobody else moves.
   assert.deepEqual(await names('.os-p.in'), ['Gamma WR', 'Beta QB']);
   assert.deepEqual(await names('.os-p.out'), ['Beta RB', 'Beta WR']);
@@ -2586,7 +2586,7 @@ test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes a
   assert.match(await page.locator(nflDialog('.warn-banner')).textContent(), /Beta QB is Questionable/);
   const started = page.locator(nflDialog('.os-row.same')).filter({ hasText: 'Early RB' });
   assert.equal(await started.locator('.os-status').textContent(), 'Started');
-  assert.equal(await page.locator(nflDialog('.os-row.same button')).count(), 0, 'slots that stay have no button');
+  assert.equal(await page.locator(nflDialog('.os-row.same .os-act button')).count(), 0, 'slots that stay have no button');
   assert.equal(await page.locator(nflDialog('.lose-banner, [data-op-ack]')).count(), 0, 'no warnings to confirm');
   await page.locator(nflDialog('.how')).hover();
   assert.match(await page.locator(nflDialog('.how-tip')).innerText(), /^How it picks:\n1\. Every player gets a number: their projected points/);

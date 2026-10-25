@@ -2,10 +2,10 @@
 // (bio, rankings), then game logs, career and transaction history on the left
 // and latest news and the depth chart on the right. Pure: state -> HTML.
 (globalThis.SNP ||= {}).card = (() => {
-  const { esc, f2, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner } = globalThis.SNP.ui;
+  const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, pct: share, tierClass,
+    dash, num, height, ago, heat, scaler } = globalThis.SNP.ui;
   const { scoreStats } = globalThis.SNP.scoring;
   const { scoreTier } = globalThis.SNP.model;
-  const CDN = 'https://sleepercdn.com';
 
   // NBA team nicknames and primary colors, for the hero ("KINGS #9").
   const TEAMS = {
@@ -22,8 +22,6 @@
   const NEWS_SOURCES = { fantasy_pros: 'Fantasy Pros', rotowire: 'Rotowire', rotoworld: 'Rotoworld' };
 
   const seasonLabel = (season) => `'${String(season).slice(2)}-'${String(Number(season) + 1).slice(2)}`;
-  const dash = (v) => (v == null || v === '' ? '-' : v);
-  const num = (v, digits = 0) => (v == null || Number.isNaN(v) ? '-' : Number(v).toFixed(digits));
 
   function age(bio) {
     if (!bio?.birth_date) return bio?.age ?? null;
@@ -31,41 +29,6 @@
     const now = new Date();
     const had = now.getMonth() > born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() >= born.getDate());
     return now.getFullYear() - born.getFullYear() - (had ? 0 : 1);
-  }
-
-  function height(inches) {
-    const n = Number(inches);
-    return n ? `${Math.floor(n / 12)}'${n % 12}"` : '-';
-  }
-
-  function ago(ms, now) {
-    const s = Math.max(0, (now - ms) / 1000);
-    const [n, unit] = s < 3600 ? [Math.round(s / 60), 'minute'] : s < 86400 ? [Math.round(s / 3600), 'hour'] : [Math.round(s / 86400), 'day'];
-    if (unit === 'minute' && n < 1) return 'just now';
-    return `${n} ${unit}${n === 1 ? '' : 's'} ago`;
-  }
-
-  // Heat color for a cell, as Sleeper shades stat tables: red (low) through olive to green (high).
-  function heat(t) {
-    if (t == null || Number.isNaN(t)) return '';
-    const stops = [[150, 72, 96], [128, 122, 78], [84, 132, 100]];
-    const x = Math.min(1, Math.max(0, t)) * 2;
-    const [a, b] = x <= 1 ? [stops[0], stops[1]] : [stops[1], stops[2]];
-    const f = x <= 1 ? x : x - 1;
-    const c = a.map((v, i) => Math.round(v + (b[i] - v) * f));
-    return ` style="background:rgba(${c.join(',')},.5)"`;
-  }
-
-  // Scales each column's values to 0..1 across the rows that have them.
-  function scaler(rows, key, invert = false) {
-    const vals = rows.map((r) => r[key]).filter((v) => v != null && !Number.isNaN(v));
-    const lo = Math.min(...vals);
-    const hi = Math.max(...vals);
-    return (v) => {
-      if (v == null || Number.isNaN(v) || !vals.length) return null;
-      const t = hi === lo ? 0.5 : (v - lo) / (hi - lo);
-      return invert ? 1 - t : t;
-    };
   }
 
   const pct = (made, att) => (att ? made / att : null);
@@ -114,7 +77,7 @@
     const m = s.modal;
     const id = m.playerId;
     const c = s.cards?.[id] || {};
-    const p = s.players?.[id] || { name: `Player #${id}`, positions: [] };
+    const p = playerOf(s.players, id);
     const bio = c.bio;
     const team = bio?.team || p.team;
     const [nick, color] = TEAMS[team] || ['Free Agent', '#3a4256'];
@@ -123,7 +86,6 @@
     const ownerName = owner ? s.usersById?.[owner.owner_id]?.display_name || `Team ${owner.roster_id}` : null;
     const latest = (c.career || []).find((r) => r.stats?.rank_std != null);
     const research = s.weeks?.[s.currentWeek]?.research?.[id];
-    const pctOf = (n) => (n == null ? '–' : `${Math.ceil(n)}%`);
 
     return `<div class="modal pc-modal">
       <div class="backdrop" data-action="close-modal"></div>
@@ -157,8 +119,8 @@
               <div class="pc-ranks">
                 <span><b>${latest ? `#${latest.stats.pos_rank_std}` : '–'}</b>${esc(position)}</span>
                 <span><b>${latest ? `#${latest.stats.rank_std}` : '–'}</b>Overall</span>
-                <span><b>${pctOf(research?.owned)}</b>Rostered</span>
-                <span><b>${pctOf(research?.started)}</b>Started</span>
+                <span><b>${share(research?.owned)}</b>Rostered</span>
+                <span><b>${share(research?.started)}</b>Started</span>
               </div>
             </div>
           </header>
@@ -182,10 +144,11 @@
     return `<div class="pc-item"><div class="pc-item-label">${label}</div><div class="pc-item-value">${raw ? value : esc(value)}</div></div>`;
   }
 
-  const loading = '<p class="pc-empty">Loading…</p>';
-  // Placeholder rows hold a table's height while it loads, so nothing below jumps.
+  // Placeholders hold a section's size while it loads, so nothing below jumps:
+  // blank rows like the loaded ones, as many as are known (or usual).
   const SKELETON_ROWS = 15;
   const skeleton = (rows, cols) => Array.from({ length: rows }, () => `<tr class="skeleton">${'<td>&nbsp;</td>'.repeat(cols)}</tr>`).join('');
+  const blank = (n, html) => Array.from({ length: n }, () => html).join('');
 
   function gameLogSection(s, c, m) {
     const seasons = c.seasons || [];
@@ -217,8 +180,8 @@
         return `<tr>
           <td class="dim">${dash(r.week)}</td><td class="dim">${md(r.date)}</td><td class="opp">${r.away ? '@' : ''}${esc(r.opp || '')}</td>
           <td class="dim">${r.proj != null ? f2(r.proj) : '-'}</td>
-          <td class="fpts${r.played ? ` ${scoreTier(r.fpts, s.tiers)}` : ''}">${r.played ? f2(r.fpts) : '-'}</td>
-          ${admin ? `<td class="fpts admin${r.played ? ` ${scoreTier(r.adminFpts, s.tiers)}` : ''}">${r.played ? f2(r.adminFpts) : '-'}</td>` : ''}
+          <td class="fpts${r.played ? tierClass(scoreTier(r.fpts, s.tiers)) : ''}">${r.played ? f2(r.fpts) : '-'}</td>
+          ${admin ? `<td class="fpts admin${r.played ? tierClass(scoreTier(r.adminFpts, s.tiers)) : ''}">${r.played ? f2(r.adminFpts) : '-'}</td>` : ''}
           ${cell('min')}${cell('pts')}${cell('reb')}${cell('ast')}${cell('stl')}${cell('blk')}${cell('to')}
           ${ratio('fgm', 'fga', 'fg')}${ratio('tpm', 'tpa', 'tp')}${ratio('ftm', 'fta', 'ft')}
         </tr>`;
@@ -267,7 +230,11 @@
 
   // Transaction history in this league, newest first, worded like Sleeper's card.
   function historySection(s, c) {
-    if (!c.history) return `<section class="pc-section"><div class="pc-section-head"><h2>Transaction History</h2></div>${c.historyError ? '<p class="pc-empty">Log in to Sleeper to see this league\'s transactions.</p>' : loading}</section>`;
+    // Loading: one transaction's row (a rostered player has at least their add or draft pick).
+    if (!c.history) {
+      return `<section class="pc-section" aria-busy="${!c.historyError}"><div class="pc-section-head"><h2>Transaction History</h2></div>${c.historyError ? '<p class="pc-empty">Log in to Sleeper to see this league\'s transactions.</p>'
+        : '<ul class="pc-history"><li class="pc-tx skeleton"><span class="pc-tx-label">&nbsp;</span><span class="pc-tx-text">&nbsp;</span><span class="pc-tx-date">&nbsp;</span></li></ul>'}</section>`;
+    }
     const id = s.modal.playerId;
     const byRoster = Object.fromEntries((s.rosters || []).map((r) => [r.roster_id, s.usersById?.[r.owner_id]?.display_name || `Team ${r.roster_id}`]));
     const user = (uid) => s.usersById?.[uid]?.display_name;
@@ -312,9 +279,11 @@
         ${md.analysis ? `<p><b>Analysis:</b> ${esc(md.analysis)}</p>` : ''}
       </article>`;
     }).join('');
-    return `<section class="pc-section">
+    // Loading: a blank news card (a two-line title and a paragraph).
+    const card = `<article class="pc-news skeleton"><h3>&nbsp;<br>&nbsp;</h3><div class="pc-news-meta">&nbsp;</div><p>${blank(6, '&nbsp;<br>')}</p></article>`;
+    return `<section class="pc-section" aria-busy="${!c.news}">
       <div class="pc-section-head"><h2>Latest News</h2></div>
-      ${!c.news ? loading : items || '<p class="pc-empty">No recent news.</p>'}
+      ${!c.news ? card : items || '<p class="pc-empty">No recent news.</p>'}
     </section>`;
   }
 
@@ -323,13 +292,20 @@
     const chart = c.depth;
     const groups = chart ? DEPTH_ORDER.filter((pos) => chart[pos]?.length).map((pos) => `<div class="pc-depth-row">
         <span class="pos ${pos.toLowerCase()}">${pos}</span>
-        <ol>${chart[pos].map((pid) => `<li class="${pid === id ? 'me' : ''}">${esc(s.players[pid]?.name || `Player #${pid}`)}</li>`).join('')}</ol>
+        <ol>${chart[pos].map((pid) => `<li class="${pid === id ? 'me' : ''}">${esc(playerName(s.players, pid))}</li>`).join('')}</ol>
       </div>`).join('') : '';
-    return `<section class="pc-section">
+    // Loading: a row per position, as many lines as the team has players there.
+    const teamAt = (pos) => Object.values(s.players || {}).filter((p) => p.team === team && p.position === pos).length;
+    const rows = DEPTH_ORDER.map((pos) => `<div class="pc-depth-row skeleton">
+        <span class="pos ${pos.toLowerCase()}">${pos}</span>
+        <ol>${blank(Math.max(1, teamAt(pos)), '<li>&nbsp;</li>')}</ol>
+      </div>`).join('');
+    return `<section class="pc-section" aria-busy="${!chart}">
       <div class="pc-section-head"><h2>Depth Chart</h2></div>
-      ${!chart ? loading : groups || '<p class="pc-empty">No depth chart.</p>'}
+      ${!chart ? rows : groups || '<p class="pc-empty">No depth chart.</p>'}
     </section>`;
   }
 
-  return { render, gameLog, careerRow, seasonLabel, age, height };
+  // The stat table helpers live in ui.js; they're here too for the cards that share them.
+  return { render, gameLog, careerRow, seasonLabel, dash, num, height, ago, heat, scaler };
 })();

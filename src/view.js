@@ -1,10 +1,10 @@
 // Pure render functions: (state, api log) -> HTML string for the shadow root.
 (globalThis.SNP ||= {}).view = (() => {
   const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId, scoreTier } = globalThis.SNP.model;
-  const { esc, f2, headshot, teamName, avatar, record, injuryTag, positions, gameTime, weekday, lockIcon, slotBadge, weekNav, notice, lineup, taxiRule, reserveRule,
-    whatIfOn, whatIfBanner, owns } = globalThis.SNP.ui;
+  const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule,
+    whatIfOn, playerOf, teamTag, researchLine, padTo, real, loading, errorMsg, shell, teamCard, rowHead, swapHint, swapClass, emptyCard,
+    teamPicker, matchupPicker, matchupPairs } = globalThis.SNP.ui;
   const PREVIEW_CHARS = 20000;
-  const PAGES = { team: 'Team', matchup: 'Matchup' };
 
   function render(state, log) {
     // Sleeper's League tab keeps its own content; the week's matchups go on top of it.
@@ -15,100 +15,9 @@
       : state.sessionExpired ? sessionExpired()
       : state.page === 'matchup' ? globalThis.SNP.matchup.render(state)
       : teamView(state);
-    // The notice floats over the panel so showing or clearing it never shifts the cards being clicked.
-    // While a dialog is open it shows over the dialog instead.
-    const whatIf = state.tab !== 'api' && whatIfOn(state);
-    return `<div class="app${whatIf ? ' whatif' : ''}">${toolbar(state, log)}${whatIf ? whatIfBanner(state) : ''}<div class="body">${body}</div>${state.tab === 'api' || state.modal ? '' : notice(state)}</div>`;
-  }
-
-  function toolbar(s, log) {
-    const tab = (id, label) =>
-      `<button role="tab" data-tab="${id}" aria-selected="${s.tab === id}" class="${s.tab === id ? 'active' : ''}">${label}</button>`;
-    const picker = !s.rosters?.length ? '' : s.page === 'matchup' ? matchupPicker(s) : teamPicker(s);
-    // Only on the owner's editable Team tab, once the week's games are in.
-    const l = s.ready && s.page === 'team' && s.tab === 'page' && !s.error && !s.sessionExpired ? lineup(s) : null;
-    const optimize = !(l?.editable && l.week) ? ''
-      : whatIfOn(s) ? '<button class="optimize" disabled title="Optimize uses your league\'s scoring. Switch what-if scoring off to use it.">Optimize lineup</button>'
-      : `<button class="optimize" data-action="optimize" title="Propose the best starting lineup for this week" ${s.saving ? 'disabled' : ''}>Optimize lineup</button>`;
-    return `<nav class="toolbar">
-      <div class="tabs" role="tablist">${tab('page', PAGES[s.page] || 'Team')}${tab('api', `API calls <span class="count">${log.length}</span>`)}</div>
-      <div class="tools">
-        ${optimize}
-        ${picker && !s.sessionExpired ? picker : ''}
-        <button class="icon" data-action="refresh" title="Refetch everything" aria-label="Refresh">↻</button>
-      </div>
-    </nav>`;
-  }
-
-  // The team shown: a picker with each team's avatar, name and owner, A to Z,
-  // and, while it's someone else's, a one-click way back to your own.
-  function teamPicker(s) {
-    const pic = (r, cls) => {
-      const url = r && avatar(s, r);
-      return url ? `<img class="${cls}" src="${esc(url)}" alt="">` : `<span class="${cls} blank">${esc(r ? teamName(s, r).slice(0, 1).toUpperCase() : '')}</span>`;
-    };
-    const teams = [...s.rosters].sort((a, b) => teamName(s, a).localeCompare(teamName(s, b)));
-    const current = s.rosters.find((r) => r.roster_id === s.rosterId);
-    const mine = s.rosters.find((r) => owns(s, r));
-    const back = mine && current && mine.roster_id !== current.roster_id
-      ? `<button class="my-team" data-pick-roster="${mine.roster_id}" title="Back to ${esc(teamName(s, mine))}"><span aria-hidden="true">←</span>My team</button>` : '';
-    return `${back}<div class="team-pick${s.rosterMenu ? ' open' : ''}">
-      <button class="tp-button" data-action="roster-menu" data-roster="${current?.roster_id ?? ''}" aria-haspopup="listbox" aria-expanded="${Boolean(s.rosterMenu)}" aria-label="Team to show">
-        ${pic(current, 'tp-avatar')}<span class="tp-name">${esc(current ? teamName(s, current) : 'Pick a team')}</span><span class="tp-chevron" aria-hidden="true"></span>
-      </button>
-      <div class="tp-menu" role="listbox">${teams.map((r) => {
-        const owner = s.usersById?.[r.owner_id];
-        return `<button role="option" data-pick-roster="${r.roster_id}" aria-selected="${r.roster_id === s.rosterId}">${pic(r, 'tp-avatar')}
-          <span class="tp-label"><b>${esc(teamName(s, r))}</b><small>@${esc(owner?.display_name || 'unknown')}${mine?.roster_id === r.roster_id ? ' · you' : ''}</small></span></button>`;
-      }).join('')}</div>
-    </div>`;
-  }
-
-  // The Matchup tab picks a matchup, not a team: the week's pairs, each with
-  // both teams' avatars and names (yours first, then A to Z by the left team),
-  // and, while it's someone else's, a one-click way back to yours.
-  function matchupPicker(s) {
-    const pairs = matchupPairs(s);
-    if (!pairs.length) return teamPicker(s);
-    const pic = (r, cls) => {
-      const url = r && avatar(s, r);
-      return url ? `<img class="${cls}" src="${esc(url)}" alt="">` : `<span class="${cls} blank">${esc(r ? teamName(s, r).slice(0, 1).toUpperCase() : '')}</span>`;
-    };
-    const half = (r) => (r ? `${pic(r, 'tp-avatar')}<span class="tp-name">${esc(teamName(s, r))}</span>` : '<span class="tp-name bye">No opponent</span>');
-    const current = pairs.find((p) => p.some((r) => r?.roster_id === s.rosterId));
-    // The shown team stays on the left.
-    const shown = current && (current[0]?.roster_id === s.rosterId ? current : [current[1], current[0]]);
-    const mine = pairs.find((p) => p.some((r) => r && owns(s, r)));
-    const back = mine && mine !== current
-      ? `<button class="my-team" data-pick-roster="${mine[0].roster_id}" title="Back to your matchup"><span aria-hidden="true">←</span>My matchup</button>` : '';
-    return `${back}<div class="team-pick pair-pick${s.rosterMenu ? ' open' : ''}">
-      <button class="tp-button" data-action="roster-menu" data-roster="${s.rosterId ?? ''}" aria-haspopup="listbox" aria-expanded="${Boolean(s.rosterMenu)}" aria-label="Matchup to show">
-        ${shown ? `<span class="tp-pair">${half(shown[0])}<span class="tp-vs">vs</span>${half(shown[1])}</span>` : '<span class="tp-name">Pick a matchup</span>'}<span class="tp-chevron" aria-hidden="true"></span>
-      </button>
-      <div class="tp-menu" role="listbox">${pairs.map((p) => p === current ? shown : p).map((p) => `<button role="option" data-pick-roster="${p[0].roster_id}" aria-selected="${p === shown}">
-          <span class="tp-pair">${half(p[0])}<span class="tp-vs">vs</span>${half(p[1])}</span></button>`).join('')}</div>
-    </div>`;
-  }
-
-  // The shown week's matchups as pairs of rosters ([a, b], b null without an
-  // opponent): yours first, yours on the left, then A to Z by the left team.
-  function matchupPairs(s) {
-    const week = s.weeks?.[s.week];
-    const pool = week?.legs?.length ? week.legs : week?.matchups || [];
-    const byId = Object.fromEntries((s.rosters || []).map((r) => [r.roster_id, r]));
-    const groups = new Map();
-    for (const m of pool) {
-      const roster = byId[m.roster_id];
-      if (!roster) continue;
-      const key = m.matchup_id ?? `solo:${m.roster_id}`;
-      groups.set(key, [...(groups.get(key) || []), roster]);
-    }
-    const name = (r) => teamName(s, r);
-    const pairs = [...groups.values()].map((list) => {
-      const [a, b = null] = [...list].sort((x, y) => (owns(s, y) - owns(s, x)) || name(x).localeCompare(name(y)));
-      return [a, b];
-    });
-    return pairs.sort((x, y) => (owns(s, y[0]) - owns(s, x[0])) || name(x[0]).localeCompare(name(y[0])));
+    // Optimize lineup: only on the owner's editable Team tab, once the week's games are in.
+    const l = state.ready && state.page === 'team' && state.tab === 'page' && !state.error && !state.sessionExpired ? lineup(state) : null;
+    return shell(state, log, body, { optimize: Boolean(l?.editable && l.week) });
   }
 
   // In place of the tab while Sleeper rejects the page's login.
@@ -121,10 +30,10 @@
   }
 
   function teamView(s) {
-    if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
+    if (s.error) return errorMsg(s.error);
     const l = lineup(s);
-    if (!l) return '<p class="msg">Loading…</p>';
-    const { week, matchup, starters, editable } = l;
+    if (!l) return loading();
+    const { week, starters, editable } = l;
     const targets = new Set(editable && s.swap ? swapTargets(s.swap, l) : []);
     // Only spots with somewhere to go get a button, so nothing is a dead click.
     const movable = new Set(editable ? spotRefs(l).filter((ref) => swapTargets(ref, l).length) : []);
@@ -133,25 +42,18 @@
       s,
       week,
       // Sleeper's own per-player points use the league's scoring; what-if rebuilds them from Lock-In rules.
-      points: whatIfOn(s) ? null : matchup?.players_points || {},
+      points: whatIfOn(s) ? null : l.matchup?.players_points || {},
       locks: l.locks,
       // Your own lineup's lockable games can be locked from their cell.
       lockRoster: l.lockable ? l.roster.roster_id : null,
       started: l.started,
       editable: editable && !s.saving,
-      selecting: Boolean(editable && s.swap),
       targets,
     };
-
     const picked = s.swap && s.players[spotId(s.swap, starters)];
-    const hint = editable ? (s.saving ? 'Saving lineup…'
-      : picked ? `Pick a player to swap with ${esc(picked.name)} · Esc to cancel`
-      : s.swap ? 'Pick a player for this slot · Esc to cancel'
-      : 'Tap a position to update your lineup') : '';
-
     return `
-      ${teamCard(s, l)}
-      ${week ? rosterSections(ctx, l, hint) : '<p class="msg">Loading week…</p>'}`;
+      ${summary(s, l)}
+      ${week ? rosterSections(ctx, l, swapHint(s, editable, picked?.name)) : loading('Loading week…')}`;
   }
 
   // A section's header row, aligned with its player rows: title, the week's days, points.
@@ -159,11 +61,7 @@
     const { s, week } = ctx;
     const days = week.days.map((date) => `<div class="dh${date === s.today ? ' today' : ''}">
       <b>${esc(weekday(date, 'narrow'))}</b>${Number(date.slice(8))}</div>`).join('');
-    return `<div class="rhead${cls ? ` ${cls}` : ''}">
-      <div class="rtitle"><h3>${esc(title)}</h3>${hint ? `<div class="hint">${hint}</div>` : ''}</div>
-      <div class="days">${days}</div>
-      <div class="week-pts">Pts</div>
-    </div>`;
+    return rowHead(title, { hint, cls, middle: `<div class="days">${days}</div>` });
   }
 
   // Every player card needs the week's schedule, so these only render once it's loaded.
@@ -172,14 +70,13 @@
     const { slots, starters, bench, taxi, reserve, taxiEditable, reserveEditable } = l;
     const settings = s.league.settings || {};
     const card = (slot, id, spot) => playerCard(ctx, slot, id, spot);
-    const padded = (ids, count) => [...ids, ...Array(Math.max(0, (count || 0) - ids.length)).fill('0')];
     const openSpots = (prefix, n, slot) => Array.from({ length: n }, (_, k) => card(slot, '0', `${prefix}:${k}`)).join('');
     const taxiCards = taxiEditable
       ? taxi.map((id) => card('TX', id, `t:${id}`)).join('') + openSpots('te', l.taxiRoom, 'TX')
-      : padded(taxi, settings.taxi_slots).map((id) => card('TX', id)).join('');
+      : padTo(taxi, settings.taxi_slots).map((id) => card('TX', id)).join('');
     const reserveCards = reserveEditable
       ? reserve.map((id) => card('IR', id, `r:${id}`)).join('') + openSpots('re', l.reserveRoom, 'IR')
-      : padded(reserve, settings.reserve_slots).map((id) => card('IR', id)).join('');
+      : padTo(reserve, settings.reserve_slots).map((id) => card('IR', id)).join('');
     const benchCards = bench.map((id) => card('BN', id, `b:${id}`)).join('') +
       (taxiEditable || reserveEditable ? openSpots('be', l.benchRoom, 'BN') : '');
     return `
@@ -198,15 +95,14 @@
     return kind === 'b' || kind === 't' ? key : null;
   }
 
-  function teamCard(s, l) {
+  // The team card: points so far and the projection, and the Waivers button on your own team.
+  function summary(s, l) {
     const { roster, week, matchup, leg, starters } = l;
-    const owner = s.usersById?.[roster.owner_id];
-    const image = avatar(s, roster);
-    // Sleeper's totals use the league's scoring, so under what-if scoring they're added up here from Lock-In rules.
     // The public matchup is cached for minutes, so with the (fresh) leg, or under what-if
-    // scoring, the total is added up here as Sleeper does: each starter's locked game,
-    // else their latest finished one. Sleeper's own leg points (and a commissioner's custom points) still win.
-    const states = (whatIfOn(s) || leg) && week ? starters.filter((id) => id && id !== '0')
+    // scoring (Sleeper's totals use the league's), the total is added up here as Sleeper
+    // does: each starter's locked game, else their latest finished one. Sleeper's own
+    // leg points (and a commissioner's custom points) still win.
+    const states = (whatIfOn(s) || leg) && week ? starters.filter(real)
       .map((id) => lockState(playerDays(week, s.players[id]?.team, id), l.locks[id], s.now)) : null;
     const proj = whatIfOn(s) && states ? states.reduce((sum, st) => sum + (st.counted ? st.points : lockInDefault(st.games) ?? 0), 0)
       : leg?.proj_points ?? (week && starters.reduce((sum, id) => sum + (lockInDefault(playerDays(week, s.players[id]?.team, id)) ?? 0), 0));
@@ -215,39 +111,22 @@
       : leg ? leg.custom_points ?? leg.points ?? live : matchup?.custom_points ?? matchup?.points;
     const opp = matchup?.matchup_id != null &&
       week.matchups.find((m) => m.matchup_id === matchup.matchup_id && m.roster_id !== roster.roster_id);
-    const oppRoster = opp && s.rosters.find((r) => r.roster_id === opp.roster_id);
-    const name = teamName(s, roster);
     const claims = s.claims?.length || 0;
-    return `<section class="team-card">
-      ${image ? `<img class="avatar" src="${esc(image)}" alt="">` : '<div class="avatar"></div>'}
-      <div class="who">
-        <div class="team-name">${esc(name)}</div>
-        <div class="sub">${owner && owner.display_name !== name ? `${esc(owner.display_name)} · ` : ''}${record(roster)}${oppRoster ? ` · vs ${esc(teamName(s, oppRoster))}` : ''}</div>
-      </div>
-      <div class="score">
-        <div class="pts">${points ? f2(points) : '–'}</div>
-        <div class="sub">proj ${f2(proj)}</div>
-      </div>
-      ${l.mine ? `<button class="waivers" data-action="claims">Waivers${claims ? ` <span class="count">${claims}</span>` : ''}</button>` : ''}
-      ${weekNav(s, week)}
-    </section>`;
-  }
-
-  function cardClass({ s, editable, selecting, targets }, spot) {
-    if (!editable || !spot) return '';
-    if (s.swap === spot) return ' selected';
-    if (selecting) return targets.has(spot) ? ' target' : ' dim';
-    return '';
+    return teamCard(s, roster, {
+      points: points || null,
+      proj,
+      opponent: opp && s.rosters.find((r) => r.roster_id === opp.roster_id),
+      week,
+      extra: l.mine ? `<button class="waivers" data-action="claims">Waivers${claims ? ` <span class="count">${claims}</span>` : ''}</button>` : '',
+    });
   }
 
   function playerCard(ctx, slot, id, spot) {
-    const { s, week, points, locks, editable, movable, lockRoster, started } = ctx;
+    const { s, week, points, locks, editable, movable, lockRoster, started, targets } = ctx;
     const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
-    const cls = cardClass(ctx, spot);
-    if (!id || id === '0') {
-      return `<article class="card empty${cls}">${slotBadge(slot, button)}<div class="headshot"></div><div class="info"><span class="name">Empty</span></div></article>`;
-    }
-    const p = s.players[id] || { name: `Player #${id}`, positions: [] };
+    const cls = swapClass(s, editable, spot, targets);
+    if (!real(id)) return emptyCard(slotBadge(slot, button), cls);
+    const p = playerOf(s.players, id);
     const locked = lockedGameId(locks[id]);
     const days = playerDays(week, p.team, id).map((d) => ({ ...d, locked: locked != null && String(d.game?.id) === String(locked) }));
     const lockedDay = days.find((d) => d.locked);
@@ -257,14 +136,12 @@
     const lastDone = st.games.filter((d) => d.game.status === 'complete').at(-1);
     const state = st.lockable ? 'lockable' : st.unsure ? 'maybe' : st.benched ? 'benched' : null;
     const mark = (d) => (starting && d === lastDone ? state : null);
-    const research = week.research[id];
-    const pct = (n) => (n == null ? '–' : `${Math.ceil(n)}%`);
     return `<article class="card${cls}">
       ${slotBadge(slot, button)}
       <img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}">
       <div class="info">
-        <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${positions(p)}<span class="team">- ${esc(p.team || 'FA')}</span>${injuryTag(p)}</div>
-        <div class="line2" title="Started and rostered in leagues like this one"><b>${pct(research?.started)}</b> Start<span class="bar">|</span><b>${pct(research?.owned)}</b> Rostered</div>
+        <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${teamTag(p, { chips: true })}${injuryTag(p)}</div>
+        ${researchLine(week.research[id])}
       </div>
       <div class="days">${days.map((d) => {
         const m = mark(d);
@@ -304,7 +181,7 @@
     const note = mark === 'benched' ? 'played on your bench, so it can\'t be locked in'
       : mark === 'maybe' ? 'can be locked in only if they were starting at tip-off (the extension didn\'t see your lineup then)'
       : { locked: 'locked in', lockable: 'can still be locked in', past: 'too late to lock in' }[state];
-    const title = `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}${time ? `, ${time}` : ''}${note ? `, ${note}` : ''}`;
+    const title = `${gameLabel(d)}${time ? `, ${time}` : ''}${note ? `, ${note}` : ''}`;
     const icon = d.locked || lockable ? lockIcon(!d.locked) : '';
     const shown = value == null ? '–' : f2(value);
     if (lockRef && s.lockConfirm === lockRef) {
@@ -381,5 +258,6 @@
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   }
 
+  // The pickers live in ui.js (both sports use them); content.js reads matchupPairs from here.
   return { render, matchupPairs, teamPicker, matchupPicker, apiView, sessionExpired };
 })();
