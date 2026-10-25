@@ -505,6 +505,21 @@
       </div>`;
   }
   document.addEventListener('click', () => document.querySelector(`${PLAYERS_PANEL} .snp-team-pick.open`)?.classList.remove('open'));
+  // With a team picked, arrow up and down go through the league's teams (A to
+  // Z, as the picker lists them), round and round. Not while typing (Find player).
+  document.addEventListener('keydown', (e) => {
+    if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    if (e.target instanceof Element && e.target.matches('input, select, textarea, [contenteditable]')) return;
+    const panel = playersPanel();
+    const picked = panel && pickedTeam(panel);
+    if (!picked) return;
+    const teams = leagueTeams(panel);
+    const at = teams.findIndex((t) => t.id === picked);
+    if (at < 0) return;
+    e.preventDefault();
+    panel.snpTeamPicked = true;
+    pickTeam(panel, teams[(at + (e.key === 'ArrowDown' ? 1 : -1) + teams.length) % teams.length].id);
+  });
 
   // A rostered player's owner line: the team's avatar and name, in place of Sleeper's arrow and username.
   function ownerLine(row, id, panel) {

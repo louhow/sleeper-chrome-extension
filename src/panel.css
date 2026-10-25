@@ -275,7 +275,7 @@ h3 {
 .rhead {
   --day: 50px;
   display: grid;
-  grid-template-columns: 40px 30px minmax(0, 1fr) auto 62px;
+  grid-template-columns: 40px 30px minmax(0, 1fr) auto 54px;
   align-items: center;
   column-gap: 8px;
 }
@@ -735,14 +735,22 @@ button.cell:disabled {
   height: 8px;
 }
 /* A locked-in score reads as banked. */
-/* A locked score: boxed like its locked day cell, its score's color in a gold frame. */
+/* A locked score: boxed like its locked day cell (same height, padlock under the
+   score), its score's color in a gold frame. */
 .week-pts.locked b {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 3px 7px;
+  justify-content: center;
+  gap: 1px;
+  box-sizing: border-box;
+  height: 38px;
+  min-width: 50px;
+  padding: 0 4px;
   border: 2px solid #ffcf3a;
-  border-radius: 7px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 14px;
   background: #2a3142;
   background-clip: padding-box;
   box-shadow: inset 0 0 0 1px rgba(13, 20, 33, 0.55);
@@ -752,8 +760,9 @@ button.cell:disabled {
 .week-pts.locked b.tier-yellow { background-color: #977a17; }
 .week-pts.locked b.tier-red { background-color: #b03f59; }
 .week-pts.locked b .lock-icon {
-  width: 11px;
-  height: 11px;
+  order: 1;
+  width: 10px;
+  height: 10px;
   color: #ffe07a;
 }
 
@@ -762,7 +771,7 @@ button.cell:disabled {
   .card,
   .rhead {
     --day: minmax(0, 1fr);
-    grid-template-columns: 40px 30px minmax(0, 1fr) 62px;
+    grid-template-columns: 40px 30px minmax(0, 1fr) 54px;
     row-gap: 4px;
   }
   .card .days,

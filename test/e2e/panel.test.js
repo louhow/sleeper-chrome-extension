@@ -383,12 +383,12 @@ const sleeper = {
   injured: new Set(), // player ids the players feed reports as Out
   // When set, each team's first game of the week is reported as finished a few
   // hours ago, with projections standing in as stats, so Lock-In has something
-  // to lock; every other game is still to come, `laterDays` days on.
+  // to lock; every other game is still to come, `laterShift` ms later.
   midWeek: false,
   finished: new Set(),
   // When set, the finished games tipped off at this time instead (see seenThroughTipOff).
   tipAt: null,
-  laterDays: 0,
+  laterShift: 0,
   // When set, it is week 1 of the regular season and no game has tipped off yet.
   beforeTipoff: false,
   // When set, rewrites the weekly projection rows (and so mid-week stats, which stand in from them).
@@ -413,11 +413,11 @@ async function startMidWeek() {
     for (const t of [g.metadata?.home_team?.team, g.metadata?.away_team?.team]) firstByTeam[t] ??= g.game_id;
   }
   sleeper.finished = new Set(Object.values(firstByTeam));
-  // Once the real week is underway, later games may have been played too: they
-  // move on by whole days, keeping their clock times, so the first starts at
-  // least two hours from now.
+  // Once the real week is underway (or over), later games may have been played
+  // too: their tip-offs move on together, keeping their order and their days
+  // (so they stay in the week), until the first is at least two hours away.
   const later = data.scores.filter((g) => !sleeper.finished.has(g.game_id)).map((g) => g.start_time);
-  sleeper.laterDays = Math.max(0, Math.ceil((Date.now() + 2 * 3600e3 - Math.min(...later)) / 864e5));
+  sleeper.laterShift = Math.max(0, Date.now() + 2 * 3600e3 - Math.min(...later));
   sleeper.midWeek = true;
   sleeper.tipAt = null;
 }
@@ -434,15 +434,13 @@ async function seenThroughTipOff(ready) {
 }
 
 function fakeMidWeek(scores) {
-  const day = (date, n) => new Date(Date.parse(`${date}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
   for (const g of scores) {
     if (sleeper.finished.has(g.game_id)) {
       g.status = 'complete';
       g.start_time = sleeper.tipAt ?? Date.now() - 3 * 3600e3;
     } else {
       g.status = 'pre_game';
-      g.start_time += sleeper.laterDays * 864e5;
-      if (g.date) g.date = day(g.date, sleeper.laterDays);
+      g.start_time += sleeper.laterShift;
     }
   }
   return scores;
@@ -906,6 +904,18 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
   const back = page.locator(panel('.tools .my-team'));
   assert.match(await back.innerText(), /^←\s*My team$/);
   await page.screenshot({ path: `${OUT}team-someone-else.png` });
+  // Arrow keys go through the other teams, A to Z, skipping yours, round and round.
+  const others = await page.evaluate((me) => {
+    const root = document.querySelector('#sleeper-nba-panel').shadowRoot;
+    return [...root.querySelectorAll('.tp-menu [data-pick-roster]')].filter((b) => b.dataset.pickRoster !== me).map((b) => b.querySelector('b').textContent.trim());
+  }, String(mine.roster_id));
+  const shown = async () => (await page.locator(panel('.team-card .team-name')).textContent()).trim();
+  const at = others.indexOf(await shown());
+  await page.keyboard.press('ArrowDown');
+  await page.locator(panel('.team-card .team-name')).filter({ hasText: others[(at + 1) % others.length] }).waitFor();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await page.locator(panel('.team-card .team-name')).filter({ hasText: others[(at - 1 + others.length) % others.length] }).waitFor();
   await back.click();
   await page.locator(panel('.tools .my-team')).waitFor({ state: 'detached' });
   assert.equal(await page.locator(panel('.team-pick .tp-button')).getAttribute('data-roster'), String(mine.roster_id), 'your own team again');
@@ -2117,6 +2127,17 @@ test('players tab: a team picker beside the search, and rostered players show th
   assert.equal(await picker.locator('.snp-team-button .snp-team-name').textContent(), 'Cling Kong');
   assert.equal(await picker.locator('.snp-team-menu').isVisible(), false, 'the menu closes');
   assert.deepEqual(await page.evaluate(() => [panel.state.filterByUser, panel.state.hideOwned]), [true, false]);
+  // Arrow keys go through the teams, A to Z, round and round; not while typing in Find player.
+  await page.keyboard.press('ArrowDown');
+  await page.waitForFunction(() => document.querySelector('.snp-team-button .snp-team-name')?.textContent === 'Cookie Monster');
+  assert.deepEqual(await rows(), ['mine']);
+  await page.keyboard.press('ArrowDown');
+  await page.waitForFunction(() => document.querySelector('.snp-team-button .snp-team-name')?.textContent === 'Cling Kong');
+  await page.locator('.player-search input').focus();
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(300);
+  assert.equal(await picker.locator('.snp-team-button .snp-team-name').textContent(), 'Cling Kong', 'typing keeps the team');
+  await page.locator('.player-search input').blur();
   await page.screenshot({ path: `${OUT}players-team-picked.png` });
   // It comes back next time, with the rest of the view.
   await page.waitForTimeout(700);

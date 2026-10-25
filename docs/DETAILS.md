@@ -22,7 +22,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
   | Later in the week | Quiet outline, projection muted |
 
 - A game played is tinted, muted, by its score's color (green 24+, yellow 15+, red below, as in the game log); a locked one is filled bright in that color inside its gold frame.
-- The points column shows a locked-in score once, boxed like its day cell (its score's color in a gold frame), with a padlock, in yellow, so it reads apart from a score still in play.
+- The points column shows a locked-in score once, boxed like its day cell (the same height, its score's color in a gold frame, a padlock under the score), in yellow, so it reads apart from a score still in play.
 - Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
 - Lock-In needs the player starting when the game tipped off and never benched since. Sleeper's own wording (in its app's strings): "Player was not in starting lineup OR was moved to bench since game began". A game played on the bench can't be locked after moving them in, nor one whose player was benched and started again.
   Sleeper keeps no lineup history, so the extension remembers your lineups as it reads them, in the browser's extension storage: the current week only (earlier weeks are deleted), at most 100 lineup changes.
@@ -102,7 +102,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 ### Team picker
 
 - The toolbar's team picker shows every team with its avatar, name and owner, A to Z (yours marked "you"); the pick is kept for next time.
-- While you're looking at someone else's team, a "My team" button beside it goes back to yours in one click.
+- While you're looking at someone else's team, a "My team" button beside it goes back to yours in one click, and the arrow up and down keys go through the other teams in the picker's order, round and round (not while typing).
 - On the Matchup tab, and on the League tab's matchups, a team's avatar, owner or name opens it on the Team tab (just for now: the picker's choice stays).
 
 ### League
@@ -129,7 +129,7 @@ Sleeper's own NBA Players table, with these additions:
   A game played wears its score's color by the league's scoring (green 24+, yellow 15+, red below, as on the Team tab; dim gray when they didn't play); in the game log's muted tones; bright red is a game on now, light gray one still to play, faint no game.
   Hovering a mark shows a card: the game, its score (or tip-off time), and how many games are left; sorting by the column sorts by games left.
   The schedule is the week's GraphQL `scores` (already loaded for the Team tab's week, else one query per week); the scores come from the week's stat rows, which Best and Worst already load.
-- Team picker: beside Find player, every league team with its avatar and name (All teams first); picking one narrows the list to that team's players through Sleeper's own owner filter (the one in its filter section), so the Week strip scans a whole roster. Ticking Free agents lets the pick go. It's remembered with the rest of the view.
+- Team picker: beside Find player, every league team with its avatar and name (All teams first); picking one narrows the list to that team's players through Sleeper's own owner filter (the one in its filter section), so the Week strip scans a whole roster. With a team picked, arrow up and down go through the teams, round and round (not while typing in Find player). Ticking Free agents lets the pick go. It's remembered with the rest of the view.
 - With more columns than Sleeper's 9 they narrow to fit, the labels center, and each value sits right under its label (Sleeper's own rows only line up at its 60px width); the name area gets 12px more.
 - Rostered players' owner line shows the team's avatar (or initial) and team name, in place of Sleeper's arrow and username.
 - Shooting: a small + at the end of the column header (−, filled, while on), in Stats only, off until pressed: FGM, FGA, 3PA, FTM and FTA at the end of the table. It stays out of Sleeper's filter row, which has no room to spare.
