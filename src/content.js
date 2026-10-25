@@ -470,12 +470,14 @@
         disabled = true;
         teardown();
         // NFL leagues get only Optimize lineup on Sleeper's own Team tab.
-        if (league.sport === 'nfl' && !destroyed) nflSession = mountNfl(leagueId, lastPage);
+        if (league.sport === 'nfl' && !destroyed) nflSession = mountNfl(leagueId, lastPage, api, league);
         else console.info('[sleeper-nba-panel] not an NBA league, staying hidden');
         return;
       }
       // Tells page-hook.js to route this league's waiver and add buttons here.
       document.documentElement.dataset.snpNbaLeague = leagueId;
+      // And to add its columns to this league's Players tab.
+      document.documentElement.dataset.snpPlayersLeague = leagueId;
       const rosterKey = `roster:${leagueId}`;
       const whatIfKey = `whatif:${leagueId}`;
       const [nbaState, users, rosters, bracket, traded, drafts, players, prefs, me] = await Promise.all([
@@ -1476,6 +1478,7 @@
       document.removeEventListener('snp:player-action', onPlayerAction);
       document.removeEventListener('snp:player-card', onPlayerCard);
       if (document.documentElement.dataset.snpNbaLeague === leagueId) delete document.documentElement.dataset.snpNbaLeague;
+      if (document.documentElement.dataset.snpPlayersLeague === leagueId) delete document.documentElement.dataset.snpPlayersLeague;
       cancelAnimationFrame(frame);
       host.remove();
       layer.remove();
@@ -1505,7 +1508,7 @@
   // NFL leagues: Sleeper's web app runs the Team tab itself. This adds an
   // OPTIMIZE button beside its WAIVER and TRADE buttons, a confirm dialog, and
   // saves through Sleeper's own actions (page-hook.js reads and writes the lineup).
-  function mountNfl(leagueId, page) {
+  function mountNfl(leagueId, page, api, league) {
     const BUTTON_ID = 'snp-optimize';
     const layer = document.createElement('div');
     layer.id = 'sleeper-nfl-dialog';
@@ -1724,6 +1727,113 @@
       }
     });
 
+    // League data the Players tab's Last 5 column needs: the current week,
+    // score colors (see loadTiers) and each week's stat rows, which finished
+    // weeks keep for the session and the week on now for a couple of minutes.
+    const weekData = { currentWeek: null, tiers: null, rows: {}, scores: {} };
+    const LIVE_MS = 2 * 60e3;
+    function weekRows(season, week) {
+      const key = `${season}|${week}`;
+      const hit = weekData.rows[key];
+      const live = String(season) === String(league.season) && week >= weekData.currentWeek;
+      if (!hit || (live && Array.isArray(hit.rows) && Date.now() - hit.at > LIVE_MS)) {
+        const load = api.get(`/stats/nfl/${season}/${week}?season_type=regular`)
+          .then((rows) => { weekData.rows[key] = { rows: rows || [], at: Date.now() }; })
+          .catch(() => { weekData.rows[key] = { rows: hit?.rows || [], at: Date.now() }; })
+          .finally(() => document.dispatchEvent(new CustomEvent('snp:week-games-ready')));
+        // A refresh keeps showing what it had meanwhile.
+        weekData.rows[key] = { rows: hit?.rows ?? null, at: hit?.at ?? 0, load };
+      }
+      return weekData.rows[key].rows;
+    }
+    // The week on now: each team's game, live, done or still to come, with its kickoff.
+    function weekScores(season, week) {
+      const key = `${season}|${week}`;
+      const hit = weekData.scores[key];
+      if (!hit || (Array.isArray(hit.games) && Date.now() - hit.at > LIVE_MS && !hit.loading)) {
+        weekData.scores[key] = { games: hit?.games ?? null, at: hit?.at ?? 0, loading: true };
+        api.graphql(`scores (week ${week})`, `query scores {
+  scores(sport: "nfl", season_type: "regular", season: ${JSON.stringify(String(season))}, week: ${Number(week)}) {
+    game_id metadata status start_time
+  }
+}`).then((data) => { weekData.scores[key] = { games: data?.scores || [], at: Date.now() }; })
+          .catch(() => { weekData.scores[key] = { games: hit?.games || [], at: Date.now() }; })
+          .finally(() => document.dispatchEvent(new CustomEvent('snp:week-games-ready')));
+      }
+      return weekData.scores[key].games;
+    }
+    async function loadNfl() {
+      const now = await api.get('/v1/state/nfl');
+      weekData.currentWeek = Number(now.display_week || now.week || 1);
+      weekData.tiers = await loadTiers(api, league, weekData.currentWeek).catch((err) => {
+        console.warn('[sleeper-nfl] score colors unavailable', err);
+        return null;
+      });
+      if (destroyed) return;
+      document.documentElement.dataset.snpPlayersLeague = leagueId;
+      // Page-hook waits for this to know the extension is in (admin tools are NBA-only).
+      document.dispatchEvent(new CustomEvent('snp:admin-scoring', { detail: JSON.stringify({ leagueId, enabled: false, changed: false }) }));
+    }
+    loadNfl().catch((err) => console.warn('[sleeper-nfl] league data unavailable', err));
+
+    // The Last 5 column: the five weeks played through `week` (the week on now
+    // counts once a game in it has kicked off), each player's score per week
+    // (league scoring, colored by position), points per game over them, and
+    // for the week on now, where each team's game stands. Null until the
+    // weeks are in ('snp:week-games-ready' follows).
+    function recentWeeks(e) {
+      const { season, week } = JSON.parse(e.detail);
+      let out = null;
+      if (weekData.currentWeek != null) {
+        const current = String(season) === String(league.season) ? weekData.currentWeek : Infinity;
+        const thisWeek = Number(week) >= current ? current : Number(week);
+        const rowsNow = thisWeek === current ? weekRows(season, current) : [];
+        // Before anything kicks off, the week on now has no stat rows yet.
+        const end = thisWeek === current && Array.isArray(rowsNow) && !rowsNow.length ? current - 1 : thisWeek;
+        const weeks = [];
+        for (let w = Math.max(league.settings?.start_week || 1, end - 4); w <= end; w++) weeks.push(w);
+        const all = weeks.map((w) => weekRows(season, w));
+        const games = end === current ? weekScores(season, current) : [];
+        if (all.every(Array.isArray) && games) {
+          const settings = league.scoring_settings || {};
+          const points = {};
+          const teamOf = {};
+          all.forEach((rows, i) => {
+            for (const { player_id: id, stats, team, opponent, player } of rows) {
+              if (!model.playedGame(stats)) continue;
+              const fpts = scoring.scoreStats(settings, stats);
+              const position = player?.fantasy_positions?.[0] || player?.position;
+              (points[id] ||= {})[weeks[i]] = { fpts, tier: model.scoreTier(fpts, weekData.tiers, position), team, opponent };
+              teamOf[id] = team;
+            }
+          });
+          const avg = Object.fromEntries(Object.entries(points).map(([id, byWeek]) => {
+            const list = Object.values(byWeek);
+            return [id, list.reduce((sum, x) => sum + x.fpts, 0) / list.length];
+          }));
+          const status = {};
+          const kickoff = {};
+          if (end === current) {
+            const now = Date.now();
+            for (const g of games) {
+              const state = g.status === 'complete' ? 'done' : g.status === 'in_game' || (g.start_time != null && g.start_time <= now) ? 'live' : 'left';
+              for (const side of ['home_team', 'away_team']) {
+                // NFL names each side's team plainly; NBA nests it.
+                const team = typeof g.metadata?.[side] === 'string' ? g.metadata[side] : g.metadata?.[side]?.team;
+                if (!team) continue;
+                (status[current] ||= {})[team] = state;
+                if (g.start_time != null) kickoff[team] = g.start_time;
+              }
+            }
+          }
+          out = { weeks, current, points, avg, teamOf, status, kickoff, tiers: weekData.tiers, ready: true,
+            sig: `${season}|${weeks.join(',')}|${all.map((r) => r.length).join(',')}|${JSON.stringify(status)}` };
+        }
+      }
+      document.dispatchEvent(new CustomEvent('snp:recent-weeks', { detail: JSON.stringify(out) }));
+    }
+    document.addEventListener('snp:recent-weeks-request', recentWeeks);
+
     // Sleeper re-renders its header now and then, so this runs on every page change.
     function attach() {
       if (destroyed) return;
@@ -1775,6 +1885,8 @@
 
     function destroy() {
       destroyed = true;
+      document.removeEventListener('snp:recent-weeks-request', recentWeeks);
+      if (document.documentElement.dataset.snpPlayersLeague === leagueId) delete document.documentElement.dataset.snpPlayersLeague;
       leagueWatch.disconnect();
       leagueHost.remove();
       hideRows.remove();

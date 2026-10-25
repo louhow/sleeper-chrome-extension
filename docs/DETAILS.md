@@ -219,6 +219,19 @@ The value is Sleeper's FPTS plus the changed settings scored on their own (`snp:
 - The numbers are Sleeper's own: its cards stay on the page, hidden, and the extension reads them as they update during games, so they always match the rest of Sleeper.
 - Clicking a matchup opens it the way Sleeper's own card does. Sleeper's week picker and the rest of the tab (standings, activity) stay as they are.
 
+### NFL: Players tab
+
+Sleeper's own NFL Players table, with these additions (the same hooks as the NBA Players tab):
+
+- Last 5: a column after FPTS with a mark a week for the last five weeks played, through the week picked (the season: through the current week).
+  The week on now counts once a game in it has kicked off; before that, the five weeks before it.
+  A week played wears its score's color by the league's scoring and the player's position (see [Score colors](#score-colors)); gray when they didn't play, faint for a bye, bright red for a game on now, light gray for one still to come.
+  Hovering a mark shows the week, the opponent (from Sleeper's own schedule) and the score, with points per game over those weeks; sorting by the column sorts by that.
+  The scores come from `/stats/nfl/<season>/<week>` (finished weeks once per page load, the week on now every two minutes at most) and, for the week on now, GraphQL `scores` for where each game stands.
+- Sleeper's group headers (Fantasy, Rushing, Receiving, Passing) move with the columns, centered over their own.
+- The team picker and team lines of the NBA Players tab: every league team with its avatar, narrowing the list to one team through Sleeper's owner filter, arrow keys through the teams, and each rostered player's team avatar and name.
+- The view you last had on comes back, as on the NBA Players tab.
+
 ### NFL: Optimize lineup
 
 Sleeper's web app already runs NFL leagues, so the extension adds only one thing there: an **OPTIMIZE** button on your own Team tab, left of Sleeper's WAIVER and TRADE buttons (it reuses their classes, so it looks like them).

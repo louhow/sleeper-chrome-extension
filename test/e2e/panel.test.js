@@ -146,6 +146,8 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   .custom-checkbox.checked { background: #f5b469; }
   /* Sleeper's header is 42px, its labels the bottom 25px. */
   .table-header { height: 42px; padding-top: 16px; box-sizing: border-box; }
+  .table-header:has(.section-header) { height: 58px; padding-top: 12px; }
+  .section-header { display: flex; height: 16px; font-size: 11px; font-weight: 700; }
 </style>
 <div class="integration-players-panel"><div class="filters"><div class="header-top"><button data-pos="ALL">ALL</button><button data-pos="PG">PG</button>
     <div class="player-search-wrapper"><div class="player-search"><input placeholder="Find player"></div></div></div>
@@ -156,7 +158,8 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
 <script>
   // Keys Sleeper has no label for print capitalized (and show uppercase).
   const LABELS = { fpts_proj: 'FPTS', fpts: 'FPTS', sp: 'MIN', pts: 'PTS', tpm: '3PM', reb: 'REB', ast: 'AST', stl: 'STL', blk: 'BLK', to: 'TO',
-    fgm: 'Fgm', fga: 'Fga', tpa: '3pa', ftm: 'Ftm', fta: 'Fta', GP: 'GP', Week: 'Week' };
+    fgm: 'Fgm', fga: 'Fga', tpa: '3pa', ftm: 'Ftm', fta: 'Fta', GP: 'GP', Week: 'Week',
+    rush_att: 'ATT', rush_yd: 'YD', rush_td: 'TD', rec: 'REC', rec_tgt: 'TAR', rec_yd: 'YD', rec_td: 'TD', pass_cmp: 'CMP', pass_att: 'ATT', pass_yd: 'YD', pass_td: 'TD' };
   const PLAYERS = ${JSON.stringify(players)};
   // Rostered players show their owner under the name, which makes the name area wider.
   // Owners are league users (a team name each); ownedPlayers maps player -> owner, as Sleeper's props do.
@@ -209,6 +212,13 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   function render() {
     const { playerStatsMap: map, statKeys, sort, positionFilter, hideOwned, filterByUser, filterByUserMap } = panel.state;
     const owned = panel.props.ownedPlayers;
+    // NFL: group headers over the columns, fixed-width boxes in a row, as Sleeper's are.
+    if (panel.props.sections && !document.querySelector('.section-header')) {
+      const head = document.createElement('div');
+      head.className = 'section-header';
+      head.innerHTML = panel.props.sections.map(([name, width], i) => '<div class="' + name + '" style="flex: 0 0 ' + width + 'px;' + (i ? '' : ' margin-left: 156px;') + '">' + name.toUpperCase() + '</div>').join('');
+      document.querySelector('.table-header').prepend(head);
+    }
     document.querySelector('.stat-key-header').innerHTML = statKeys.map((k) => '<div class="label nba" data-key="' + k + '"><span>' + (LABELS[k] || k) + '</span></div>').join('');
     const view = PLAYERS.filter((p) => positionFilter === 'ALL' || p.pos === positionFilter)
       .filter((p) => !(hideOwned && owned[p.id]) && !(filterByUser && !filterByUserMap[owned[p.id]?.user_id]))
@@ -2166,6 +2176,126 @@ test('players tab: a team picker beside the search, and rostered players show th
   await picker.locator('.snp-team-menu button', { hasText: 'All teams' }).click();
   await page.waitForFunction(() => document.querySelectorAll('.player-list-item').length === 4);
   await forgetPlayersView();
+  documentBody = LOGGED_OUT;
+});
+
+test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors, a team picker and team lines', async () => {
+  const NFL_KEYS = ['fpts', 'rush_att', 'rush_yd', 'rush_td', 'rec', 'rec_tgt', 'rec_yd', 'rec_td', 'pass_cmp', 'pass_att', 'pass_yd', 'pass_td'];
+  // Three made-up players' games, added to Sleeper's real weekly stats (which the score colors come from).
+  // The QB throws for 300 and 2 TDs some weeks, 150 and none others; the TE has a bye in week 4 and sat week 5.
+  const games = {
+    qbx: { 2: { pass_yd: 300, pass_td: 2 }, 3: { pass_yd: 150 }, 4: { pass_yd: 300, pass_td: 2 }, 5: { pass_yd: 150 }, 6: { pass_yd: 225, pass_td: 1 } },
+    tex: { 2: { rec: 6, rec_yd: 80, rec_td: 1 }, 3: { rec: 2, rec_yd: 15 }, 6: { rec: 4, rec_yd: 40 } },
+    rbx: { 2: { rush_yd: 20 }, 3: { rush_yd: 20 }, 4: { rush_yd: 20 }, 5: { rush_yd: 20 }, 6: { rush_yd: 120, rush_td: 1 } },
+  };
+  const info = { qbx: ['QB', 'DET'], tex: ['TE', 'KC'], rbx: ['RB', 'SF'] };
+  await context.route(/api\.sleeper\.app\/stats\/nfl\/2026\/\d+/, async (route) => {
+    const week = Number(route.request().url().match(/\/2026\/(\d+)/)[1]);
+    const res = await route.fetch();
+    const rows = await res.json();
+    for (const [id, byWeek] of Object.entries(games)) {
+      if (byWeek[week]) rows.push({ player_id: id, team: info[id][1], opponent: 'XXX', week, player: { position: info[id][0], fantasy_positions: [info[id][0]] }, stats: { gp: 1, ...byWeek[week] } });
+    }
+    return route.fulfill({ response: res, json: rows });
+  });
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
+  const schedule = (byWeek) => Object.fromEntries(Object.entries(byWeek).map(([w, opp]) => [`week_${w}`, opp]));
+  const schedulesMap = {
+    DET: schedule({ 2: '@BUF', 3: 'NYJ', 4: '@CAR', 5: '@ARI', 6: 'BYE', 7: 'GB' }),
+    KC: schedule({ 2: 'LV', 3: '@DEN', 4: 'BYE', 5: 'LAC', 6: '@NYJ', 7: 'SEA' }),
+    SF: schedule({ 2: 'NO', 3: '@LAR', 4: 'ARI', 5: '@SEA', 6: 'DAL', 7: '@ATL' }),
+  };
+  // DET's week 6 is a bye here, so the QB's week 6 game above is someone else's (it doesn't show).
+  delete games.qbx[6];
+  const stats = (fpts) => ({ fpts, rush_att: 1 });
+  documentBody = playersTable([
+    { id: 'qbx', pos: 'QB', team: 'DET', owner: 'Cookie Monster', stats: stats(20) },
+    { id: 'tex', pos: 'TE', team: 'KC', owner: 'Cling Kong', stats: stats(12) },
+    { id: 'rbx', pos: 'RB', team: 'SF', stats: stats(8) },
+  ], { statType: 'stat', statInterval: 6, statKeys: NFL_KEYS, sort: 'fpts' }, {
+    leagueId: NFL_LEAGUE, sport: 'nfl', leg: 7, schedulesMap,
+    sections: [['fantasy', 96], ['rushing', 160], ['receiving', 197], ['passing', 55]],
+  });
+  const NFL_PLAYERS_URL = `https://sleeper.com/leagues/${NFL_LEAGUE}/players`;
+  await page.goto(NFL_PLAYERS_URL);
+  // Last on week 6 in Stats (else it would open on Projection for the current week).
+  await page.evaluate((id) => localStorage.setItem(`snp:players-view:${id}`, JSON.stringify({ statType: 'stat', season: '2026', interval: 6, current: false })), NFL_LEAGUE);
+  await page.goto(NFL_PLAYERS_URL);
+  await page.waitForFunction(() => panel.state.statKeys.includes('Last 5'), null, { timeout: 30000 });
+  assert.deepEqual(await page.evaluate(() => panel.state.statKeys), ['fpts', 'Last 5', ...NFL_KEYS.slice(1)], 'right after FPTS; no NBA extras');
+  // Shown once it's all in, with no layout shift.
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-snp-players-pending'), null, { timeout: 30000 });
+  assert.equal(await page.locator('.snp-week-pick, .snp-shot-toggle').count(), 0);
+  await page.waitForFunction(() => document.querySelectorAll('.snp-recent i').length === 15, null, { timeout: 30000 });
+  // The extension's numbers: the weeks shown, everyone's scores, and the league's colors.
+  const recent = await page.evaluate(() => {
+    let out = null;
+    const take = (e) => { out = JSON.parse(e.detail); };
+    document.addEventListener('snp:recent-weeks', take);
+    document.dispatchEvent(new CustomEvent('snp:recent-weeks-request', { detail: JSON.stringify({ season: '2026', week: 6 }) }));
+    document.removeEventListener('snp:recent-weeks', take);
+    return out;
+  });
+  assert.deepEqual(recent.weeks, [2, 3, 4, 5, 6], 'the five weeks through the one picked');
+  for (const pos of ['QB', 'TE', 'RB']) {
+    const [lo, hi] = recent.tiers.positions[pos];
+    assert.ok(lo > 0 && hi > lo, `${pos} has its own colors: ${lo} / ${hi}`);
+  }
+  // Scored with the league's settings (as Sleeper's own FPTS are).
+  const league = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}`)).json();
+  const fpts = (s) => Object.entries(s).reduce((sum, [k, v]) => sum + v * (league.scoring_settings[k] ?? 0), 0);
+  const tier = (pos, points) => {
+    const [lo, hi] = recent.tiers.positions[pos];
+    return points >= hi ? 'green' : points >= lo ? 'yellow' : 'red';
+  };
+  const marks = (id) => page.locator(`.player-list-item[data-id="${id}"] .snp-recent i`).evaluateAll((els) => els.map((m) => m.className));
+  const expect = (id, byes = []) => recent.weeks.map((w) => (byes.includes(w) ? 'none' : games[id][w] ? `done ${tier(info[id][0], fpts(games[id][w]))}` : 'done dnp'));
+  assert.deepEqual(await marks('qbx'), expect('qbx', [6]), 'a bye is a faint mark');
+  assert.deepEqual(await marks('tex'), expect('tex', [4]), 'a week sat out is gray');
+  assert.deepEqual(await marks('rbx'), expect('rbx'));
+  assert.equal(new Set(await marks('qbx')).size > 1, true, 'good and bad weeks read apart');
+  // Hovering a mark: the week, the opponent and the score, in its color.
+  await page.locator('.player-list-item[data-id="qbx"] .snp-recent i').nth(3).hover();
+  const tip = page.locator('.snp-week-tip');
+  await tip.waitFor();
+  assert.equal(await tip.locator('b').textContent(), 'Week 5 @ ARI');
+  assert.equal(await tip.locator('.snp-tip-score').textContent(), String(fpts(games.qbx[5])));
+  assert.match(await tip.locator('.snp-tip-foot').textContent(), /a game over 4 weeks$/);
+  await page.locator('.player-list-item[data-id="tex"] .snp-recent i').nth(2).hover();
+  assert.deepEqual([await tip.locator('b').textContent(), await tip.locator('.snp-tip-head span').textContent()], ['Week 4', 'Bye']);
+  // The Fantasy group header spans FPTS and Last 5, centered over them; the others follow their own columns.
+  const spans = await page.evaluate(() => {
+    const box = (el) => el.getBoundingClientRect();
+    const labels = [...document.querySelectorAll('.stat-key-header > .label')].map(box);
+    const at = (cls) => box(document.querySelector(`.section-header > .${cls}`));
+    return { fantasy: [at('fantasy'), labels[0], labels[1]], rushing: [at('rushing'), labels[2], labels[4]], passing: [at('passing'), labels[9], labels[12]] };
+  });
+  for (const [name, [group, first, last]] of Object.entries(spans)) {
+    assert.ok(Math.abs(group.left - first.left) <= 1 && Math.abs(group.right - last.right) <= 1, `${name} spans its columns`);
+  }
+  // Values line up under their labels.
+  const misaligned = await page.evaluate(() => {
+    const labels = [...document.querySelectorAll('.stat-key-header > .label')];
+    const cells = [...document.querySelector('.player-list-item').querySelectorAll(':scope > .cell')];
+    return labels.map((l, i) => Math.abs((l.getBoundingClientRect().left + l.getBoundingClientRect().right) / 2 - (cells[i].getBoundingClientRect().left + cells[i].getBoundingClientRect().right) / 2)).filter((d) => d > 1);
+  });
+  assert.deepEqual(misaligned, []);
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: `${OUT}players-nfl.png` });
+  // Sorting by Last 5 sorts by points a game over those weeks.
+  await page.locator('.stat-key-header > .label', { hasText: 'Last 5' }).click();
+  const avg = (id) => recent.avg[id];
+  const order = await page.locator('.player-list-item').evaluateAll((els) => els.map((r) => r.dataset.id));
+  assert.deepEqual(order, ['qbx', 'tex', 'rbx'].sort((a, b) => avg(b) - avg(a)));
+  // The team picker and team lines, as on the NBA Players tab.
+  const picker = page.locator('.header-top .snp-team-pick');
+  await picker.locator('.snp-team-button').click();
+  await picker.locator('.snp-team-menu button', { hasText: 'Cling Kong' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.player-list-item').length === 1);
+  assert.equal(await page.locator('.player-list-item[data-id="tex"] .snp-owner > span:last-child').textContent(), 'Cling Kong');
+  await context.unroute(/api\.sleeper\.app\/stats\/nfl\/2026\/\d+/);
+  await context.unroute('https://api.sleeper.app/v1/state/nfl');
+  await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('snp:players-view:')).forEach((k) => localStorage.removeItem(k)));
   documentBody = LOGGED_OUT;
 });
 

@@ -126,6 +126,9 @@
   // Marks a picked game in the stats map, so its cells print as whole numbers.
   const GAME = 'snpGame';
   const PICKS = [['avg', 'Avg', 'Average per game this week'], ['best', 'Best', 'Best game this week'], ['worst', 'Worst', 'Worst game this week']];
+  // NFL: the last five weeks played, through the week picked, a mark each in
+  // its score's color; it sorts by points per game over them.
+  const RECENT_KEY = 'Last 5';
   let weekPick = 'avg';
   let shooting = false;
   const schedules = {}; // `${season}|${week}` -> { days, teams: { [team]: day states }, teamOf: { [player id]: team } }
@@ -192,6 +195,25 @@
     return value ?? hit?.value ?? null;
   }
 
+  // NFL: each player's scores over the last five weeks played, from the
+  // extension, as weekGames. Kept for a minute while a week is on (the
+  // extension keeps finished weeks), and not until it's all in.
+  const recents = {};
+  function recentWeeks(season, week) {
+    const key = `${season}|${week}`;
+    const hit = recents[key];
+    if (hit && Date.now() - hit.at < 60e3) return hit.value;
+    let value = null;
+    const take = (e) => {
+      value = JSON.parse(e.detail);
+    };
+    document.addEventListener('snp:recent-weeks', take);
+    send('snp:recent-weeks-request', { season, week });
+    document.removeEventListener('snp:recent-weeks', take);
+    if (value?.ready) recents[key] = { at: Date.now(), value };
+    return value ?? hit?.value ?? null;
+  }
+
   // What you last had on (Projection or Stats, the season and week, Avg / Best
   // / Worst, Shooting), per league, in the page's storage. A week that was the
   // current one comes back as the current one, so a new week opens on it.
@@ -221,10 +243,11 @@
     }
   }
 
+  // Sleeper's table, on a league the extension has loaded (NBA or NFL).
   function playersPanel() {
-    const league = document.documentElement.dataset.snpNbaLeague;
+    const league = document.documentElement.dataset.snpPlayersLeague;
     const el = document.querySelector(PLAYERS_PANEL);
-    const panel = el && fiber(el, (x) => x.scoringSettings && x.sport === 'nba' && 'leagueId' in x)?.stateNode;
+    const panel = el && fiber(el, (x) => x.scoringSettings && (x.sport === 'nba' || x.sport === 'nfl') && 'leagueId' in x)?.stateNode;
     const ours = Boolean(panel?.state && admin && league && admin.leagueId === league && String(panel.props.leagueId) === league);
     return ours ? panel : null;
   }
@@ -233,10 +256,11 @@
   // then GP (a week's Avg), the week's games (a week picked), Sleeper's own,
   // and the shot-volume columns at the end (Stats, Shooting on). Switching
   // away takes them back out. Null until Sleeper has settled which FPTS it shows.
-  function columns(keys, base, other, { adminOn, volumeOn, gpOn, weekOn }) {
+  function columns(keys, base, other, { adminOn, volumeOn, gpOn, weekOn, recentOn }) {
     if (keys[0] !== base || keys.includes(other)) return null;
-    const out = keys.filter((k) => k !== ADMIN_KEY && k !== DELTA_KEY && k !== GP_KEY && k !== WEEK_KEY && !VOLUME.includes(k));
+    const out = keys.filter((k) => k !== ADMIN_KEY && k !== DELTA_KEY && k !== GP_KEY && k !== WEEK_KEY && k !== RECENT_KEY && !VOLUME.includes(k));
     if (volumeOn) out.push(...VOLUME);
+    if (recentOn) out.splice(1, 0, RECENT_KEY);
     if (weekOn) out.splice(1, 0, WEEK_KEY);
     if (gpOn) out.splice(1, 0, GP_KEY);
     if (adminOn) out.splice(1, 0, ADMIN_KEY, DELTA_KEY);
@@ -292,7 +316,9 @@
   // add or take away, so it matches FPTS exactly until a value changes.
   function patchPlayers() {
     const panel = playersPanel();
-    const adminOn = Boolean(panel && admin.enabled);
+    // NFL gets the team picker, team lines and the Last 5 column; the rest is NBA's.
+    const nfl = panel?.props.sport === 'nfl';
+    const adminOn = Boolean(panel && admin.enabled && !nfl);
     document.documentElement.toggleAttribute('data-snp-admin-changed', Boolean(adminOn && admin.changed));
     document.documentElement.toggleAttribute('data-snp-admin-col', Boolean(panel?.state.statKeys?.includes(ADMIN_KEY)));
     sizeColumns(panel);
@@ -318,11 +344,14 @@
     const other = base === 'fpts' ? 'fpts_proj' : 'fpts';
     // A week picked in Stats (rather than the season).
     const shownWeek = statInterval != null && statInterval !== 'season' && Number(statInterval) > 0 ? Number(statInterval) : null;
-    const week = statType === 'stat' ? shownWeek : null;
+    const week = statType === 'stat' && !nfl ? shownWeek : null;
     weekSwitch(week);
-    shotToggle(statType === 'stat');
+    shotToggle(statType === 'stat' && !nfl);
     teamPicker(panel);
-    const fetched = shownWeek ? weekSchedule(season, shownWeek) : null;
+    const fetched = shownWeek && !nfl ? weekSchedule(season, shownWeek) : null;
+    // The season shows the weeks through the current one (Sleeper's leg).
+    const recent = nfl ? recentWeeks(season, shownWeek ?? panel.props.leg) : null;
+    panel.snpRecent = recent;
     // Teams from the extension's players, else from Sleeper's own list.
     const schedule = fetched && { ...fetched, teamOf: { ...Object.fromEntries(listPlayers().map((p) => [String(p.player_id), p.team])), ...fetched.teamOf } };
     panel.snpSchedule = schedule;
@@ -337,7 +366,7 @@
     // Order doesn't matter (sorting by adminDelta reorders it), only who is in view.
     const loaded = picked || played ? `${season}|${week}` : '';
     const left = schedule ? JSON.stringify(schedule.teams) : '';
-    const key = [mode, loaded, gpOn, left, adminOn ? adminVersion : 'off', [...view].sort().join(',')].join('|');
+    const key = [mode, loaded, gpOn, left, recent?.sig ?? '', adminOn ? adminVersion : 'off', [...view].sort().join(',')].join('|');
     const update = {};
     if (source && (panel.snpSourceSeen !== source || panel.snpKey !== key)) {
       // That game alone, as one game played, so Sleeper's per-game numbers are its own.
@@ -346,6 +375,9 @@
       // GP shows "-" until the week's games load.
       if (gpOn) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
         [id, s && played ? { ...s, [GP_KEY]: played[id] ?? 0 } : s]));
+      // Points per game over the last five weeks, to sort by.
+      if (recent) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
+        [id, s ? { ...s, [RECENT_KEY]: recent.avg[id] ?? 0 } : s]));
       // Games still to play this week, to sort by.
       if (schedule) stats = Object.fromEntries(Object.entries(stats).map(([id, s]) =>
         [id, s ? { ...s, [WEEK_KEY]: (schedule.teams[schedule.teamOf[id]] || []).filter((d) => d === 'left').length } : s]));
@@ -369,7 +401,7 @@
       panel.snpSourceSeen = source;
       panel.snpKey = key;
     }
-    const keys = columns(statKeys, base, other, { adminOn, volumeOn: statType === 'stat' && shooting, gpOn, weekOn: Boolean(shownWeek) });
+    const keys = columns(statKeys, base, other, { adminOn, volumeOn: statType === 'stat' && shooting && !nfl, gpOn, weekOn: Boolean(shownWeek) && !nfl, recentOn: nfl });
     if (keys && keys.join() !== statKeys.join()) update.statKeys = keys;
     // In Stats, Sleeper keeps sorting by the projection (fpts_proj), which isn't
     // a column there, so the list never follows the numbers shown (and Best or
@@ -384,10 +416,11 @@
     }
     watchRows();
     decorateRows();
+    alignSections(panel);
     // Shown once it's all in: the view restored and loaded, our columns on and
     // sized, and the week's data the columns need.
     const settled = !panel.state.loading && !panel.snpWant && Boolean(keys) && keys.join() === (panel.state.statKeys || []).join() &&
-      (!shownWeek || schedule) && (!gpOn || played) && (mode === 'avg' || picked);
+      (!shownWeek || nfl || schedule) && (!gpOn || played) && (mode === 'avg' || picked) && (!nfl || recent?.ready);
     if (settled) reveal();
   }
 
@@ -630,6 +663,50 @@
     el.setAttribute('aria-label', count);
   }
 
+  // NFL: the last five weeks played, a mark a week: its score's color (gray
+  // when they didn't play), faint for a bye, red for a game on now, light gray
+  // for one still to come. Hovering one says the week, opponent and score.
+  function recentStrip(cell, recent, id, panel) {
+    if (!cell.hasAttribute('data-snp-cell')) cell.setAttribute('data-snp-cell', '');
+    cell.querySelector(':scope > .snp-value')?.remove();
+    let el = cell.querySelector(':scope > .snp-week');
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'snp-week snp-recent';
+      cell.append(el);
+    }
+    const team = listPlayers().find((p) => String(p.player_id) === id)?.team || recent?.teamOf?.[id] || null;
+    const scores = recent?.points[id] || {};
+    const sig = recent ? `${recent.sig}|${team}|${JSON.stringify(scores)}` : '';
+    if (el.dataset.sig === sig) return;
+    el.dataset.sig = sig;
+    if (!recent) {
+      el.textContent = '-';
+      return;
+    }
+    const schedules = panel.props.schedulesMap || {};
+    const games = recent.weeks.filter((w) => scores[w]).length;
+    const count = games ? `${whole(recent.avg[id] ?? 0)} a game over ${games} week${games === 1 ? '' : 's'}` : 'No games in these weeks';
+    const time = (ms) => new Date(ms).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    el.textContent = '';
+    for (const w of recent.weeks) {
+      const score = scores[w];
+      const playedFor = score?.team || team;
+      const opp = schedules[playedFor]?.[`week_${w}`] || (score?.opponent ? score.opponent : null);
+      const status = recent.status?.[w]?.[playedFor];
+      const mark = document.createElement('i');
+      const bye = opp === 'BYE' || (!opp && !score);
+      mark.className = bye ? 'none' : status === 'live' ? 'live' : status === 'left' ? 'left' : score ? `done ${score.tier}` : 'done dnp';
+      mark.dataset.tip = `Week ${w}${bye ? '' : ` ${opp.startsWith('@') ? `@ ${opp.slice(1)}` : `vs ${opp}`}`}`;
+      mark.dataset.note = bye ? 'Bye' : status === 'left' ? (recent.kickoff?.[playedFor] ? time(recent.kickoff[playedFor]) : 'Still to play')
+        : score ? `${whole(score.fpts)}${status === 'live' ? ' so far' : ''}` : status === 'live' ? 'On now' : 'Didn\'t play';
+      if (score?.tier && status !== 'left') mark.dataset.tier = score.tier;
+      mark.dataset.count = count;
+      el.append(mark);
+    }
+    el.setAttribute('aria-label', count);
+  }
+
   // The strip's hover card, on the page so the row doesn't clip it.
   let tip = null;
   function showTip(mark) {
@@ -722,6 +799,10 @@
           weekStrip(cells[i], schedule, schedule?.teamOf[id], id);
           return;
         }
+        if (key === RECENT_KEY) {
+          recentStrip(cells[i], panel.snpRecent, id, panel);
+          return;
+        }
         const text = cellText(key, s);
         if (text == null) {
           clearOverlay(cells[i]);
@@ -808,8 +889,8 @@
     if (!pendingSince) return;
     const id = location.pathname.match(PLAYERS_ROUTE)?.[1];
     const [league, sport] = (document.documentElement.dataset.snpLeagueSport || '').split(':');
-    if (Date.now() - pendingSince > PENDING_MS || (league === id && sport !== 'nba')) return reveal();
-    if (document.documentElement.dataset.snpNbaLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
+    if (Date.now() - pendingSince > PENDING_MS || (league === id && sport !== 'nba' && sport !== 'nfl')) return reveal();
+    if (document.documentElement.dataset.snpPlayersLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
   }
   for (const method of ['pushState', 'replaceState']) {
     const original = history[method];
@@ -824,7 +905,7 @@
 
   setInterval(() => {
     checkPending();
-    if (document.documentElement.dataset.snpNbaLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
+    if (document.documentElement.dataset.snpPlayersLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
   }, 500);
 
   // Sleeper's stat columns are 60px with 2px each side, which fits its 9 in
@@ -856,7 +937,7 @@
     const week = keys.indexOf(WEEK_KEY);
     // The week strip takes its own width; the other columns share what's left.
     const strip = week >= 0 ? WEEK_W : 0;
-    const fit = (keys.length > 9 || strip) && headerRoom(panel.state.statType === 'stat');
+    const fit = (keys.length > 9 || strip) && headerRoom(panel.state.statType === 'stat' && panel.props.sport !== 'nfl');
     const others = keys.length - (strip ? 1 : 0);
     const width = fit ? `${Math.min(60, Math.floor((fit.room - (strip ? strip + fit.margins : 0)) / others - fit.margins))}px` : '';
     if (html.style.getPropertyValue('--snp-col') !== width) {
@@ -871,6 +952,57 @@
     if (volumeStyle.textContent !== css) volumeStyle.textContent = css;
   }
 
+
+  // NFL's group headers (Fantasy, Rushing, Receiving, Passing, ...) are
+  // fixed-width boxes in a row over the columns; with columns narrowed or added
+  // they'd drift, so each is placed over its own columns and centered, as the
+  // labels are. A group's columns are told by their stat keys; a group none
+  // match takes the columns left between its neighbours'.
+  const GROUPS = { fantasy: /^(fpts|Last 5$)/, rushing: /^rush_/, receiving: /^rec_/, passing: /^pass_/, kicking: /^(fg|xp)/ };
+  function alignSections(panel) {
+    const head = document.querySelector(`${PLAYERS_PANEL} .section-header`);
+    const labels = [...document.querySelectorAll(`${PLAYERS_PANEL} .stat-key-header > .label`)];
+    const keys = panel?.state.statKeys || [];
+    const sections = head ? [...head.children] : [];
+    const ours = document.documentElement.hasAttribute('data-snp-cols');
+    if (!sections.length || !ours || labels.length !== keys.length) {
+      for (const el of sections) if (el.hasAttribute('data-snp-placed')) {
+        el.removeAttribute('data-snp-placed');
+        el.style.removeProperty('flex');
+        el.style.removeProperty('margin-left');
+        el.style.removeProperty('text-align');
+      }
+      return;
+    }
+    const groupOf = (el) => Object.keys(GROUPS).find((g) => el.classList.contains(g));
+    // Each group's first and last column, by key; unmatched groups fill the gaps in order.
+    const spans = sections.map((el) => {
+      const re = GROUPS[groupOf(el)];
+      const at = re ? keys.flatMap((k, i) => (re.test(k) ? [i] : [])) : [];
+      return at.length ? [at[0], at.at(-1)] : null;
+    });
+    spans.forEach((span, i) => {
+      if (span) return;
+      const from = (spans.slice(0, i).reverse().find(Boolean)?.[1] ?? -1) + 1;
+      const to = (spans.slice(i + 1).find(Boolean)?.[0] ?? keys.length) - 1;
+      spans[i] = from <= to ? [from, to] : null;
+    });
+    const left = head.getBoundingClientRect().left + parseFloat(getComputedStyle(head).paddingLeft);
+    let end = left;
+    sections.forEach((el, i) => {
+      const span = spans[i];
+      const a = span && labels[span[0]].getBoundingClientRect();
+      const b = span && labels[span[1]].getBoundingClientRect();
+      const width = span ? Math.round(b.right - a.left) : 0;
+      const margin = span ? Math.round(a.left - end) : 0;
+      end += margin + width;
+      const flex = `0 0 ${width}px`;
+      if (el.style.flex !== flex) el.style.flex = flex;
+      if (el.style.marginLeft !== `${margin}px`) el.style.marginLeft = `${margin}px`;
+      if (el.style.textAlign !== 'center') el.style.textAlign = 'center';
+      el.setAttribute('data-snp-placed', '');
+    });
+  }
 
   // The admin headers read as named (not uppercase), on two lines.
   // adminFPTS wears the what-if color once a value differs from the league's.
@@ -922,6 +1054,9 @@
     ${PLAYERS_PANEL} .snp-week i.done.red { background: rgb(150, 72, 96); }
     ${PLAYERS_PANEL} .snp-week i.done.dnp { background: rgba(185, 196, 212, 0.3); }
     ${PLAYERS_PANEL} .snp-week i[data-tip] { cursor: default; }
+    ${PLAYERS_PANEL} .snp-recent { gap: 2px; }
+    ${PLAYERS_PANEL} .snp-recent i { flex-basis: 6px; }
+    ${PLAYERS_PANEL} .snp-recent i.none { background: rgba(255, 255, 255, 0.04); }
     ${PLAYERS_PANEL} .snp-week i[data-tip]:hover { outline: 1px solid rgba(255, 255, 255, 0.8); outline-offset: 1px; }
     .snp-week-tip {
       position: absolute; z-index: 10000; display: none; padding: 7px 10px; border-radius: 8px; pointer-events: none;
