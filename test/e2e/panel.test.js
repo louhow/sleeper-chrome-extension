@@ -868,7 +868,7 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
   await page.waitForURL(`**/leagues/${LEAGUE}/team`);
   await page.locator(panel('.team-card .team-name')).filter({ hasText: theirName }).waitFor({ timeout: 30000 });
   const back = page.locator(panel('.tools .my-team'));
-  assert.equal(await back.innerText(), 'My team');
+  assert.match(await back.innerText(), /^←\s*My team$/);
   await page.screenshot({ path: `${OUT}team-someone-else.png` });
   await back.click();
   await page.locator(panel('.tools .my-team')).waitFor({ state: 'detached' });

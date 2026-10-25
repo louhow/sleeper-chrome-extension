@@ -1086,20 +1086,24 @@ button.tp-button:hover:not(:disabled) {
   font-size: 11px;
   line-height: 14px;
 }
+/* A shortcut, not a selection: outlined, quiet until hovered. */
 .my-team {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 32px;
-  padding: 0 12px 0 5px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 16px;
-  background: rgba(0, 206, 184, 0.14);
-  color: var(--accent);
-  font-size: 13px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 700;
 }
 button.my-team:hover:not(:disabled) {
-  background: rgba(0, 206, 184, 0.24);
+  border-color: rgba(255, 255, 255, 0.32);
+  background: none;
+  color: var(--text);
 }
 /* A team's avatar, owner and name open it on the Team tab. */
 .team-link {

@@ -51,7 +51,7 @@
     const current = s.rosters.find((r) => r.roster_id === s.rosterId);
     const mine = s.rosters.find((r) => owns(s, r));
     const back = mine && current && mine.roster_id !== current.roster_id
-      ? `<button class="my-team" data-pick-roster="${mine.roster_id}" title="Back to ${esc(teamName(s, mine))}">${pic(mine, 'tp-avatar')}My team</button>` : '';
+      ? `<button class="my-team" data-pick-roster="${mine.roster_id}" title="Back to ${esc(teamName(s, mine))}"><span aria-hidden="true">←</span>My team</button>` : '';
     return `${back}<div class="team-pick${s.rosterMenu ? ' open' : ''}">
       <button class="tp-button" data-action="roster-menu" data-roster="${current?.roster_id ?? ''}" aria-haspopup="listbox" aria-expanded="${Boolean(s.rosterMenu)}" aria-label="Team to show">
         ${pic(current, 'tp-avatar')}<span class="tp-name">${esc(current ? teamName(s, current) : 'Pick a team')}</span><span class="tp-chevron" aria-hidden="true"></span>
