@@ -13,7 +13,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
 
   | State | Looks like |
   | --- | --- |
-  | Locked in | Filled yellow, closed padlock |
+  | Locked in | Filled yellow, closed padlock, framed in its score's color |
   | Finished, can still be locked (a starter who was starting at tip-off, before their next tip-off) | Bright teal outline, open padlock |
   | Finished, may be lockable (the extension didn't see your lineup at tip-off) | Dashed teal outline, open padlock |
   | Finished, too late to lock, played on your bench, or a bench player's | Faded, no outline |
@@ -21,6 +21,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
   | Today, still to tip off | Bright outline, bold time |
   | Later in the week | Quiet outline, projection muted |
 
+- A game played is tinted, muted, by its score's color (green 24+, yellow 15+, red below, as in the game log); a locked one keeps its gold fill, framed in that color.
 - The points column marks a locked-in score with a padlock, in yellow, so it reads apart from a score still in play.
 - Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
 - Lock-In needs the player starting when the game tipped off: a game played on the bench can't be locked after moving them in.
@@ -113,8 +114,9 @@ Sleeper's own NBA Players table, with these additions:
   Hovering a mark shows a card: the game, its score (or tip-off time), and how many games are left; sorting by the column sorts by games left.
   The schedule is the week's GraphQL `scores` (already loaded for the Team tab's week, else one query per week); the scores come from the week's stat rows, which Best and Worst already load.
 - Team picker: beside Find player, every league team with its avatar and name (All teams first); picking one narrows the list to that team's players through Sleeper's own owner filter (the one in its filter section), so the Week strip scans a whole roster. Ticking Free agents lets the pick go. It's remembered with the rest of the view.
+- With more columns than Sleeper's 9 they narrow to fit, the labels center, and each value sits right under its label (Sleeper's own rows only line up at its 60px width); the name area gets 12px more.
 - Rostered players' owner line shows the team's avatar (or initial) and team name, in place of Sleeper's arrow and username.
-- Shooting: a checkbox in Sleeper's filter row (after Free agents, Watchlist and Rookies), in Stats only, off until ticked: FGM, FGA, 3PA, FTM and FTA at the end of the table.
+- Shooting: a small + at the end of the column header (−, filled, while on), in Stats only, off until pressed: FGM, FGA, 3PA, FTM and FTA at the end of the table. It stays out of Sleeper's filter row, which has no room to spare.
   They don't score in the league, so they're dimmed.
   Sleeper's stats already carry them; they go into its table component as stat keys, so they sort from their headers like its own columns.
 - Avg / Best / Worst: in Stats with a week picked (not the season), a switch in the table's top-left corner, centered on the header labels' text. The pick stays when you switch to Projection and back.

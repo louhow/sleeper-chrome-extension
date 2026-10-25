@@ -1,6 +1,6 @@
 // Pure render functions: (state, api log) -> HTML string for the shadow root.
 (globalThis.SNP ||= {}).view = (() => {
-  const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId } = globalThis.SNP.model;
+  const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId, scoreTier } = globalThis.SNP.model;
   const { esc, f2, headshot, teamName, avatar, record, injuryTag, positions, gameTime, weekday, lockIcon, slotBadge, weekNav, notice, lineup, taxiRule, reserveRule,
     whatIfOn, whatIfBanner } = globalThis.SNP.ui;
   const PREVIEW_CHARS = 20000;
@@ -213,18 +213,21 @@
   // `lockRef` (your own lineup), a lockable cell is a button: hovering it asks
   // "Lock?", and clicking it asks to confirm in the cell, since a lock is final.
   // `mark`: 'lockable', 'maybe' or 'benched' for the finished game in question.
+  // A game played is tinted by its score (green, yellow, red, as in the game
+  // log); a locked one keeps its gold fill, framed in that color.
   function dayCell(d, s, mark, lockRef = null) {
     const lockable = mark === 'lockable' || mark === 'maybe';
     if (!d.game) return `<div class="day${d.date === s.today ? ' today' : ''}"><div class="cell"></div></div>`;
     const done = d.game.status === 'complete';
     const live = !done && (d.game.status === 'in_game' || (d.game.start != null && d.game.start <= s.now));
-    const kind = d.locked ? 'locked' : mark === 'lockable' ? 'lockable' : mark === 'maybe' ? 'lockable maybe'
+    const state = d.locked ? 'locked' : mark === 'lockable' ? 'lockable' : mark === 'maybe' ? 'lockable maybe'
       : done ? 'past' : live ? 'live' : d.date === s.today ? 'today' : 'future';
+    const kind = done && d.actual != null ? `${state} tier-${scoreTier(d.actual)}` : state;
     const value = done || d.actual != null ? d.actual : d.proj;
     const time = done ? 'Final' : live ? 'Live' : d.game.start ? gameTime(d.game.start) : '';
     const note = mark === 'benched' ? 'played on your bench, so it can\'t be locked in'
       : mark === 'maybe' ? 'can be locked in only if they were starting at tip-off (the extension didn\'t see your lineup then)'
-      : { locked: 'locked in', lockable: 'can still be locked in', past: 'too late to lock in' }[kind];
+      : { locked: 'locked in', lockable: 'can still be locked in', past: 'too late to lock in' }[state];
     const title = `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}${time ? `, ${time}` : ''}${note ? `, ${note}` : ''}`;
     const icon = d.locked || lockable ? lockIcon(!d.locked) : '';
     const shown = value == null ? '–' : f2(value);

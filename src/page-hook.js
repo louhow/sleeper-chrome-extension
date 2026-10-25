@@ -91,10 +91,12 @@
   const VOLUME = ['fgm', 'fga', 'tpa', 'ftm', 'fta'];
   // A week's days, a mark each (played, on now, still to play), sorting by games left.
   const WEEK_KEY = 'Week';
-  // Its column: seven 5px marks and 2px gaps, centered under the "WEEK"
-  // label, as Sleeper centers its numbers under theirs (each cell starts 17px
-  // left of its label).
-  const WEEK_W = 68;
+  // Its column: seven 5px marks and 2px gaps, and a little air.
+  const WEEK_W = 52;
+  // Narrowed columns give the name area this much of the header's corner.
+  const NAME_EXTRA = 12;
+  // The Shooting +/- at the end of the header.
+  const TOGGLE_W = 26;
   // Games played in the week (Sleeper's week stats are per game, with no count).
   const GP_KEY = 'GP';
   // Marks a picked game in the stats map, so its cells print as whole numbers.
@@ -294,7 +296,7 @@
     const shownWeek = statInterval != null && statInterval !== 'season' && Number(statInterval) > 0 ? Number(statInterval) : null;
     const week = statType === 'stat' ? shownWeek : null;
     weekSwitch(week);
-    shootingBox(statType === 'stat');
+    shotToggle(statType === 'stat');
     teamPicker(panel);
     const fetched = shownWeek ? weekSchedule(season, shownWeek) : null;
     // Teams from the extension's players, else from Sleeper's own list.
@@ -386,14 +388,7 @@
       });
       header.append(el);
     }
-    // Centered on the header labels' text (each label box has padding under it),
-    // wherever Sleeper's layout puts them.
-    const text = header.querySelector('.stat-key-header > .label > span');
-    if (text) {
-      const box = text.getBoundingClientRect();
-      const top = `${Math.round(box.top - header.getBoundingClientRect().top + (box.height - el.offsetHeight) / 2)}px`;
-      if (el.style.top !== top) el.style.top = top;
-    }
+    centerOnLabels(header, el);
     for (const button of el.children) {
       const on = button.dataset.snpPick === weekPick;
       if (button.getAttribute('aria-checked') !== String(on)) button.setAttribute('aria-checked', String(on));
@@ -503,35 +498,48 @@
     owner.append(line);
   }
 
-  // "Shooting" in Sleeper's filter row, after its own checkboxes and in their
-  // markup, while Stats is on: shows the shot-volume columns at the end.
-  function shootingBox(on) {
-    const row = document.querySelector(`${PLAYERS_PANEL} .filter-row`);
-    let el = document.querySelector(`${PLAYERS_PANEL} .snp-shooting`);
-    if (!on || !row) {
+  // Shooting: a small +/- at the end of the column header, while Stats is on,
+  // shows the shot-volume columns there (it doesn't take room in Sleeper's
+  // filter row, which would wrap).
+  function shotToggle(on) {
+    const header = document.querySelector(`${PLAYERS_PANEL} .table-header`);
+    let el = document.querySelector(`${PLAYERS_PANEL} .snp-shot-toggle`);
+    document.documentElement.toggleAttribute('data-snp-shot-toggle', Boolean(on && header));
+    if (!on || !header) {
       el?.remove();
       return;
     }
-    if (!el || el.parentElement !== row) {
+    if (!el || el.parentElement !== header) {
       el?.remove();
-      el = document.createElement('div');
-      el.className = 'filter-item snp-shooting';
-      el.setAttribute('role', 'checkbox');
-      el.tabIndex = 0;
-      el.title = 'Shot volume (FGM, FGA, 3PA, FTM, FTA): it doesn\'t score, but shows who shoots';
-      el.innerHTML = '<div class="custom-checkbox-item"><div class="custom-checkbox nba"><span class="checkmark"></span></div><div class="meta"><div class="name"></div></div></div><div class="filter-label">Shooting</div>';
-      const toggle = (e) => {
+      el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'snp-shot-toggle';
+      el.addEventListener('click', (e) => {
         e.stopPropagation();
         shooting = !shooting;
         patchPlayers();
-      };
-      el.addEventListener('click', toggle);
-      el.addEventListener('keydown', (e) => (e.key === ' ' || e.key === 'Enter') && (e.preventDefault(), toggle(e)));
-      const items = row.querySelectorAll(':scope > .filter-item:not(.snp-shooting)');
-      (items[items.length - 1] || row.lastElementChild)?.after(el);
+      });
+      header.append(el);
     }
-    el.querySelector('.custom-checkbox').classList.toggle('checked', shooting);
-    if (el.getAttribute('aria-checked') !== String(shooting)) el.setAttribute('aria-checked', String(shooting));
+    const text = shooting ? '−' : '+';
+    if (el.textContent !== text) el.textContent = text;
+    const title = `${shooting ? 'Hide' : 'Show'} shooting: FGM, FGA, 3PA, FTM, FTA (they don't score, but show who shoots)`;
+    if (el.title !== title) {
+      el.title = title;
+      el.setAttribute('aria-label', title);
+      el.setAttribute('aria-pressed', String(shooting));
+    }
+    centerOnLabels(header, el);
+  }
+
+  // Puts a header control's middle on the labels' text (each label box has
+  // padding under it), wherever Sleeper's layout puts them.
+  function centerOnLabels(header, el) {
+    const text = header.querySelector('.stat-key-header > .label > span');
+    if (!text) return;
+    const box = text.getBoundingClientRect();
+    const top = `${Math.round(box.top - header.getBoundingClientRect().top + (box.height - el.offsetHeight) / 2)}px`;
+    if (el.style.top !== top) el.style.top = top;
   }
 
   // The week strip for a player's team: one mark a day, Monday to Sunday. A
@@ -727,19 +735,23 @@
   // Sleeper's stat columns are 60px with 2px each side, which fits its 9 in
   // the header after its 176px corner (and in the 796px rows, after the name
   // area). With more, the table would scroll sideways and the name area would
-  // shrink, pulling every value left of its header. So the columns narrow to
-  // share the header's room, and the name area keeps the 118px Sleeper's own
-  // rows have, which centers each value under its (left-aligned) header as
-  // Sleeper's table does. The volume columns are dimmed: they don't score.
+  // shrink. So the columns narrow to share the header's room. Sleeper's rows
+  // start each cell 17px left of its label, which only lines a value up under
+  // a left-aligned label at 60px; narrowed, the labels center and the rows'
+  // name area takes those 17px (and 12 more, from the header's corner, for
+  // names and team lines), so each value sits right under its label. The
+  // volume columns are dimmed: they don't score.
   const volumeStyle = document.createElement('style');
-  function headerRoom() {
+  function headerRoom(toggleOn) {
     const header = document.querySelector(`${PLAYERS_PANEL} .stat-key-header`);
     const label = header?.querySelector(':scope > .label');
     if (!label) return null;
-    const box = getComputedStyle(header);
     const cell = getComputedStyle(label);
+    // As laid out once narrowed: Sleeper's 176px corner and the name area's
+    // extra, and the Shooting toggle's spot at the end (in Stats).
+    const toggle = toggleOn ? TOGGLE_W : 0;
     return {
-      room: header.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight),
+      room: header.clientWidth - 176 - NAME_EXTRA - toggle,
       margins: parseFloat(cell.marginLeft) + parseFloat(cell.marginRight),
     };
   }
@@ -749,7 +761,7 @@
     const week = keys.indexOf(WEEK_KEY);
     // The week strip takes its own width; the other columns share what's left.
     const strip = week >= 0 ? WEEK_W : 0;
-    const fit = (keys.length > 9 || strip) && headerRoom();
+    const fit = (keys.length > 9 || strip) && headerRoom(panel.state.statType === 'stat');
     const others = keys.length - (strip ? 1 : 0);
     const width = fit ? `${Math.min(60, Math.floor((fit.room - (strip ? strip + fit.margins : 0)) / others - fit.margins))}px` : '';
     if (html.style.getPropertyValue('--snp-col') !== width) {
@@ -771,7 +783,10 @@
   const adminStyle = document.createElement('style');
   adminStyle.textContent = `
     html[data-snp-cols] ${PLAYERS_PANEL} :is(.stat-key-header > .label, .player-list-item > .cell) { flex-basis: var(--snp-col) !important; }
-    html[data-snp-cols] ${PLAYERS_PANEL} .player-list-item > .player-meta-container { flex: 0 0 118px !important; }
+    html[data-snp-cols] ${PLAYERS_PANEL} .player-list-item > .player-meta-container { flex: 0 0 ${118 + 17 + NAME_EXTRA}px !important; }
+    html[data-snp-cols] ${PLAYERS_PANEL} .stat-key-header { padding-left: ${176 + NAME_EXTRA}px !important; }
+    html[data-snp-cols] ${PLAYERS_PANEL} .stat-key-header > .label { justify-content: center; text-align: center; }
+    html[data-snp-cols][data-snp-shot-toggle] ${PLAYERS_PANEL} .stat-key-header { padding-right: ${TOGGLE_W}px !important; }
     html[data-snp-admin-col] ${PLAYERS_PANEL} .stat-key-header > ${ours} span {
       text-transform: none; font-size: 10px; line-height: 10px; white-space: normal; width: min-content;
     }
@@ -784,9 +799,16 @@
     ${PLAYERS_PANEL} .stat-key-header > .label[data-snp-sorted]::after {
       content: ''; position: absolute; left: 0; width: 24px; bottom: 0; height: 2px; border-radius: 1px; background: #00ceb8;
     }
+    html[data-snp-cols] ${PLAYERS_PANEL} .stat-key-header > .label[data-snp-sorted]::after { left: 50%; transform: translateX(-50%); }
     ${PLAYERS_PANEL} .snp-places { font-size: 9px; line-height: 10px; color: rgba(255, 255, 255, 0.55); white-space: nowrap; font-variant-numeric: tabular-nums; }
     ${PLAYERS_PANEL} .snp-places:empty { display: none; }
-    ${PLAYERS_PANEL} .table-header:has(> .snp-week-pick) { position: relative; }
+    ${PLAYERS_PANEL} .table-header:has(> .snp-week-pick, > .snp-shot-toggle) { position: relative; }
+    ${PLAYERS_PANEL} .snp-shot-toggle {
+      position: absolute; right: 4px; top: 13px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+      background: rgb(32, 38, 53); color: rgb(185, 196, 212); font: 700 14px/20px Poppins, sans-serif; text-align: center; cursor: pointer;
+    }
+    ${PLAYERS_PANEL} .snp-shot-toggle:hover { background: rgb(52, 61, 82); color: #fff; }
+    ${PLAYERS_PANEL} .snp-shot-toggle[aria-pressed="true"] { background: rgb(196, 213, 230); color: rgb(2, 32, 71); }
     ${PLAYERS_PANEL} .snp-week-pick {
       position: absolute; left: 16px; top: 15px; display: flex; gap: 2px; padding: 3px; border-radius: 14px; background: rgb(32, 38, 53);
     }
@@ -798,7 +820,6 @@
     ${PLAYERS_PANEL} .snp-week i { flex: 0 0 5px; border-radius: 1.5px; background: rgba(255, 255, 255, 0.06); }
     ${PLAYERS_PANEL} .snp-week i.live { background: #ff5b6e; }
     ${PLAYERS_PANEL} .snp-week i.left { background: #00ceb8; }
-    ${PLAYERS_PANEL} .snp-shooting { cursor: pointer; }
     ${PLAYERS_PANEL} .snp-week i.done { background: rgba(185, 196, 212, 0.6); }
     ${PLAYERS_PANEL} .snp-week i.done.green { background: #4caf74; }
     ${PLAYERS_PANEL} .snp-week i.done.yellow { background: #d8b73e; }
@@ -844,10 +865,10 @@
     ${PLAYERS_PANEL} .snp-team-label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
     ${PLAYERS_PANEL} .snp-team-label small { color: rgb(120, 134, 156); font-size: 11px; line-height: 14px; }
     ${PLAYERS_PANEL} .owner[data-snp-owner] > :not(.snp-owner) { display: none !important; }
-    ${PLAYERS_PANEL} .snp-owner { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; color: rgb(185, 196, 212); }
+    ${PLAYERS_PANEL} .snp-owner { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; color: rgb(185, 196, 212); font-size: 10px; line-height: 16px; }
     ${PLAYERS_PANEL} .snp-owner > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    ${PLAYERS_PANEL} .snp-owner-avatar { flex: none; width: 12px; height: 12px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15); }
-    ${PLAYERS_PANEL} .snp-owner .snp-blank { background: rgb(52, 61, 82); font-size: 7px; }
+    ${PLAYERS_PANEL} .snp-owner-avatar { flex: none; width: 16px; height: 16px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18); }
+    ${PLAYERS_PANEL} .snp-owner .snp-blank { background: rgb(52, 61, 82); font-size: 9px; }
     ${PLAYERS_PANEL} .snp-week-pick button:hover { color: #fff; }
     ${PLAYERS_PANEL} .snp-week-pick button[aria-checked="true"] { background: rgb(196, 213, 230); color: rgb(2, 32, 71); }
     ${PLAYERS_PANEL} .snp-delta {

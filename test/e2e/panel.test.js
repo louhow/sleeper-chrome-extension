@@ -1551,7 +1551,7 @@ test('what-if scoring: the Players tab gets sortable adminFPTS and adminDelta co
     });
   });
   for (const row of layout) {
-    assert.deepEqual(row.offsets, [-17], 'columns line up');
+    assert.deepEqual(row.offsets, [0], 'each value right under its label');
     assert.ok(row.overflow <= 0, `the last column fits (${row.overflow}px over)`);
   }
 
@@ -1647,13 +1647,13 @@ test('players tab opens on Projection for the current week, then on whatever you
   await page.waitForFunction(() => panel.snpOpenedFor);
   await page.evaluate(() => panel.setState({ statInterval: 2, leg: 2 }));
   await page.locator('.snp-week-pick button', { hasText: 'Worst' }).click();
-  await page.locator('.snp-shooting').click();
+  await page.locator('.snp-shot-toggle').click();
   await page.waitForFunction(() => panel.state.statKeys.includes('fta'));
   await page.goto(PLAYERS_URL);
   await page.waitForFunction(() => panel.state.statType === 'stat' && panel.state.statInterval === 2, null, { timeout: 30000 });
   await page.locator('.snp-week-pick [aria-checked="true"]', { hasText: 'Worst' }).waitFor();
   await page.waitForFunction(() => panel.state.statKeys.includes('fta'));
-  assert.match(await page.locator('.snp-shooting .custom-checkbox').getAttribute('class'), /\bchecked\b/);
+  assert.equal(await page.locator('.snp-shot-toggle').getAttribute('aria-pressed'), 'true');
   // That was the current week, so when the next one starts, it opens on that one.
   documentBody = playersTable(players, { statType: 'stat', statInterval: 'season', statKeys: STAT_KEYS, sort: 'fpts' }, { leg: 3 });
   await page.goto(PLAYERS_URL);
@@ -1752,14 +1752,18 @@ test('players tab in Stats: games played, games left, shooting at the end, and a
   await page.mouse.move(0, 0);
   await page.locator('.snp-week-tip').waitFor({ state: 'hidden' });
   assert.equal(await page.evaluate(() => panel.state.playerStatsMap.shooter.Week), left, 'sorts by games left');
-  // Shooting: shot volume, which doesn't score, at the end of the table and dimmed.
-  const shootingBox = page.locator('.filter-row .snp-shooting');
-  assert.equal(await shootingBox.locator('.filter-label').textContent(), 'Shooting');
-  assert.doesNotMatch(await shootingBox.locator('.custom-checkbox').getAttribute('class'), /\bchecked\b/);
+  // Shooting: shot volume, which doesn't score, at the end of the table and dimmed,
+  // from a +/- at the end of the column header (Sleeper's filter row has no room).
+  const shootingBox = page.locator('.table-header .snp-shot-toggle');
+  assert.equal(await shootingBox.textContent(), '+');
+  assert.equal(await shootingBox.getAttribute('aria-pressed'), 'false');
+  assert.match(await shootingBox.getAttribute('title'), /^Show shooting: FGM, FGA, 3PA, FTM, FTA/);
+  assert.equal(await page.locator('.filter-row .snp-shooting').count(), 0, 'nothing added to the filter row');
   await shootingBox.click();
   await page.waitForFunction(() => panel.state.statKeys.includes('fta'));
   assert.deepEqual(await labels(), ['FPTS', 'GP', 'Week', 'MIN', 'PTS', '3PM', 'REB', 'AST', 'STL', 'BLK', 'TO', 'Fgm', 'Fga', '3pa', 'Ftm', 'Fta']);
-  assert.match(await shootingBox.locator('.custom-checkbox').getAttribute('class'), /\bchecked\b/);
+  assert.equal(await shootingBox.textContent(), '−');
+  assert.equal(await shootingBox.getAttribute('aria-pressed'), 'true');
   await cellIs('shooter', 'GP', '2');
   assert.equal(await cell('steady', 'GP'), '1');
   // Sleeper leaves Stats sorted by the projection, which isn't a column; it sorts by the FPTS shown instead.
@@ -1794,7 +1798,7 @@ test('players tab in Stats: games played, games left, shooting at the end, and a
     assert.ok(header <= 0, `the last header fits (${header}px over)`);
     assert.ok(scroll <= 0, `no sideways scroll (${scroll}px)`);
     for (const row of rows) {
-      assert.deepEqual(row.offsets, [-17], 'columns line up');
+      assert.deepEqual(row.offsets, [0], 'each value right under its label');
       assert.ok(row.overflow <= 0, `the last column fits (${row.overflow}px over)`);
     }
   };
@@ -1887,7 +1891,7 @@ test('players tab: a team picker beside the search, and rostered players show th
   const owner = page.locator('.player-list-item[data-id="theirs"] .owner');
   await owner.locator('.snp-owner').waitFor();
   assert.equal(await owner.locator('.snp-owner > span:last-child').textContent(), 'Cling Kong');
-  assert.equal(await owner.locator('.snp-owner .snp-owner-avatar').count(), 1);
+  assert.equal(await owner.locator('.snp-owner .snp-owner-avatar').evaluate((el) => el.getBoundingClientRect().width), 16, 'big enough to tell teams apart');
   assert.equal(await owner.locator('i.fa-arrow-right').isVisible(), false);
   assert.equal(await page.locator('.player-list-item[data-id="free"] .snp-owner').count(), 0, 'free agents have none');
   // Picking a team narrows the list to its players, through Sleeper's own owner filter.

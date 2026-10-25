@@ -148,8 +148,9 @@ test('game cells: locked, still lockable, past locking, live, today and later re
   } };
   const cells = (html, name) => {
     const card = html.split('<article').find((c) => c.includes(name));
-    return [...card.matchAll(/class="day game (\w+)" title="([^"]+)"/g)].map((m) => [m[1], m[2]]);
+    return [...card.matchAll(/class="day game (\w+)(?: tier-\w+)?" title="([^"]+)"/g)].map((m) => [m[1], m[2]]);
   };
+  const tiers = (html, name) => [...html.split('<article').find((c) => c.includes(name)).matchAll(/class="day game [^"]*?(?:tier-(\w+))?"/g)].map((m) => m[1] ?? null);
   const html = render(s, []);
   assert.deepEqual(cells(html, 'Luka Doncic'), [
     ['past', 'Tue vs GSW, Final, too late to lock in'],
@@ -158,6 +159,9 @@ test('game cells: locked, still lockable, past locking, live, today and later re
     ['future', 'Sun vs SAC, 7:00pm'],
   ]);
   assert.match(html.split('<article').find((c) => c.includes('Luka Doncic')), /<span class="when"><svg class="lock-icon"/, 'an open lock on the lockable game');
+  // Games played are tinted by their score (8 is red, 20 yellow); games to come aren't.
+  assert.deepEqual(tiers(html, 'Luka Doncic'), ['red', 'yellow', null, null]);
+  assert.deepEqual(tiers(html, 'Bench Guard'), ['green', null], '40 is green');
   // A bench player's finished game can't be locked; a game under way reads live.
   assert.deepEqual(cells(html, 'Bench Guard').map(([kind]) => kind), ['past', 'live']);
   assert.doesNotMatch(html, /data-lock=/, 'only your own lineup, in season, can lock');
@@ -178,11 +182,11 @@ test('game cells: locked, still lockable, past locking, live, today and later re
   assert.doesNotMatch(bench, /data-lock="1:a"/);
   // Never seen around tip-off: dashed, and still a button, saying it depends on that.
   const unseen = render({ ...s, lineupHistory: { 1: {} } }, []);
-  assert.match(unseen, /class="day game lockable maybe" title="Thu vs PHX, Final, can be locked in only if they were starting at tip-off/);
+  assert.match(unseen, /class="day game lockable maybe tier-yellow" title="Thu vs PHX, Final, can be locked in only if they were starting at tip-off/);
   assert.match(unseen, /data-lock="1:a"/);
   s.lockConfirm = '1:a';
   const confirming = render(s, []);
-  assert.match(confirming, /class="day game lockable confirming"/);
+  assert.match(confirming, /class="day game lockable tier-yellow confirming"/);
   assert.match(text(confirming), /Lock 20\.00\? Yes No/);
   assert.match(confirming, /<button class="yes" data-lock-confirm="1:a"/);
   assert.match(confirming, /<button class="no" data-lock-cancel/);
