@@ -998,7 +998,7 @@ ol.calls {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 8px 0 10px;
+  margin: 2px 0 8px;
 }
 .lg-head h3 {
   margin: 0;
@@ -1007,7 +1007,43 @@ ol.calls {
 }
 .lg-list {
   display: grid;
-  gap: 8px;
+  gap: 5px;
+}
+/* Compact cards, so a 14-team league's 7 matchups fit without scrolling. */
+.lg-match .mu-team {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  row-gap: 3px;
+  column-gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+.lg-match .mu-team.theirs {
+  grid-template-columns: auto minmax(0, 1fr) 28px;
+}
+.lg-match .mu-team .avatar {
+  width: 28px;
+  height: 28px;
+}
+.lg-match .mu-who .sub {
+  font-size: 10px;
+  line-height: 12px;
+}
+.lg-match .mu-who .team-name {
+  font-size: 13px;
+  line-height: 16px;
+}
+.lg-match .mu-pts {
+  font-size: 17px;
+}
+.lg-match .mu-meta {
+  font-size: 10px;
+  line-height: 13px;
+}
+.lg-match.mu-head .vs {
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  font-size: 10px;
 }
 button.lg-match {
   width: 100%;

@@ -840,6 +840,15 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content, op
     return host.parentElement.className === 'league-tab-container' && host.nextElementSibling.className === 'panel-row';
   }), true);
   assert.equal(await page.locator('.league-members-container').isVisible(), true);
+  // A 14-team league's 7 matchups fit in Sleeper's tab without scrolling.
+  const fit = await page.evaluate(() => {
+    const host = document.querySelector('#sleeper-nba-panel');
+    const list = host.shadowRoot.querySelector('.lg-list');
+    const box = document.querySelector('.scrollbar-container').getBoundingClientRect();
+    return { bottom: list.getBoundingClientRect().bottom - box.top, room: box.height, cards: list.children.length };
+  });
+  assert.equal(fit.cards, 7);
+  assert.ok(fit.bottom <= fit.room, `all ${fit.cards} fit (${Math.round(fit.bottom)} of ${Math.round(fit.room)}px)`);
   await page.screenshot({ path: `${OUT}league-matchups.png` });
   // Another matchup opens on the Matchup tab, with that team on the left.
   const other = cards.nth(1);

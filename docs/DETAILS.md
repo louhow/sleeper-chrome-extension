@@ -100,6 +100,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 ### League
 
 - Above Sleeper's own League tab content (which stays), the week's matchups, every one in the league, yours first and framed: each is the Matchup tab's header for that pair (avatars, scores, win chance, record and rank, starters yet to play, projection), with the same week picker.
+- The cards are a compact take on that header, so a 14-team league's 7 matchups fit in the tab without scrolling.
 - Clicking a matchup opens it on the Matchup tab, that team on the left, through Sleeper's own MATCHUP tab.
 
 Win probability is Sleeper's own formula, ported from its web app: each side is a normal distribution centred on its projection, narrowing as the score approaches it.
