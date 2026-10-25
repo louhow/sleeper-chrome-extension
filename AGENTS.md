@@ -40,3 +40,25 @@ User-facing docs: `README.md` (feature list, install, privacy), `docs/DETAILS.md
 - Save order: taxi before starters; a starter going to IR leaves the lineup, then IR saves, then the final lineup.
 - Nothing renders until the first league + week load is done, so the user never sees a half-built panel or Sleeper's placeholder.
 - Writing style: no em-dashes; one sentence per line in long Markdown.
+
+## Debugging
+
+When debugging broken behavior, use these diagnostics - reach for them by judgment, not as a required sequence. Two are worth defaulting to: the contrast check in Rule 2 and verify-the-fix in Rule 8, because both catch a false "done" cheaply.
+
+**1. Understand the System.** Learn how the thing is supposed to work before you touch it.
+
+**2. Make It Fail By Contrast.** Reproduce the failure next to a passing baseline that differs by exactly the suspected cause. Don't be tricked into thinking you have reproduced a failure when you haven't established the baseline working.
+
+**3. Quit Thinking and Look.** Observe the actual failure instead of theorizing about it.
+
+**4. Divide and Conquer.** Narrow the search by halving it, working upstream from the known-bad output.
+
+**5. Change One Thing at a Time.** While hunting or fixing, vary a single factor per attempt.
+
+**6. Check the Plug.** Question the obvious assumptions first.
+
+**7. Get a Fresh View.** When truly stuck and searching online, obtain a new angle by stating the symptoms rather than previous theories.
+
+**8. If You Didn't Fix It, It Ain't Fixed.** Confirm the fix actually fixed it, because failures never leave on their own.
+
+**9. Fix the Bug, Then Propose the Refactor.** Stay scoped to the bug; surface adjacent architectural improvements after it is fixed, not during.
