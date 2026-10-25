@@ -395,11 +395,12 @@
     </div>`;
   }
 
-  // Two teams face to face (teamSide data; `b` null without an opponent).
+  // Two teams face to face (teamSide data; `b` null without an opponent, and
+  // `a` null only for a Sleeper card read before its teams are on it).
   // `cls`/`attrs` on the wrapper: the League tab's cards open their matchup.
   function matchupPair(a, b, { tag = 'div', cls = '', attrs = '', failed = NO_FAILED } = {}) {
     return `<${tag} class="mu-head${cls ? ` ${cls}` : ''}"${attrs ? ` ${attrs}` : ''}>
-        ${teamSide(a, 'mine', failed)}
+        ${a ? teamSide(a, 'mine', failed) : ''}
         <span class="vs">VS</span>
         ${b ? teamSide(b, 'theirs', failed) : '<div class="mu-team theirs bye"><span class="sub">No opponent this week</span></div>'}
       </${tag}>`;

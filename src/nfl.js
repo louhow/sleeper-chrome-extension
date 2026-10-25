@@ -121,7 +121,7 @@
   function league(cards, failed) {
     if (!cards.length) return '';
     const order = cards.map((c, i) => ({ ...c, i })).sort((a, b) => b.own - a.own || a.i - b.i);
-    const team = (t) => t && { avatar: t.avatar, owner: t.owner, team: t.team, points: t.score, win: t.win ? parseFloat(t.win) / 100 : null, bar: t.bar, record: t.record, proj: t.proj };
+    const team = (t) => t && { avatar: t.avatar, owner: t.owner, team: t.team, points: t.score, win: Number.isFinite(parseFloat(t.win)) ? parseFloat(t.win) / 100 : null, bar: t.bar, record: t.record, proj: t.proj };
     return `<div class="app league nfl-league"><div class="lg-list">${order.map((c) => {
       const [a, b] = c.sides;
       const label = `Open ${a?.team || 'matchup'}${b ? ` vs ${b.team}` : ''}`;

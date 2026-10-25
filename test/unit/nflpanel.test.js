@@ -93,3 +93,14 @@ test('NFL league cards: Sleeper\'s own numbers, broken avatars as the plain circ
   assert.match(html, /<div class="avatar"><\/div>\s*<div class="mu-who">\s*<div class="sub">@theirs/);
   assert.match(html, /class="mu-head lg-match own" role="button" tabindex="0" data-nfl-matchup="0"/);
 });
+
+test("League tab cards: Sleeper's own text as read, a card with no teams yet, and win text that isn't a number", () => {
+  const side = (team, win) => ({ avatar: '', owner: team.toLowerCase(), team, score: '12.30', win, record: '3-3', proj: '40.10' });
+  const out = text(nfl.league([
+    { own: true, sides: [side('Gridiron', '57%'), side('Blitz', '43%')] },
+    { own: false, sides: [] },
+    { own: false, sides: [side('Hail', '--'), side('Mary', '')] },
+  ], new Set()));
+  assert.match(out, /Gridiron 12\.30 57% WIN 3-3 40\.10 VS @blitz Blitz 12\.30 43% WIN/);
+  assert.doesNotMatch(out, /NaN/);
+});
