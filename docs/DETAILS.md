@@ -13,7 +13,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
 
   | State | Looks like |
   | --- | --- |
-  | Locked in | Filled yellow, closed padlock, framed in its score's color |
+  | Locked in | Bright gold frame around its score's color, gold padlock and "Final" |
   | Finished, can still be locked (a starter who was starting at tip-off, before their next tip-off) | Bright teal outline, open padlock |
   | Finished, may be lockable (the extension didn't see your lineup at tip-off) | Dashed teal outline, open padlock |
   | Finished, too late to lock, played on your bench, or a bench player's | Faded, no outline |
@@ -21,7 +21,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
   | Today, still to tip off | Bright outline, bold time |
   | Later in the week | Quiet outline, projection muted |
 
-- A game played is tinted, muted, by its score's color (green 24+, yellow 15+, red below, as in the game log); a locked one keeps its gold fill, framed in that color.
+- A game played is tinted, muted, by its score's color (green 24+, yellow 15+, red below, as in the game log); a locked one is filled bright in that color inside its gold frame.
 - The points column marks a locked-in score with a padlock, in yellow, so it reads apart from a score still in play.
 - Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
 - Lock-In needs the player starting when the game tipped off: a game played on the bench can't be locked after moving them in.

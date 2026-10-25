@@ -622,29 +622,32 @@ button.slot:hover {
   background: none;
   box-shadow: none;
 }
-/* Locked in: filled. */
+/* Locked in: a bright gold frame around the score's color (gold on dark when
+   there's no score). The fill stays inside the frame, so nothing shows past it. */
 .day.locked .cell {
-  border-color: var(--warn);
-  background: var(--warn);
-  color: #1d2230;
+  border: 2px solid #ffcf3a;
+  background: #2a3142;
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px rgba(13, 20, 33, 0.55);
+  color: var(--text);
 }
 .day.locked .v {
-  color: #1d2230;
+  color: var(--text);
   font-weight: 800;
 }
 .day.locked .time {
-  color: rgba(29, 34, 48, 0.75);
+  color: #ffe07a;
+  font-weight: 700;
 }
 /* A game played, tinted by its score, muted so the week still reads at a glance.
-   Lockable keeps its teal frame over the tint; locked keeps its gold fill, framed
-   in the score's color (a thin dark line between, so a yellow frame reads on gold). */
+   Lockable keeps its teal frame over the tint; locked is filled bright in it (above). */
 .day.past.tier-green .cell, .day.lockable.tier-green .cell { background: rgba(76, 175, 116, 0.17); }
 .day.past.tier-yellow .cell, .day.lockable.tier-yellow .cell { background: rgba(216, 183, 62, 0.15); }
 .day.past.tier-red .cell, .day.lockable.tier-red .cell { background: rgba(216, 90, 116, 0.16); }
 .day.lockable.maybe[class*="tier-"] .cell { box-shadow: none; }
-.day.locked.tier-green .cell { box-shadow: inset 0 0 0 2px #4caf74, inset 0 0 0 3px rgba(29, 34, 48, 0.55); }
-.day.locked.tier-yellow .cell { box-shadow: inset 0 0 0 2px #c99a1c, inset 0 0 0 3px rgba(29, 34, 48, 0.55); }
-.day.locked.tier-red .cell { box-shadow: inset 0 0 0 2px #d85a74, inset 0 0 0 3px rgba(29, 34, 48, 0.55); }
+.day.locked.tier-green .cell { background-color: #2f8f58; }
+.day.locked.tier-yellow .cell { background-color: #977a17; }
+.day.locked.tier-red .cell { background-color: #b03f59; }
 /* Your own lockable game is a button: hovering asks "Lock?", clicking confirms in the cell. */
 button.cell {
   width: 100%;
