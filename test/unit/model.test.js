@@ -645,6 +645,16 @@ test('NFL best lineup: a bye week projects nothing and IDP flex takes any defend
   assert.deepEqual(plain(model.bestNflLineup(l).starters), ['dl1', 'db1', 'k2'], 'k1 is on bye');
 });
 
+test('lineup solver: any sport, ties broken by `later` past 99.99 points, negative worth still starts', () => {
+  const players = { a: { positions: ['X'] }, b: { positions: ['X'] }, c: { positions: ['Y'] } };
+  const base = { slots: ['X'], starters: ['a', 'c'], bench: ['b'], players, worth: () => 10 };
+  const later = { a: 120, b: 150, c: 200 };
+  const plan = model.solveLineup({ ...base, later: (id) => later[id], fits: (slot, p) => slot === 'BN' || p.positions.includes(slot) || slot === 'ANY', openSlot: 'ANY' });
+  assert.deepEqual(plain(plan.starters), ['b', 'c'], 'b is worth more later, and the slot past `slots` is ANY');
+  const negative = model.solveLineup({ ...base, starters: ['a'], bench: [], worth: () => -2 });
+  assert.deepEqual(plain(negative.starters), ['a'], 'a slot never goes empty to dodge a negative projection');
+});
+
 test('game state: done, live (on now, or past its start while still to come) or left; nothing without a game', () => {
   const now = Date.parse('2026-10-21T23:30:00Z');
   const at = (start, status) => ({ status, start: Date.parse(start) });
