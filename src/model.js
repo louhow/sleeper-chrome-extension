@@ -360,7 +360,12 @@
     const perGame = left.length ? left.reduce((sum, d) => sum + (d.proj ?? 0), 0) / left.length : 0;
     // Only starters can lock, so only a starter's finished game is worth keeping.
     const banked = starting && st.lockable ? st.current : null;
+    // A starter with no games left: with no lock, the week's final game counts,
+    // so kept, their slot scores it (unless they're known to have played it on the bench).
+    const done = st.games.filter((d) => d.game.status === 'complete').at(-1);
+    const final = starting && !st.locked && !left.length && done && !st.benched ? done : null;
     return {
+      final,
       // A finished game that may be lockable: it's unknown whether they started it.
       maybe: starting && st.unsure ? st.current : null,
       perGame,
@@ -368,7 +373,7 @@
       left,
       banked,
       open: openValue(left.map((d) => Math.max(0, d.proj ?? 0))),
-      value: Math.max(perGame, banked?.actual ?? 0),
+      value: Math.max(perGame, banked?.actual ?? 0, final?.actual ?? 0),
       fixed: st.locked ? 'locked' : st.games.some((d) => gameLive(d.game, now)) ? 'live' : null,
       locked: st.locked,
     };
@@ -499,7 +504,8 @@
     // A finished game is worth keeping if it beats what leaving the slot open is worth.
     const worthy = (o) => (o.banked && o.banked.actual > 0 && o.banked.actual > o.open ? o.banked : null);
     const skip = new Set(noLock);
-    const today = (id) => Math.max(look[id].left.find((d) => d.date === date)?.proj ?? 0, worthy(look[id])?.actual ?? 0);
+    const today = (id) => Math.max(look[id].left.find((d) => d.date === date)?.proj ?? 0, worthy(look[id])?.actual ?? 0,
+      look[id].final?.actual ?? 0);
     const solve = (locking) => solveLineup({
       slots: l.slots, starters: l.starters, bench: l.bench, players: l.players,
       worth: today,

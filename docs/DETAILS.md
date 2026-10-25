@@ -72,6 +72,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
   The week's last game counts unless an earlier one gets locked, and a game is worth locking when it beats what the games after it are worth.
   Each game's points are taken to spread about 35% of the projection either way (a normal distribution), so two games left are worth more than either alone.
 - A starter with a finished game that can still be locked, scoring more than the open value, is worth that score.
+- A starter with no games left is worth their final game's score: with no lock, the week's final game counts, so kept, their slot scores it (unless the extension knows they played it on the bench). So a starter who's done for the week isn't benched for a smaller projection.
 - Lock in: such a starter is recommended for locking when the best lineup keeps them and they have a game left (with none, the last game counts anyway).
   Each recommendation shows the score, the open value and when the window closes (their next tip-off).
   "Keep open" leaves it out and keeps the player in the lineup, so the score can still be locked later; the rest of the plan is worked out again. "Lock instead" brings it back.

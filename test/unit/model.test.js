@@ -484,6 +484,23 @@ test('best lineup: a game played on the bench can\'t be locked after moving in, 
   assert.deepEqual(plain(seen.locks.map((k) => k.id)), ['dillon']);
 });
 
+test('best lineup: a starter with no games left keeps their final game, which counts without a lock', () => {
+  // Sunday is next. jaquez is done for the week (21.5 Saturday): kept, that's his slot's score.
+  // black plays Sunday (10.41); walter, on the bench, plays Sunday too (12.76) and fits either slot.
+  const l = optimizerLineup(['G', 'SG'], ['jaquez', 'black'], ['walter'], { jaquez: ['SG', 'SF'], black: ['SG'], walter: ['SG', 'SF'] }, {
+    jaquez: [['j1', '2026-10-24', 'complete', 20, 21.5]],
+    black: [['b1', '2026-10-23', 'complete', 8, 0], ['b2', '2026-10-25', 'pre_game', 10.41]],
+    walter: [['w1', '2026-10-25', 'pre_game', 12.76]],
+  });
+  const now = Date.parse('2026-10-25T12:00:00Z');
+  // Whether jaquez started Saturday is unknown: his final game counts anyway, so walter replaces black.
+  const plan = model.bestLineup({ ...l, started: () => null }, now);
+  assert.deepEqual(plain(plan.changes.map((c) => [c.id, c.from, c.to])), [['walter', 'BN', 'SG'], ['black', 'SG', 'BN']]);
+  // Known to have played it on the bench: it doesn't count for him, so he's the one to go.
+  const benched = model.bestLineup({ ...l, started: (id) => (id === 'jaquez' ? false : null) }, now);
+  assert.deepEqual(plain(benched.changes.map((c) => c.id).sort()), ['jaquez', 'walter']);
+});
+
 test('best lineup: a player being locked keeps their slot, and the lineup works around them', () => {
   // Without the lock, kj would slide to UTIL to make room for the pure SF at F.
   const l = optimizerLineup(['F', 'UTIL'], ['kj', 'pg'], ['sf'], { kj: ['SF', 'PF'], pg: ['PG'], sf: ['SF'] }, {
