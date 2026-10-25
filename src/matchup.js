@@ -177,5 +177,37 @@
     return `<span class="chip ${cls}" title="${esc(label)}"><img src="${teamLogo(d.opponent)}" alt="${esc(d.opponent)}"></span>`;
   }
 
-  return { render };
+  // League tab: every matchup of the week, each as the Matchup tab's header
+  // (score, win chance, record and rank, yet to play, projection), yours
+  // first. Clicking one opens it on the Matchup tab.
+  function league(s) {
+    const week = s.weeks?.[s.week];
+    const head = `<div class="lg-head"><h3>Matchups</h3>${weekNav(s, week)}</div>`;
+    if (!week) return `${head}<p class="msg">Loading week…</p>`;
+    const groups = new Map();
+    for (const r of s.rosters || []) {
+      const l = lineup(s, r.roster_id);
+      const id = (l?.leg ?? l?.matchup)?.matchup_id;
+      if (id == null) continue;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(l);
+    }
+    const mine = (l) => l.mine;
+    const pairs = [...groups.entries()].sort(([a, x], [b, y]) => (y.some(mine) - x.some(mine)) || a - b)
+      .map(([, list]) => list.sort((a, b) => mine(b) - mine(a)));
+    if (!pairs.length) return `${head}<p class="msg">No matchups this week.</p>`;
+    return `${head}<div class="lg-list">${pairs.map(([a, b]) => {
+      const left = side(s, a);
+      const right = b && side(s, b);
+      const [p1, p2] = right ? winProbability(left.points, left.proj, right.points, right.proj) : [null, null];
+      const label = `Open ${teamName(s, a.roster)}${b ? ` vs ${teamName(s, b.roster)}` : ''} on the Matchup tab`;
+      return `<button type="button" class="lg-match mu-head${a.mine ? ' own' : ''}" data-open-matchup="${a.roster.roster_id}" aria-label="${esc(label)}">
+        ${teamSide(s, left, p1, 'mine')}
+        <span class="vs">VS</span>
+        ${right ? teamSide(s, right, p2, 'theirs') : '<div class="mu-team theirs bye"><span class="sub">No opponent this week</span></div>'}
+      </button>`;
+    }).join('')}</div>`;
+  }
+
+  return { render, league };
 })();

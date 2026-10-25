@@ -38,6 +38,23 @@ const TEAM_TAB = `<!doctype html><title>Sleeper</title>
   // Like Sleeper's React app: the tab (and its placeholder) render after load.
   setTimeout(() => document.body.append(document.getElementById('app').content.cloneNode(true)), 150);
 </script>`;
+// Sleeper's NBA League tab: its own content (the teams list) in .league-tab-container,
+// which the week's matchups go on top of. Its MATCHUP tab routes like Sleeper's
+// router does, and the Matchup tab shows the placeholder the panel fills.
+const LEAGUE_TAB = TEAM_TAB.replace('<template id="app">', `<template id="league"><div class="center-panel"><div class="league-panel"><div class="league-panel-tabs-wrapper"><div class="postdraft-panel">
+  <div class="center-tab-selector"><div class="item-tab">MATCHUP</div><div class="item-tab">TEAM</div><div class="item-tab selected">LEAGUE</div><div class="item-tab">PLAYERS</div></div>
+  <div class="scrollbar-container" style="flex: 1; overflow: auto"><div class="league-tab-container"><div class="panel-row"><div class="league-members-container"><div class="header"><div>Team</div><div class="text">League is full</div></div></div></div></div></div>
+</div></div></div></div></template>
+<template id="app">`).replace("setTimeout(() => document.body.append(document.getElementById('app').content.cloneNode(true)), 150);", `setTimeout(() => {
+    const onLeague = /\\/league$/.test(location.pathname);
+    document.body.append(document.getElementById(onLeague ? 'league' : 'app').content.cloneNode(true));
+  }, 150);
+  document.addEventListener('click', (e) => {
+    const tab = e.target.closest('.item-tab');
+    if (!tab || tab.textContent !== 'MATCHUP') return;
+    history.pushState({}, '', location.pathname.replace(/league$/, 'matchup'));
+    document.querySelector('.center-panel').replaceWith(document.getElementById('app').content.cloneNode(true));
+  });`);
 const FAKE_TOKEN = 'e2e-fake-session-token';
 const LOGGED_IN = TEAM_TAB.replace('<title>Sleeper</title>', `<title>Sleeper</title><script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>`);
 const LOGGED_OUT = TEAM_TAB.replace('<title>Sleeper</title>', "<title>Sleeper</title><script>localStorage.removeItem('token')</script>");
@@ -638,7 +655,7 @@ test('logs every API call, including the GraphQL query', async () => {
 });
 
 test('unmounts on other league tabs and restores the placeholder', async () => {
-  await page.evaluate((id) => history.pushState({}, '', `/leagues/${id}/league`), LEAGUE);
+  await page.evaluate((id) => history.pushState({}, '', `/leagues/${id}/trend`), LEAGUE);
   await page.locator('#sleeper-nba-panel').waitFor({ state: 'detached' });
   assert.equal(await page.locator('.empty-panel-container').isVisible(), true);
   await page.evaluate(() => history.back());
@@ -794,6 +811,42 @@ test('matchup: locks in a finished game for your starter', async () => {
   assert.ok(Number((await card.first().locator('.mp-pts b').textContent()).trim()) > 0, 'the locked game counts');
   assert.ok(Math.abs(await headerPts() - headerBefore) < 0.01, `the finished game already counted, so the lock keeps the total (${headerBefore})`);
   await page.screenshot({ path: `${OUT}lock-done.png` });
+  sleeper.midWeek = false;
+  documentBody = LOGGED_OUT;
+});
+
+test('league tab: every matchup of the week on top of Sleeper\'s own content, opening on the Matchup tab', async () => {
+  documentBody = LEAGUE_TAB.replace('<title>Sleeper</title>', `<title>Sleeper</title><script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>`);
+  await startMidWeek();
+  sleeper.legs = {};
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}/users`)).json();
+  sleeper.me = users.find((u) => u.display_name === 'louhow').user_id;
+  await page.goto(`https://sleeper.com/leagues/${LEAGUE}/league`);
+  const cards = page.locator(panel('.lg-match'));
+  await cards.first().waitFor({ timeout: 30000 });
+  const legs = sleeper.legs[1];
+  assert.equal(await cards.count(), new Set(legs.map((l) => l.matchup_id)).size, 'one card per matchup');
+  // Yours first, marked; each card is the Matchup tab's header: two teams, scores, win chances.
+  const mine = legs.find((l) => sleeper.rosters?.find((r) => r.roster_id === l.roster_id)?.owner_id === sleeper.me) ?? legs[0];
+  assert.match(await cards.first().getAttribute('class'), /\bown\b/);
+  assert.equal(await cards.first().getAttribute('data-open-matchup'), String(mine.roster_id));
+  for (const card of await cards.all()) {
+    assert.equal(await card.locator('.mu-team').count(), 2);
+    assert.match(await card.innerText(), /\d+% WIN[\s\S]*VS[\s\S]*\d+% WIN/);
+  }
+  // Sleeper's own League tab content stays, under the matchups.
+  assert.equal(await page.evaluate(() => {
+    const host = document.querySelector('#sleeper-nba-panel');
+    return host.parentElement.className === 'league-tab-container' && host.nextElementSibling.className === 'panel-row';
+  }), true);
+  assert.equal(await page.locator('.league-members-container').isVisible(), true);
+  await page.screenshot({ path: `${OUT}league-matchups.png` });
+  // Another matchup opens on the Matchup tab, with that team on the left.
+  const other = cards.nth(1);
+  const name = (await other.locator('.mu-team.mine .team-name').textContent()).trim();
+  await other.click();
+  await page.waitForURL(`**/leagues/${LEAGUE}/matchup`);
+  await page.locator(panel('.mu-head .mu-team.mine .team-name')).filter({ hasText: name }).waitFor({ timeout: 30000 });
   sleeper.midWeek = false;
   documentBody = LOGGED_OUT;
 });
@@ -1186,19 +1239,43 @@ test('player card: opens from the Players and Trend tabs instead of Sleeper\'s c
 });
 
 
-test('sidebar: from a Matchup tab, an NBA league opens on its Matchup tab', async () => {
+test('sidebar: each league opens on the tab you were last on in it, any sport', async () => {
   documentBody = leagueNav;
+  const path = () => new URL(page.url()).pathname;
+  // Each visit is remembered within half a second.
+  const visit = async (url) => {
+    await page.goto(url);
+    await page.waitForTimeout(700);
+  };
   await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/matchup`);
+  await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('snp:league-page:')).forEach((k) => localStorage.removeItem(k)));
+  await visit(`https://sleeper.com/leagues/${NFL_LEAGUE}/matchup`);
+  // Never been on the NBA league: from a Matchup tab it opens on its Matchup tab.
   await page.locator('[data-sport=nba] .league-title').click();
-  assert.equal(new URL(page.url()).pathname, `/leagues/${LEAGUE}/matchup`);
-  assert.deepEqual(await page.evaluate(() => [window.__selected, window.__sleeperNav]), [[LEAGUE], []]);
-  // Other sports, and other tabs, keep Sleeper's own navigation.
+  assert.equal(path(), `/leagues/${LEAGUE}/matchup`);
+  assert.deepEqual(await page.evaluate(() => [window.__selected, window.__sleeperNav]), [[LEAGUE], []], 'through Sleeper\'s router, not its link');
+  await visit(`https://sleeper.com/leagues/${LEAGUE}/players`);
+  // Back and forth: each league where you left it, NFL included.
   await page.locator('[data-sport=nfl]').click();
-  assert.equal(new URL(page.url()).pathname, `/leagues/${NFL_LEAGUE}`);
-  await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/league`);
+  assert.equal(path(), `/leagues/${NFL_LEAGUE}/matchup`);
+  await page.waitForTimeout(700);
   await page.locator('[data-sport=nba]').click();
-  assert.equal(new URL(page.url()).pathname, `/leagues/${LEAGUE}`);
+  assert.equal(path(), `/leagues/${LEAGUE}/players`);
+  await visit(`https://sleeper.com/leagues/${NFL_LEAGUE}/trend`);
+  await page.locator('[data-sport=nba]').click();
+  assert.equal(path(), `/leagues/${LEAGUE}/players`);
+  await page.waitForTimeout(700);
+  await page.locator('[data-sport=nfl]').click();
+  assert.equal(path(), `/leagues/${NFL_LEAGUE}/trend`);
+  assert.deepEqual(await page.evaluate(() => window.__sleeperNav), [], 'never Sleeper\'s own link');
+  // Nothing remembered, and not from a Matchup tab: Sleeper's own navigation.
+  await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('snp:league-page:')).forEach((k) => localStorage.removeItem(k)));
+  await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/league`);
+  await page.evaluate(() => localStorage.removeItem('snp:league-page:${LEAGUE}'));
+  await page.locator('[data-sport=nba]').click();
+  assert.equal(path(), `/leagues/${LEAGUE}`);
   assert.deepEqual(await page.evaluate(() => window.__sleeperNav), ['nba']);
+  await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('snp:league-page:')).forEach((k) => localStorage.removeItem(k)));
   documentBody = LOGGED_OUT;
 });
 

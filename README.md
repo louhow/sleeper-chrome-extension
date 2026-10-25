@@ -13,6 +13,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 **NBA**
 - Team tab: roster, weekly game strips that show what's locked, still lockable (only games the player started) or past locking, tinted by score (lock right from the cell), projections, lineup swaps, taxi and IR moves, draft picks.
 - Matchup tab: both lineups slot by slot, win probability, Lock-In status.
+- League tab: every matchup of the week, styled like the Matchup tab; click one to open it.
 - Optimize lineup: recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.
 - Players tab: remembers your last view; a week strip per player (games played in their score's color, games left, scores on hover); a team picker to scan any roster; team avatars on rostered players; in Stats, a week's Avg (with games played) / Best / Worst game and an optional Shooting group (FGM, FGA, 3PA, FTM, FTA).
@@ -29,6 +30,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 - Player card with next match, projections, game log, career and history.
 
 **All sports**
+- Each league opens on the tab you were last on in it when you switch leagues in the sidebar.
 - API tab: a log of every call the extension makes, with status, timing, size and a JSON preview.
 
 Details: [docs/DETAILS.md](docs/DETAILS.md) (NBA and NFL) and [docs/EPL.md](docs/EPL.md) (Premier League).

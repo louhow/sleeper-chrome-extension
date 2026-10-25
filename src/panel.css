@@ -982,6 +982,53 @@ ol.calls {
   margin-left: 0;
   margin-right: auto;
 }
+/* League tab: the week's matchups, above Sleeper's own content. */
+:host(.on-league) {
+  display: block;
+  margin-bottom: 16px;
+}
+.app.league {
+  padding: 0 24px;
+}
+.lg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 10px;
+}
+.lg-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+}
+.lg-list {
+  display: grid;
+  gap: 8px;
+}
+button.lg-match {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.lg-match:hover:not(:disabled) {
+  background: none;
+}
+button.lg-match:hover .mu-team {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+}
+button.lg-match.own .mu-team {
+  border-color: rgba(0, 206, 184, 0.45);
+}
+button.lg-match .mu-team.theirs {
+  text-align: right;
+}
 .mu-starters {
   display: flex;
   align-items: center;

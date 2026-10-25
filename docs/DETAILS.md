@@ -95,7 +95,12 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - Per player: the game that matters for Lock-In (the locked game, the one that can be locked, or the next one), its points or projection, and team logos for the week's games.
 - Lock-In for your own starters: once a game ends, `LOCK-IN` stays open until that player's next game starts, if they were starting when it tipped off (see the Team tab). Locking is final, so it asks to confirm.
 - Team totals are Sleeper's running total, added up from the leg's lineup as on the Team tab.
-- Switching leagues in the sidebar from any Matchup tab opens an NBA league on its Matchup tab, where Sleeper would open its League tab.
+- Switching leagues in the sidebar (any sport) opens each league on the tab you were last on in it, where Sleeper would open its League tab; the last tab per league is kept in the page's storage. A league you haven't been on yet opens where Sleeper sends it, except an NBA league from a Matchup tab, which opens on its Matchup tab.
+
+### League
+
+- Above Sleeper's own League tab content (which stays), the week's matchups, every one in the league, yours first and framed: each is the Matchup tab's header for that pair (avatars, scores, win chance, record and rank, starters yet to play, projection), with the same week picker.
+- Clicking a matchup opens it on the Matchup tab, that team on the left, through Sleeper's own MATCHUP tab.
 
 Win probability is Sleeper's own formula, ported from its web app: each side is a normal distribution centred on its projection, narrowing as the score approaches it.
 Rank comes from `roster_standings`; before any games are played, it falls back to the standings order (record, points, then waiver order), which is what Sleeper shows then.

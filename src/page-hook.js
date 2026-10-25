@@ -52,20 +52,44 @@
   }, true);
 
   // Sleeper's sidebar sends every league to /leagues/<id>, which lands on its
-  // League tab. From a Matchup tab, an NBA league opens on its Matchup tab
-  // instead, through Sleeper's own router so its state stays in step.
+  // League tab. Instead each league (any sport) opens on the tab you were last
+  // on in it, remembered in the page's storage; one you haven't been on yet
+  // opens on its Matchup tab when you come from a Matchup tab and it's NBA.
+  // Through Sleeper's own router, so its state stays in step.
+  const LEAGUE_PAGE = /^\/leagues\/(\d+)\/([a-z]+)(?:\/|$)/;
+  const pageKey = (id) => `snp:league-page:${id}`;
+  let seenPath = '';
+  setInterval(() => {
+    if (location.pathname === seenPath) return;
+    seenPath = location.pathname;
+    const [, id, page] = seenPath.match(LEAGUE_PAGE) ?? [];
+    if (!id) return;
+    try {
+      localStorage.setItem(pageKey(id), page);
+    } catch {
+      // Storage off: leagues open where Sleeper sends them.
+    }
+  }, 500);
   addEventListener('click', (e) => {
-    if (!/^\/leagues\/\d+\/matchup(\/|$)/.test(location.pathname) || !(e.target instanceof Element)) return;
+    if (!(e.target instanceof Element)) return;
     const link = e.target.closest(NAV_LEAGUE);
     const item = link && props(link, (x) => x.league && x.selectLeague);
     const nav = item && props(link, (x) => x.router?.push);
-    if (item?.league.sport !== 'nba' || !nav) return;
+    if (!item || !nav) return;
+    const id = item.league.league_id;
+    let page = null;
+    try {
+      page = localStorage.getItem(pageKey(id));
+    } catch {
+      page = null;
+    }
+    if (!page && item.league.sport === 'nba' && /^\/leagues\/\d+\/matchup(\/|$)/.test(location.pathname)) page = 'matchup';
+    if (!page || location.pathname.startsWith(`/leagues/${id}/${page}`)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    const id = item.league.league_id;
     item.selectLeague(id);
     item.closeNavbar?.();
-    nav.router.push(`/leagues/${id}/matchup`);
+    nav.router.push(`/leagues/${id}/${page}`);
   }, true);
 
   // NBA Players tab. It opens on Projection for the current week (Sleeper's

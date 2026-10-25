@@ -7,6 +7,10 @@
   const PAGES = { team: 'Team', matchup: 'Matchup' };
 
   function render(state, log) {
+    // Sleeper's League tab keeps its own content; the week's matchups go on top of it.
+    if (state.page === 'league') {
+      return `<div class="app league">${state.sessionExpired ? sessionExpired() : globalThis.SNP.matchup.league(state)}</div>`;
+    }
     const body = state.tab === 'api' ? apiView(state, log)
       : state.sessionExpired ? sessionExpired()
       : state.page === 'matchup' ? globalThis.SNP.matchup.render(state)

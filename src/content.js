@@ -6,7 +6,7 @@
 (() => {
   const { createApi, view, model, scoring, ui, waivers, optimize, card, nfl, whatif } = globalThis.SNP;
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
-  const PANEL_PAGES = new Set(['team', 'matchup']);
+  const PANEL_PAGES = new Set(['team', 'matchup', 'league']);
   const PLAYERS_PATH = '/v1/players/nba';
   const PLAYERS_KEY = 'players:nba:v4';
   const PLAYERS_TTL_MS = 12 * 3600e3;
@@ -109,7 +109,7 @@
 
     const state = {
       leagueId,
-      page: PANEL_PAGES.has(page) ? page : 'team', // panel view: 'team' | 'matchup'
+      page: PANEL_PAGES.has(page) ? page : 'team', // panel view: 'team' | 'matchup' | 'league'
       onPanel: PANEL_PAGES.has(page), // whether the URL is a tab the panel fills
       tab: 'page', // 'page' | 'api'
       now: Date.now(),
@@ -160,6 +160,20 @@
       nflSession?.attach();
       if (destroyed || disabled) return;
       if (!state.onPanel) return detach();
+      // The League tab: on top of Sleeper's own content, which stays.
+      if (state.page === 'league') {
+        const container = document.querySelector('.league-tab-container');
+        // Not there (yet): out of the way, and Sleeper's placeholder back.
+        if (!container) return detach();
+        restorePlaceholder();
+        if (container.firstElementChild !== host) {
+          host.classList.remove('floating');
+          host.classList.add('on-league');
+          container.prepend(host);
+        }
+        return;
+      }
+      host.classList.remove('on-league');
       const placeholder = document.querySelector('.postdraft-panel .empty-panel-container');
       const panel = placeholder?.closest('.postdraft-panel');
       if (panel) {
@@ -1143,6 +1157,15 @@
     }
 
     root.addEventListener('click', (e) => {
+      // A League tab matchup opens on the Matchup tab, through Sleeper's own tab (so its router follows).
+      const match = e.target.closest('[data-open-matchup]');
+      if (match) {
+        state.rosterId = Number(match.dataset.openMatchup);
+        state.tab = 'page';
+        const tabs = [...document.querySelectorAll('.center-tab-selector .item-tab')];
+        tabs.find((t) => /^matchup$/i.test(t.textContent.trim()))?.click();
+        return schedule();
+      }
       const tab = e.target.closest('[data-tab]');
       if (tab) {
         state.tab = tab.dataset.tab;
