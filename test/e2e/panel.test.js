@@ -1391,7 +1391,7 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
   const moves = await page.evaluate(() => { const m = window.__careerMoves; window.__careerMoves = null; return m; });
   assert.deepEqual(moves, [], 'nothing on screen moves while game logs load');
 
-  await page.locator(dialog('.pc-news h3')).first().waitFor({ timeout: 15000 });
+  await page.locator(dialog('.pc-news:not(.skeleton) h3')).first().waitFor({ timeout: 15000 });
   await page.locator(dialog('.pc-depth-row li.me')).waitFor({ timeout: 15000 });
   assert.equal(await page.locator(dialog('.pc-depth-row li.me')).textContent(), playerName);
   assert.match(await page.locator(dialog('.pc-main')).textContent(), /Transaction History\s*Log in to Sleeper/);

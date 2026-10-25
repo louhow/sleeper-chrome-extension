@@ -80,3 +80,15 @@ test('with admin tools on, the game log shows league Fpts and what-if adminFPTS 
     assert.deepEqual(cells(html), ['league 20.00 yellow', 'admin 30.00 green', 'league 10.00 red', 'admin 15.00 yellow']);
   }
 });
+
+test('while loading, every section holds the shape of what it will show', () => {
+  const players = { p1: { name: 'Test Player', position: 'PG', positions: ['PG'], team: 'LAL' }, p2: { name: 'Other Guard', position: 'PG', team: 'LAL' }, p3: { name: 'Big', position: 'C', team: 'LAL' } };
+  const html = card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players, cards: { p1: { careerYears: 3 } } });
+  assert.doesNotMatch(html, /Loading…/);
+  assert.equal((html.match(/<tr class="skeleton">/g) || []).length, 15 + 3, 'game log rows, a career row per season');
+  assert.match(html, /<li class="pc-tx skeleton">/, 'a transaction row');
+  assert.match(html, /<article class="pc-news skeleton">/, 'a news card');
+  const depth = [...html.matchAll(/<div class="pc-depth-row skeleton">\s*<span class="pos \w+">(\w+)<\/span>\s*<ol>((?:<li>&nbsp;<\/li>)+)<\/ol>/g)].map((m) => `${m[1]} ${m[2].split('<li>').length - 1}`);
+  assert.deepEqual(depth, ['PG 2', 'SG 1', 'SF 1', 'PF 1', 'C 1'], 'a line per teammate at the position');
+  assert.equal((html.match(/aria-busy="true"/g) || []).length, 4);
+});

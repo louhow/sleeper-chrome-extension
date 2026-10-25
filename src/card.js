@@ -144,10 +144,11 @@
     return `<div class="pc-item"><div class="pc-item-label">${label}</div><div class="pc-item-value">${raw ? value : esc(value)}</div></div>`;
   }
 
-  const loading = '<p class="pc-empty">Loading…</p>';
-  // Placeholder rows hold a table's height while it loads, so nothing below jumps.
+  // Placeholders hold a section's size while it loads, so nothing below jumps:
+  // blank rows like the loaded ones, as many as are known (or usual).
   const SKELETON_ROWS = 15;
   const skeleton = (rows, cols) => Array.from({ length: rows }, () => `<tr class="skeleton">${'<td>&nbsp;</td>'.repeat(cols)}</tr>`).join('');
+  const blank = (n, html) => Array.from({ length: n }, () => html).join('');
 
   function gameLogSection(s, c, m) {
     const seasons = c.seasons || [];
@@ -229,7 +230,11 @@
 
   // Transaction history in this league, newest first, worded like Sleeper's card.
   function historySection(s, c) {
-    if (!c.history) return `<section class="pc-section"><div class="pc-section-head"><h2>Transaction History</h2></div>${c.historyError ? '<p class="pc-empty">Log in to Sleeper to see this league\'s transactions.</p>' : loading}</section>`;
+    // Loading: one transaction's row (a rostered player has at least their add or draft pick).
+    if (!c.history) {
+      return `<section class="pc-section" aria-busy="${!c.historyError}"><div class="pc-section-head"><h2>Transaction History</h2></div>${c.historyError ? '<p class="pc-empty">Log in to Sleeper to see this league\'s transactions.</p>'
+        : '<ul class="pc-history"><li class="pc-tx skeleton"><span class="pc-tx-label">&nbsp;</span><span class="pc-tx-text">&nbsp;</span><span class="pc-tx-date">&nbsp;</span></li></ul>'}</section>`;
+    }
     const id = s.modal.playerId;
     const byRoster = Object.fromEntries((s.rosters || []).map((r) => [r.roster_id, s.usersById?.[r.owner_id]?.display_name || `Team ${r.roster_id}`]));
     const user = (uid) => s.usersById?.[uid]?.display_name;
@@ -274,9 +279,11 @@
         ${md.analysis ? `<p><b>Analysis:</b> ${esc(md.analysis)}</p>` : ''}
       </article>`;
     }).join('');
-    return `<section class="pc-section">
+    // Loading: a blank news card (a two-line title and a paragraph).
+    const card = `<article class="pc-news skeleton"><h3>&nbsp;<br>&nbsp;</h3><div class="pc-news-meta">&nbsp;</div><p>${blank(6, '&nbsp;<br>')}</p></article>`;
+    return `<section class="pc-section" aria-busy="${!c.news}">
       <div class="pc-section-head"><h2>Latest News</h2></div>
-      ${!c.news ? loading : items || '<p class="pc-empty">No recent news.</p>'}
+      ${!c.news ? card : items || '<p class="pc-empty">No recent news.</p>'}
     </section>`;
   }
 
@@ -287,9 +294,15 @@
         <span class="pos ${pos.toLowerCase()}">${pos}</span>
         <ol>${chart[pos].map((pid) => `<li class="${pid === id ? 'me' : ''}">${esc(playerName(s.players, pid))}</li>`).join('')}</ol>
       </div>`).join('') : '';
-    return `<section class="pc-section">
+    // Loading: a row per position, as many lines as the team has players there.
+    const teamAt = (pos) => Object.values(s.players || {}).filter((p) => p.team === team && p.position === pos).length;
+    const rows = DEPTH_ORDER.map((pos) => `<div class="pc-depth-row skeleton">
+        <span class="pos ${pos.toLowerCase()}">${pos}</span>
+        <ol>${blank(Math.max(1, teamAt(pos)), '<li>&nbsp;</li>')}</ol>
+      </div>`).join('');
+    return `<section class="pc-section" aria-busy="${!chart}">
       <div class="pc-section-head"><h2>Depth Chart</h2></div>
-      ${!chart ? loading : groups || '<p class="pc-empty">No depth chart.</p>'}
+      ${!chart ? rows : groups || '<p class="pc-empty">No depth chart.</p>'}
     </section>`;
   }
 
