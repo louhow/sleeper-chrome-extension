@@ -1,6 +1,6 @@
 // Match tab: the selected team (left) against its opponent (right), slot by
 // slot, with win probability and each player's match. Pure: state -> HTML.
-(globalThis.SEP ||= {}).matchup = (() => {
+(globalThis.SEP ||= {}).matchupView = (() => {
   const { playerGames, weekTotals, winProbability } = globalThis.SEP.model;
   const { breakdown } = globalThis.SEP.scoring;
   const { esc, f2, shortName, playerOf, injuryTag, positions, headshot, slotBadge, weekNav, lineup, teamTotals, gameChips, versus, nextMatch, teamSide, real, loading, errorMsg } = globalThis.SEP.ui;

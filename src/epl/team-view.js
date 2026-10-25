@@ -1,6 +1,6 @@
 // Team tab, laid out like the mobile app: team card, lineup by slot with each
 // player's match and points, then bench and injured reserve. Pure: state -> HTML.
-(globalThis.SEP ||= {}).team = (() => {
+(globalThis.SEP ||= {}).teamView = (() => {
   const { playerGames, weekTotals, spotRefs, swapTargets, started } = globalThis.SEP.model;
   const { esc, f2, teamName, ownerName, avatarImg, record, slotBadge, weekNav, lineup, teamTotals, reserveRule, nextGameText, gameChips, playerLine, playerOf, pct, roleName, real, loading, errorMsg } = globalThis.SEP.ui;
 

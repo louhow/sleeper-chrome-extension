@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { loadSep } from './load.js';
 
 const { SEP, SNP } = loadSep();
-const { ui, model, scoring, view } = SEP;
+const { ui, model, scoring, panelView: view } = SEP;
 const plain = (x) => JSON.parse(JSON.stringify(x));
 
 test('helpers that are the same as NBA and NFL come from the core', () => {

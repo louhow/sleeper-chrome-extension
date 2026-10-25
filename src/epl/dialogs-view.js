@@ -1,7 +1,7 @@
 // Dialogs over the page: add a player (free agent or waiver bid, with drops),
 // drop a player, pending waiver claims, and the Optimize lineup proposal.
 // Pure: state -> HTML.
-(globalThis.SEP ||= {}).dialogs = (() => {
+(globalThis.SEP ||= {}).dialogsView = (() => {
   const { playerGames, weekTotals, rosterRoom, faabLeft, sortClaims, FAAB, started } = globalThis.SEP.model;
   const { esc, f2, headshot, positions, injuryTag, slotBadge, lineup, nextGameText, dialog, dialogErrors, myRoster, shortName, playerOf, real, loading } = globalThis.SEP.ui;
 

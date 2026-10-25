@@ -6,7 +6,7 @@
 (() => {
   // The API client, save notices and league users work as they do for NBA and NFL.
   const { createApi, shared, loaders } = globalThis.SNP;
-  const { view, model, scoring, ui, dialogs, card } = globalThis.SEP;
+  const { panelView, model, scoring, ui, dialogsView, cardView, playersView } = globalThis.SEP;
   const SPORT = 'clubsoccer:epl';
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
   const PAGE_BY_ROUTE = { team: 'team', matchup: 'match', players: 'players', league: 'league', standings: 'league', transactions: 'league' };
@@ -229,7 +229,7 @@
         const scrollTop = body?.scrollTop ?? 0;
         const focused = shadow.activeElement?.matches?.('[data-search]');
         const caret = focused ? shadow.activeElement.selectionStart : null;
-        root.innerHTML = view.render(state, api.log);
+        root.innerHTML = panelView.render(state, api.log);
         const next = root.querySelector('.body');
         if (next) next.scrollTop = scrollTop;
         if (focused) {
@@ -247,7 +247,7 @@
       const scrolls = [...layerRoot.querySelectorAll('.dialog-body')].map((el) => [el.dataset.scroll || 'dialog', el.scrollTop]);
       const focused = layerShadow.activeElement?.matches?.('[data-bid]');
       const kind = state.modal?.kind;
-      const html = kind === 'player' ? card.render(state) : dialogs.render(state);
+      const html = kind === 'player' ? cardView.render(state) : dialogsView.render(state);
       layerRoot.innerHTML = `<div class="page-layer">${html}${showNotice ? ui.notice(state) : ''}</div>`;
       for (const [key, top] of scrolls) {
         const el = layerRoot.querySelector(key === 'dialog' ? '.dialog-body' : `[data-scroll="${key}"]`);
@@ -856,7 +856,7 @@
         return schedule();
       }
       if (e.target.closest('[data-more]')) {
-        state.playersTab.shown = (state.playersTab.shown || globalThis.SEP.players.PAGE) + globalThis.SEP.players.PAGE;
+        state.playersTab.shown = (state.playersTab.shown || playersView.PAGE) + playersView.PAGE;
         return schedule();
       }
       const rosterEl = e.target.closest('[data-roster]');

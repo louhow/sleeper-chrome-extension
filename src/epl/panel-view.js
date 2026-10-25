@@ -1,6 +1,6 @@
 // The panel shell: tab bar (Match, Team, Players, League, API), team picker,
 // and the body for the shown tab. Pure: (state, api log) -> HTML.
-(globalThis.SEP ||= {}).view = (() => {
+(globalThis.SEP ||= {}).panelView = (() => {
   const { esc, teamName, notice } = globalThis.SEP.ui;
   // The API tab and the log-back-in message are the same as NBA and NFL's.
   const { apiView, sessionExpired } = globalThis.SNP.ui;
@@ -9,10 +9,10 @@
   function render(s, log) {
     const body = s.tab === 'api' ? apiView(s, log)
       : s.sessionExpired ? sessionExpired()
-      : s.page === 'match' ? globalThis.SEP.matchup.render(s)
-      : s.page === 'players' ? globalThis.SEP.players.render(s)
-      : s.page === 'league' ? globalThis.SEP.league.render(s)
-      : globalThis.SEP.team.render(s);
+      : s.page === 'match' ? globalThis.SEP.matchupView.render(s)
+      : s.page === 'players' ? globalThis.SEP.playersView.render(s)
+      : s.page === 'league' ? globalThis.SEP.leagueView.render(s)
+      : globalThis.SEP.teamView.render(s);
     return `<div class="app">${toolbar(s, log)}<div class="body" data-scroll="body">${body}</div>${s.tab === 'api' || s.modal ? '' : notice(s)}</div>`;
   }
 

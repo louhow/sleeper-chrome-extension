@@ -1,6 +1,6 @@
 // Players tab: available players, trending adds and drops, season leaders and
 // search, each with an add (or drop) button. Pure: state -> HTML.
-(globalThis.SEP ||= {}).players = (() => {
+(globalThis.SEP ||= {}).playersView = (() => {
   const { playerGames, weekTotals } = globalThis.SEP.model;
   const { esc, f2, f1, pct, teamName, ownerOf, owns, playerLine, loading, errorMsg } = globalThis.SEP.ui;
   const TABS = [['available', 'Available'], ['trending', 'Trending'], ['leaders', 'Leaders'], ['mine', 'My Team'], ['all', 'All']];

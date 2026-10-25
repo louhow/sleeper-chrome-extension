@@ -1,6 +1,6 @@
 // League tab: this week's matchups, the standings table and the week's
 // transactions, as the mobile app's League tab shows them. Pure: state -> HTML.
-(globalThis.SEP ||= {}).league = (() => {
+(globalThis.SEP ||= {}).leagueView = (() => {
   const { winProbability, standings, pointsFor, pointsAgainst, streak, faabLeft, FAAB } = globalThis.SEP.model;
   const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, teamSide, weekNav, headshot, positions, owns, playerOf, loading, errorMsg } = globalThis.SEP.ui;
 

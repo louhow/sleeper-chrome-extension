@@ -1,7 +1,7 @@
 // Player card, laid out like the mobile app's: a club-colored hero with bio
 // and add/drop, then Summary (next match, projections, news), Game Log and
 // History (transactions and career). Pure: state -> HTML.
-(globalThis.SEP ||= {}).card = (() => {
+(globalThis.SEP ||= {}).cardView = (() => {
   const { playerGames, weekTotals, started } = globalThis.SEP.model;
   const { scoreStats, breakdown } = globalThis.SEP.scoring;
   const { esc, f2, f1, teamLogo, headshot, teamName, ownerOf, owns, playerOf, positions, injuryTag, weekday, shortDate, gameTime, pct, versus, loading } = globalThis.SEP.ui;
