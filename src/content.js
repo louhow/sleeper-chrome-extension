@@ -10,8 +10,6 @@
   const PLAYERS_PATH = '/v1/players/nba';
   const PLAYERS_KEY = 'players:nba:v4';
   const PLAYERS_TTL_MS = 12 * 3600e3;
-  // Sleeper only allows trading picks this many seasons ahead; it isn't exposed per league.
-  const PICK_SEASONS = 3;
   const FLOAT_AFTER_MS = 4000;
   const NOTICE_MS = 3000;
   const CLOCK_MS = 60e3;
@@ -76,6 +74,14 @@
     }
     active?.show(page);
     active?.attach();
+  }
+
+  // The order the arrow keys go through: on the Matchup tab the matchups (the
+  // picker's order, by their left team), else every team A to Z, yours too.
+  function teamOrder(state) {
+    const pairs = state.page === 'matchup' ? view.matchupPairs(state) : [];
+    if (pairs.length) return pairs;
+    return [...state.rosters].sort((a, b) => ui.teamName(state, a).localeCompare(ui.teamName(state, b))).map((r) => [r]);
   }
 
   function mount(leagueId, page) {
@@ -309,22 +315,9 @@
     // For each player: points the changed settings add to Sleeper's FPTS, and
     // for the players in view, how many places that moves them (with its color).
     function adminDeltas(e) {
-      const league = state.league?.scoring_settings || {};
-      // Scoring with just the differences gives what they add on top of Sleeper's FPTS.
-      const delta = Object.fromEntries(Object.entries(state.whatIf.overrides).map(([key, value]) => [key, value - (league[key] ?? 0)]));
       const { stats, view, base } = JSON.parse(e.detail);
-      const points = Object.fromEntries(Object.entries(stats).map(([id, s]) => [id, s ? scoring.scoreStats(delta, s) : 0]));
-      const ids = view.filter((id) => stats[id]?.[base] != null);
-      // Ranked per game, as the table shows every stat (a season's stats are totals).
-      const games = (id) => (stats[id].gp > 0 ? stats[id].gp : 1);
-      const was = model.ranks(ids, (id) => stats[id][base] / games(id));
-      const now = model.ranks(ids, (id) => (stats[id][base] + points[id]) / games(id));
-      const shifts = Object.fromEntries(ids.map((id) => [id, was[id] - now[id]]));
-      const biggest = Math.max(0, ...Object.values(shifts).map(Math.abs));
-      const tints = Object.fromEntries(ids.map((id) => [id, model.shiftTint(shifts[id], biggest)]));
-      // Both places too, shown under the badge so a shift can be checked at a glance.
-      const places = Object.fromEntries(ids.map((id) => [id, [was[id], now[id]]]));
-      document.dispatchEvent(new CustomEvent('snp:admin-scores', { detail: JSON.stringify({ points, shifts, tints, places }) }));
+      const out = model.adminDeltas({ overrides: state.whatIf.overrides, league: state.league?.scoring_settings || {}, stats, view, base }, scoring.scoreStats);
+      document.dispatchEvent(new CustomEvent('snp:admin-scores', { detail: JSON.stringify(out) }));
     }
     document.addEventListener('snp:admin-score-request', adminDeltas);
 
@@ -351,21 +344,7 @@
     function pickWeekGames(e) {
       const { season, week, mode } = JSON.parse(e.detail);
       const rows = weekStatRows(season, week);
-      let games = null;
-      if (rows) {
-        const settings = state.league?.scoring_settings || {};
-        const better = mode === 'worst' ? (a, b) => a < b : (a, b) => a > b;
-        const best = {};
-        const played = {};
-        for (const { player_id: id, stats } of rows) {
-          // Games a player sat out come back with no stats.
-          if (!(stats?.sp > 0 || stats?.min > 0)) continue;
-          played[id] = (played[id] || 0) + 1;
-          const fpts = scoring.scoreStats(settings, stats);
-          if (!best[id] || better(fpts, best[id].fpts)) best[id] = { ...stats, gp: 1, fpts };
-        }
-        games = mode === 'played' ? played : best;
-      }
+      const games = rows && model.weekPicks(rows, mode, state.league?.scoring_settings || {}, scoring.scoreStats);
       document.dispatchEvent(new CustomEvent('snp:week-games', { detail: JSON.stringify(games) }));
     }
     document.addEventListener('snp:week-games-request', pickWeekGames);
@@ -392,31 +371,15 @@
           .finally(() => document.dispatchEvent(new CustomEvent('snp:week-games-ready')));
       }
       const scores = loaded ? null : Array.isArray(weekSchedules[key]) ? weekSchedules[key] : undefined;
-      let out = null;
-      if (loaded || scores) {
-        const days = loaded ? loaded.days : model.weekDays(scores);
-        const byTeam = loaded ? loaded.gamesByTeam : model.gamesByTeam(scores);
-        const now = Date.now();
-        const stateOf = (g) => (!g ? '' : g.status === 'complete' ? 'done'
-          : g.status === 'in_game' || (g.start != null && g.start <= now) ? 'live' : 'left');
-        const teamOf = Object.fromEntries(Object.entries(state.players || {}).filter(([, pl]) => pl.team).map(([id, pl]) => [id, pl.team]));
-        const settings = state.league?.scoring_settings || {};
-        const points = {};
-        const rows = weekStatRows(season, week);
-        for (const { player_id: id, game_id: game, stats } of rows || []) {
-          // A game sat out comes back with no stats.
-          if (!(stats?.sp > 0 || stats?.min > 0)) continue;
-          const fpts = scoring.scoreStats(settings, stats);
-          // With its color, as the Team tab and game log show it.
-          (points[id] ||= {})[game] = { fpts, tier: model.scoreTier(fpts, state.tiers) };
-        }
-        out = { days, teamOf, points, pointsReady: Boolean(rows), tiers: state.tiers,
-          teams: Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => stateOf(games[d]))])),
-          games: Object.fromEntries(Object.entries(byTeam).map(([team, games]) => [team, days.map((d) => {
-            const g = games[d];
-            return g ? { id: g.id, home: g.home === team, opponent: g.home === team ? g.away : g.home, start: g.start } : null;
-          })])) };
-      }
+      const out = loaded || scores ? model.weekStrip({
+        days: loaded ? loaded.days : model.weekDays(scores),
+        byTeam: loaded ? loaded.gamesByTeam : model.gamesByTeam(scores),
+        rows: weekStatRows(season, week),
+        teams: Object.fromEntries(Object.entries(state.players || {}).filter(([, pl]) => pl.team).map(([id, pl]) => [id, pl.team])),
+        settings: state.league?.scoring_settings || {},
+        tiers: state.tiers,
+        now: Date.now(),
+      }, scoring.scoreStats) : null;
       document.dispatchEvent(new CustomEvent('snp:week-schedule', { detail: JSON.stringify(out) }));
     }
     document.addEventListener('snp:week-schedule-request', weekSchedule);
@@ -510,8 +473,8 @@
         me,
         rosterId: (savedRoster || myRoster || rosters[0])?.roster_id ?? null,
         minWeek: league.settings?.start_week || 1,
-        maxWeek: lastWeek(league, bracket || []),
-        pickContext: { traded: traded || [], seasons: pickSeasons(league, drafts || []) },
+        maxWeek: model.lastWeek(league, bracket || []),
+        pickContext: { traded: traded || [], seasons: model.pickSeasons(league, drafts || []) },
         weeks: {},
       });
       updatePicks();
@@ -1026,11 +989,10 @@
       const player = state.players[playerId];
       state.lockConfirm = null;
       if (!lineup?.lockable || !lineup.starters.includes(playerId)) return;
-      const days = model.playerDays(lineup.week, player?.team, playerId);
-      const st = model.lockState(days, lineup.locks[playerId], Date.now(), lineup.started ? (game) => lineup.started(playerId, game) : null);
       // A game whose start the extension didn't see can still be locked; the cell said so.
-      if (!st.lockable && !st.unsure) {
-        state.notice = { kind: 'error', text: st.benched ? 'That game was played on your bench, so it can\'t be locked' : 'That game can no longer be locked' };
+      const st = model.lockCheck(lineup, playerId, player?.team, Date.now());
+      if (st.error) {
+        state.notice = { kind: 'error', text: st.error };
         return schedule();
       }
       const locks = { ...lineup.locks, [playerId]: st.current.game.id };
@@ -1078,10 +1040,7 @@
         return null;
       }
       const plan = model.bestLineup(lineup, Date.now(), { noLock: m.noLock });
-      if (JSON.stringify(plan.starters) !== JSON.stringify(m.plan.starters) ||
-        JSON.stringify(plan.current) !== JSON.stringify(m.plan.current) ||
-        JSON.stringify(plan.changes) !== JSON.stringify(m.plan.changes) ||
-        JSON.stringify(plan.locks) !== JSON.stringify(m.plan.locks)) {
+      if (!model.samePlan(plan, m.plan)) {
         m.plan = plan;
         m.ack = false;
         m.errors = ['Games have tipped off since this opened. Review the updated changes.'];
@@ -1143,10 +1102,9 @@
       if (!fresh) return;
       const { m, lineup } = fresh;
       if (!lineup.lockable || !lineup.starters.includes(id)) return;
-      const days = model.playerDays(lineup.week, state.players[id]?.team, id);
-      const st = model.lockState(days, lineup.locks[id], Date.now(), lineup.started ? (game) => lineup.started(id, game) : null);
-      if (!(st.lockable || st.unsure) || !st.current) {
-        m.errors = [st.benched ? 'That game was played on your bench, so it can\'t be locked' : 'That game can no longer be locked'];
+      const st = model.lockCheck(lineup, id, state.players[id]?.team, Date.now());
+      if (st.error) {
+        m.errors = [st.error];
         return schedule();
       }
       m.busy = `lockout:${id}`;
@@ -1434,21 +1392,10 @@
       if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
         const typing = e.composedPath().some((el) => el instanceof Element && el.matches('input, select, textarea, [contenteditable]'));
         if (typing || state.modal || !state.onPanel || (state.page !== 'team' && state.page !== 'matchup') || state.tab !== 'page' || !state.rosters?.length) return;
-        // On the Matchup tab, through the matchups (the picker's order), by their left team.
-        const pairs = state.page === 'matchup' ? view.matchupPairs(state) : [];
-        if (pairs.length) {
-          const at = pairs.findIndex((p) => p.some((r) => r?.roster_id === state.rosterId));
-          const next = pairs[at + (e.key === 'ArrowDown' ? 1 : -1)];
-          if (at < 0 || !next) return;
-          e.preventDefault();
-          return setRoster(next[0].roster_id);
-        }
-        const teams = [...state.rosters].sort((a, b) => ui.teamName(state, a).localeCompare(ui.teamName(state, b)));
-        const at = teams.findIndex((r) => r.roster_id === state.rosterId);
-        const next = teams[at + (e.key === 'ArrowDown' ? 1 : -1)];
-        if (at < 0 || !next) return;
+        const next = model.nextTeam(teamOrder(state), state.rosterId, e.key === 'ArrowDown' ? 1 : -1);
+        if (next == null) return;
         e.preventDefault();
-        return setRoster(next.roster_id);
+        return setRoster(next);
       }
       if (e.key === 'Escape' && (state.swap || state.lockConfirm)) {
         state.swap = null;
@@ -1955,49 +1902,10 @@
         loadNflLegs(week),
       ]);
       if (destroyed) return;
-      const settings = league.scoring_settings || {};
-      const teamOf = {};
-      const proj = {};
-      const actual = {};
-      const stats = {};
-      for (const row of [...(projRows || []), ...(statRows || [])]) {
-        const id = String(row.player_id);
-        const pl = row.player;
-        if (pl && !state.players[id]) {
-          const defense = pl.position === 'DEF';
-          state.players[id] = {
-            name: defense ? `${pl.first_name || ''} ${pl.last_name || ''}`.trim() || id : `${pl.first_name || ''} ${pl.last_name || ''}`.trim(),
-            first: pl.first_name, last: pl.last_name, position: pl.position,
-            positions: pl.fantasy_positions || [pl.position], team: pl.team, injury: pl.injury_status || null,
-          };
-        }
-        if (row.team) teamOf[id] = row.team;
-      }
-      for (const row of projRows || []) proj[row.player_id] = scoring.scoreStats(settings, row.stats || {});
-      for (const row of statRows || []) {
-        if (!model.playedGame(row.stats)) continue;
-        actual[row.player_id] = scoring.scoreStats(settings, row.stats);
-        stats[row.player_id] = row.stats;
-      }
-      const games = {};
-      const days = new Set();
-      for (const g of scores) {
-        const m = g.metadata || {};
-        const home = typeof m.home_team === 'string' ? m.home_team : m.home_team?.team;
-        const away = typeof m.away_team === 'string' ? m.away_team : m.away_team?.team;
-        if (!home || !away) continue;
-        if (m.day || m.date_time) days.add(String(m.day || m.date_time).slice(0, 10));
-        const q = Number(m.quarter_num) || 0;
-        const [mm, ss] = String(m.time_remaining || '15:00').split(':').map(Number);
-        const elapsed = q ? Math.min(60, (q - 1) * 15 + (15 - (mm || 0) - (ss || 0) / 60)) : 0;
-        const clock = !q ? 'Live' : m.quarter === 'Half' || m.quarter === 'half' ? 'Half' : q > 4 ? `OT ${m.time_remaining || ''}`.trim() : `Q${q} ${m.time_remaining || ''}`.trim();
-        // The team with the ball inside the 20, as Sleeper's RZ mark shows it.
-        const redZone = m.red_zone && m.possession ? m.possession : null;
-        const game = { id: g.game_id, start: g.start_time, status: g.status, home, away, homeScore: m.home_score, awayScore: m.away_score, clock, left: Math.max(0, 1 - elapsed / 60), redZone };
-        games[home] = game;
-        games[away] = game;
-      }
-      state.weeks[week] = { matchups: matchups || [], legs, teamOf, proj, actual, stats, games, days: [...days].sort(), research: research || {} };
+      const { players, teamOf, proj, actual, stats } = model.nflWeekPoints(projRows || [], statRows || [], league.scoring_settings || {}, scoring.scoreStats);
+      for (const [id, p] of Object.entries(players)) state.players[id] ??= p;
+      const { games, days } = model.nflGames(scores);
+      state.weeks[week] = { matchups: matchups || [], legs, teamOf, proj, actual, stats, games, days, research: research || {} };
       planLiveRead();
       schedulePanel();
     }
@@ -2012,7 +1920,7 @@
       if (!week || state.week !== weekData.currentWeek || destroyed) return;
       const now = Date.now();
       const list = Object.values(week.games);
-      const live = list.some((g) => g.status === 'in_game' || (g.status === 'pre_game' && g.start != null && g.start <= now));
+      const live = list.some((g) => model.gameState(g, now) === 'live');
       const next = Math.min(...list.filter((g) => g.status === 'pre_game' && g.start > now).map((g) => g.start));
       const at = live ? now + LIVE_READ_MS : Number.isFinite(next) ? next + 60e3 : null;
       if (at == null) return;
@@ -2219,13 +2127,10 @@
       if (e.composedPath().some((el) => el instanceof Element && el.matches('input, select, textarea, [contenteditable]'))) return;
       if (state.tab !== 'page' || !state.rosters?.length) return;
       // Through the matchups on the Matchup tab, the teams on the Team tab, A to Z, stopping at the ends.
-      const order = state.page === 'matchup' ? view.matchupPairs(state).map((p) => p) : [...state.rosters]
-        .sort((a, b) => ui.teamName(state, a).localeCompare(ui.teamName(state, b))).map((r) => [r]);
-      const at = order.findIndex((p) => p.some((r) => r?.roster_id === state.rosterId));
-      const next = order[at + (e.key === 'ArrowDown' ? 1 : -1)];
-      if (at < 0 || !next) return;
+      const next = model.nextTeam(teamOrder(state), state.rosterId, e.key === 'ArrowDown' ? 1 : -1);
+      if (next == null) return;
       e.preventDefault();
-      setPanelRoster(next[0].roster_id);
+      setPanelRoster(next);
     }
     document.addEventListener('keydown', onPanelKey);
     // Whatever saved the lineup (a swap here or Optimize), Sleeper's own numbers follow.
@@ -2253,39 +2158,7 @@
         const all = weeks.map((w) => weekRows(season, w));
         const games = end === current ? weekScores(season, current) : [];
         if (all.every(Array.isArray) && games) {
-          const settings = league.scoring_settings || {};
-          const points = {};
-          const teamOf = {};
-          all.forEach((rows, i) => {
-            for (const { player_id: id, stats, team, opponent, player } of rows) {
-              if (!model.playedGame(stats)) continue;
-              const fpts = scoring.scoreStats(settings, stats);
-              const position = player?.fantasy_positions?.[0] || player?.position;
-              (points[id] ||= {})[weeks[i]] = { fpts, tier: model.scoreTier(fpts, weekData.tiers, position), team, opponent };
-              teamOf[id] = team;
-            }
-          });
-          const avg = Object.fromEntries(Object.entries(points).map(([id, byWeek]) => {
-            const list = Object.values(byWeek);
-            return [id, list.reduce((sum, x) => sum + x.fpts, 0) / list.length];
-          }));
-          const status = {};
-          const kickoff = {};
-          if (end === current) {
-            const now = Date.now();
-            for (const g of games) {
-              const state = g.status === 'complete' ? 'done' : g.status === 'in_game' || (g.start_time != null && g.start_time <= now) ? 'live' : 'left';
-              for (const side of ['home_team', 'away_team']) {
-                // NFL names each side's team plainly; NBA nests it.
-                const team = typeof g.metadata?.[side] === 'string' ? g.metadata[side] : g.metadata?.[side]?.team;
-                if (!team) continue;
-                (status[current] ||= {})[team] = state;
-                if (g.start_time != null) kickoff[team] = g.start_time;
-              }
-            }
-          }
-          out = { weeks, current, points, avg, teamOf, status, kickoff, tiers: weekData.tiers, ready: true,
-            sig: `${season}|${weeks.join(',')}|${all.map((r) => r.length).join(',')}|${JSON.stringify(status)}` };
+          out = model.recentWeeks({ season, weeks, rows: all, games, current, settings: league.scoring_settings || {}, tiers: weekData.tiers, now: Date.now() }, scoring.scoreStats);
         }
       }
       document.dispatchEvent(new CustomEvent('snp:recent-weeks', { detail: JSON.stringify(out) }));
@@ -2429,26 +2302,6 @@
     // A week that didn't load is tried again next time, not kept for a week.
     if (tiers && !failed) chrome.storage.local.set({ [key]: { sig, tiers } });
     return tiers;
-  }
-
-  // The season ends when the league's playoff bracket does. Round count comes
-  // from the bracket itself; playoff_round_type sets weeks per round
-  // (0: one week each, 1: two-week final, 2: two weeks each).
-  function lastWeek(league, bracket) {
-    const { playoff_week_start: start, playoff_round_type: roundType } = league.settings || {};
-    const rounds = Math.max(0, ...bracket.map((m) => m.r));
-    // Without a bracket there's nothing to bound by, so don't invent a limit.
-    if (!start || !rounds) return Infinity;
-    const weeks = roundType === 2 ? rounds * 2 : roundType === 1 ? rounds + 1 : rounds;
-    return start + weeks - 1;
-  }
-
-  // Future picks start this season if its draft hasn't happened yet, else next season.
-  function pickSeasons(league, drafts) {
-    const season = Number(league.season);
-    const done = drafts.some((d) => d.season === league.season && d.status === 'complete');
-    const first = done ? season + 1 : season;
-    return Array.from({ length: PICK_SEASONS }, (_, i) => String(first + i));
   }
 
   // Runs at document_start: watching the DOM hides Sleeper's placeholder in the

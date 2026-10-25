@@ -636,3 +636,178 @@ test('NFL best lineup: a bye week projects nothing and IDP flex takes any defend
     { dl1: 7, lb1: 6, db1: 9, k2: 8 });
   assert.deepEqual(plain(model.bestNflLineup(l).starters), ['dl1', 'db1', 'k2'], 'k1 is on bye');
 });
+
+test('game state: done, live (on now, or past its start while still to come) or left; nothing without a game', () => {
+  const now = Date.parse('2026-10-21T23:30:00Z');
+  const at = (start, status) => ({ status, start: Date.parse(start) });
+  assert.equal(model.gameState(at('2026-10-21T20:00:00Z', 'complete'), now), 'done');
+  assert.equal(model.gameState(at('2026-10-21T23:00:00Z', 'in_game'), now), 'live');
+  assert.equal(model.gameState(at('2026-10-21T23:00:00Z', 'pre_game'), now), 'live', 'tipped off before Sleeper says so');
+  assert.equal(model.gameState(at('2026-10-22T23:00:00Z', 'pre_game'), now), 'left');
+  assert.equal(model.gameState({ status: 'pre_game', start: null }, now), 'left');
+  assert.equal(model.gameState(null, now), '');
+});
+
+test('side team: NFL names each side plainly, NBA nests it', () => {
+  assert.equal(model.sideTeam({ home_team: 'DET', away_team: 'GB' }, 'away_team'), 'GB');
+  assert.equal(model.sideTeam({ home_team: { team: 'LAL' } }, 'home_team'), 'LAL');
+  assert.equal(model.sideTeam(undefined, 'home_team'), undefined);
+});
+
+test('lock check: a starter\'s finished game can be locked until the next tips off, never one played on the bench', () => {
+  const games = [score('g1', '2026-10-20', 'LAL', 'GSW', { status: 'complete' }), score('g2', '2026-10-23', 'LAL', 'DEN')];
+  const week = { days: model.weekDays(games), gamesByTeam: model.gamesByTeam(games), proj: {}, actual: { p: { g1: 31.5 } } };
+  const now = Date.parse('2026-10-21T12:00:00Z');
+  const ok = model.lockCheck({ week, locks: {} }, 'p', 'LAL', now);
+  assert.equal(ok.error, null);
+  assert.equal(ok.current.game.id, 'g1');
+  assert.equal(ok.current.actual, 31.5);
+  const benched = model.lockCheck({ week, locks: {}, started: () => false }, 'p', 'LAL', now);
+  assert.equal(benched.error, 'That game was played on your bench, so it can\'t be locked');
+  assert.equal(model.lockCheck({ week, locks: {}, started: () => null }, 'p', 'LAL', now).error, null, 'unseen at tip-off: still offered');
+  const late = model.lockCheck({ week, locks: {} }, 'p', 'LAL', Date.parse('2026-10-24T01:00:00Z'));
+  assert.equal(late.error, 'That game can no longer be locked');
+  assert.equal(model.lockCheck({ week, locks: { p: 'g1' } }, 'p', 'LAL', now).error, 'That game can no longer be locked', 'already locked');
+});
+
+test('week picks: games played, or each player\'s best or worst game as one game played, skipping games sat out', () => {
+  const rows = [
+    { player_id: 'a', game_id: 'g1', stats: { sp: 1800, pts: 30 } },
+    { player_id: 'a', game_id: 'g2', stats: { sp: 1200, pts: 8 } },
+    { player_id: 'a', game_id: 'g3', stats: {} },
+    { player_id: 'b', game_id: 'g1', stats: { min: 20, pts: 12 } },
+  ];
+  const settings = { pts: 1 };
+  assert.deepEqual(plain(model.weekPicks(rows, 'played', settings, scoring.scoreStats)), { a: 2, b: 1 });
+  assert.deepEqual(plain(model.weekPicks(rows, 'best', settings, scoring.scoreStats).a), { sp: 1800, pts: 30, gp: 1, fpts: 30 });
+  assert.equal(model.weekPicks(rows, 'worst', settings, scoring.scoreStats).a.fpts, 8);
+});
+
+test('week strip: each team\'s days as done, live or left, its games, and the points of games played in their colors', () => {
+  const now = Date.parse('2026-10-21T23:30:00Z');
+  const games = [
+    score('g1', '2026-10-20', 'LAL', 'GSW', { status: 'complete' }),
+    score('g2', '2026-10-21', 'DEN', 'LAL'),
+    score('g3', '2026-10-24', 'LAL', 'BOS'),
+  ];
+  const tiers = { all: [10, 20], positions: {} };
+  const rows = [{ player_id: 'p', game_id: 'g1', stats: { sp: 1800, pts: 25 } }, { player_id: 'p', game_id: 'g2', stats: {} }];
+  const out = model.weekStrip({ days: model.weekDays(games), byTeam: model.gamesByTeam(games), rows, teams: { p: 'LAL' }, settings: { pts: 1 }, tiers, now }, scoring.scoreStats);
+  assert.deepEqual(plain(out.teams.LAL), ['', 'done', 'live', '', '', 'left', '']);
+  assert.deepEqual(plain(out.games.LAL[2]), { id: 'g2', home: false, opponent: 'DEN', start: games[1].start_time });
+  assert.deepEqual(plain(out.points), { p: { g1: { fpts: 25, tier: 'green' } } }, 'a game sat out scores nothing');
+  assert.equal(out.pointsReady, true);
+  assert.equal(model.weekStrip({ days: [], byTeam: {}, rows: null, teams: {}, settings: {}, tiers: null, now }, scoring.scoreStats).pointsReady, false, 'stats still loading');
+});
+
+test('NFL games: each team\'s game with its clock, the share left and the red zone; the week\'s game days', () => {
+  const { games, days } = model.nflGames([
+    { game_id: 'a', start_time: 1, status: 'in_game', metadata: { home_team: 'DET', away_team: 'GB', quarter_num: 3, time_remaining: '7:30', home_score: 14, away_score: 10, red_zone: true, possession: 'GB', date_time: '2026-10-25T17:00:00Z' } },
+    { game_id: 'b', start_time: 2, status: 'pre_game', metadata: { home_team: 'KC', away_team: 'LV', day: '2026-10-23' } },
+    { game_id: 'c', metadata: { home_team: 'SEA' } },
+  ]);
+  assert.equal(games.DET, games.GB, 'both sides share the game');
+  assert.deepEqual(plain(games.DET), { id: 'a', start: 1, status: 'in_game', home: 'DET', away: 'GB', homeScore: 14, awayScore: 10, clock: 'Q3 7:30', left: 0.375, redZone: 'GB' });
+  assert.equal(games.KC.clock, 'Live');
+  assert.equal(games.KC.left, 1);
+  assert.equal(games.SEA, undefined, 'a game needs both sides');
+  assert.deepEqual(plain(days), ['2026-10-23', '2026-10-25']);
+  assert.equal(model.nflGames([{ metadata: { home_team: 'A', away_team: 'B', quarter_num: 5, time_remaining: '2:00' } }]).games.A.clock, 'OT 2:00');
+  assert.equal(model.nflGames([{ metadata: { home_team: 'A', away_team: 'B', quarter_num: 2, quarter: 'Half' } }]).games.A.clock, 'Half');
+});
+
+test('NFL week points: the rows\' players (first seen), projections, and points and stats for games played', () => {
+  const player = (first, last, position, extra = {}) => ({ first_name: first, last_name: last, position, team: 'DET', ...extra });
+  const out = model.nflWeekPoints(
+    [{ player_id: 'q', team: 'DET', player: player('Jared', 'Goff', 'QB', { injury_status: 'Questionable' }), stats: { pass_yd: 250 } }, { player_id: 'DET', player: player('Detroit', 'Lions', 'DEF') }],
+    [{ player_id: 'q', team: 'DET', player: player('Other', 'Name', 'QB'), stats: { gp: 1, pass_yd: 300 } }, { player_id: 'w', player: player('', '', 'WR'), stats: { gp: 0 } }],
+    { pass_yd: 0.04 }, scoring.scoreStats,
+  );
+  assert.deepEqual(plain(out.players.q), { name: 'Jared Goff', first: 'Jared', last: 'Goff', position: 'QB', positions: ['QB'], team: 'DET', injury: 'Questionable' }, 'the first row seen');
+  assert.equal(out.players.DET.name, 'Detroit Lions');
+  assert.equal(out.players.w.name, 'w', 'no name: the id');
+  assert.deepEqual(plain(out.teamOf), { q: 'DET' });
+  assert.deepEqual(plain(out.proj), { q: 10, DET: 0 });
+  assert.deepEqual(plain(out.actual), { q: 12 });
+  assert.deepEqual(plain(out.stats), { q: { gp: 1, pass_yd: 300 } }, 'games not played left out');
+});
+
+test('NFL recent weeks: each week\'s score in its position\'s color, points per game, and where this week\'s games stand', () => {
+  const tiers = { all: [5, 15], positions: { QB: [12, 20] } };
+  const row = (id, team, stats) => ({ player_id: id, team, opponent: 'X', player: { position: 'QB', fantasy_positions: ['QB'] }, stats });
+  const out = model.recentWeeks({
+    season: '2026', weeks: [5, 6, 7], current: 7, settings: { pass_td: 4 }, tiers, now: 1000,
+    rows: [[row('q', 'DET', { gp: 1, pass_td: 6 })], [row('q', 'DET', { gp: 1, pass_td: 1 }), row('r', 'GB', { gp: 0 })], [row('q', 'DET', { gp: 1, pass_td: 2 })]],
+    games: [
+      { status: 'in_game', start_time: 900, metadata: { home_team: 'DET', away_team: 'GB' } },
+      { status: 'pre_game', start_time: 2000, metadata: { home_team: 'KC', away_team: 'LV' } },
+      { status: 'complete', start_time: 100, metadata: { home_team: 'SEA', away_team: 'SF' } },
+    ],
+  }, scoring.scoreStats);
+  assert.deepEqual(plain(out.points.q), {
+    5: { fpts: 24, tier: 'green', team: 'DET', opponent: 'X' },
+    6: { fpts: 4, tier: 'red', team: 'DET', opponent: 'X' },
+    7: { fpts: 8, tier: 'red', team: 'DET', opponent: 'X' },
+  });
+  assert.equal(out.avg.q, 12);
+  assert.equal(out.points.r, undefined, 'a week not played scores nothing');
+  assert.deepEqual(plain(out.status), { 7: { DET: 'live', GB: 'live', KC: 'left', LV: 'left', SEA: 'done', SF: 'done' } });
+  assert.deepEqual(plain(out.kickoff), { DET: 900, GB: 900, KC: 2000, LV: 2000, SEA: 100, SF: 100 });
+  assert.equal(out.sig, `2026|5,6,7|1,2,1|${JSON.stringify(out.status)}`);
+  const past = model.recentWeeks({ season: '2026', weeks: [2, 3], current: 7, settings: {}, tiers, now: 1000, rows: [[], []], games: [] }, scoring.scoreStats);
+  assert.deepEqual(plain(past.status), {}, 'weeks before this one: no games on');
+});
+
+test('admin deltas: what the changed settings add, how far that moves each player in view, per game', () => {
+  const stats = {
+    a: { fpts: 30, pts: 30, reb: 2, gp: 1 },
+    b: { fpts: 29, pts: 29, reb: 2, gp: 1 },
+    c: { fpts: 40, pts: 10, reb: 30, gp: 2 },
+    off: { fpts: 1, reb: 50, gp: 1 },
+    none: null,
+  };
+  const out = model.adminDeltas({ overrides: { reb: 2 }, league: { pts: 1, reb: 1 }, stats, view: ['a', 'b', 'c', 'none'], base: 'fpts' }, scoring.scoreStats);
+  assert.deepEqual(plain(out.points), { a: 2, b: 2, c: 30, off: 50, none: 0 }, 'just the differences, for everyone');
+  // Per game: a 30 to 32, b 29 to 31, c (40 + 30) / 2 = 35, up from 20.
+  assert.deepEqual(plain(out.shifts), { a: -1, b: -1, c: 2 });
+  assert.deepEqual(plain(out.places), { a: [1, 2], b: [2, 3], c: [3, 1] });
+  assert.equal(out.tints.c, model.shiftTint(2, 2));
+  const none = model.adminDeltas({ overrides: {}, league: { pts: 1 }, stats, view: ['a', 'b'], base: 'fpts' }, scoring.scoreStats);
+  assert.deepEqual(plain(none.shifts), { a: 0, b: 0 }, 'nothing moves until a value changes');
+});
+
+test('last week: the playoff bracket\'s rounds after its start week, by round type; no bracket, no limit', () => {
+  const bracket = [{ r: 1 }, { r: 2 }, { r: 3 }];
+  assert.equal(model.lastWeek({ settings: { playoff_week_start: 20, playoff_round_type: 0 } }, bracket), 22);
+  assert.equal(model.lastWeek({ settings: { playoff_week_start: 20, playoff_round_type: 1 } }, bracket), 23, 'two-week final');
+  assert.equal(model.lastWeek({ settings: { playoff_week_start: 20, playoff_round_type: 2 } }, bracket), 25, 'two weeks a round');
+  assert.equal(model.lastWeek({ settings: { playoff_week_start: 20 } }, []), Infinity);
+  assert.equal(model.lastWeek({}, bracket), Infinity);
+});
+
+test('pick seasons: from this season until its draft is done, then from the next', () => {
+  assert.deepEqual(plain(model.pickSeasons({ season: '2026' }, [])), ['2026', '2027', '2028']);
+  assert.deepEqual(plain(model.pickSeasons({ season: '2026' }, [{ season: '2026', status: 'complete' }])), ['2027', '2028', '2029']);
+  assert.deepEqual(plain(model.pickSeasons({ season: '2026' }, [{ season: '2025', status: 'complete' }], 2)), ['2026', '2027']);
+});
+
+test('lineup on the leg: once the draft is done until the league is complete, as Sleeper\'s Team tab saves', () => {
+  const statuses = ['pre_draft', 'drafting', 'in_season', 'post_season', 'complete'];
+  assert.deepEqual(statuses.map((status) => model.lineupOnLeg({ status })), [false, false, true, true, false]);
+});
+
+test('same plan: compares what the dialog shows, not how it was worked out', () => {
+  const plan = { starters: ['a'], current: ['b'], changes: [{ id: 'a' }], locks: [], info: { a: 1 } };
+  assert.equal(model.samePlan(plan, { ...plan, info: { a: 2 } }), true);
+  assert.equal(model.samePlan(plan, { ...plan, locks: [{ id: 'a' }] }), false);
+});
+
+test('next team: through the order, a team or a matchup at a time, stopping at the ends', () => {
+  const r = (id) => ({ roster_id: id });
+  const teams = [[r(3)], [r(1)], [r(2)]];
+  assert.equal(model.nextTeam(teams, 1, 1), 2);
+  assert.equal(model.nextTeam(teams, 1, -1), 3);
+  assert.equal(model.nextTeam(teams, 2, 1), null, 'the last');
+  assert.equal(model.nextTeam(teams, 9, 1), null, 'not in the order');
+  assert.equal(model.nextTeam([[r(1), r(4)], [r(2), null]], 4, 1), 2, 'matchups by their left team');
+});
