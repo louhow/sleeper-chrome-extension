@@ -115,7 +115,7 @@ Sleeper's own NBA Players table, with these additions:
   It loads the view the way Sleeper's own dropdowns do.
 - Sleeper's week dropdown reads the week shown: on its own it shows the season ("2026") on load even with a week picked, because its option values are numbers and the value it starts with is a string.
 - Week: with a week picked (Projection or Stats, not the season), a column after FPTS (and GP) with a mark a day, Monday to Sunday, from each team's schedule.
-  A game played wears its score's color by the league's scoring (green 24+, yellow 15+, red below, as on the Team tab; dim gray when they didn't play); bright red is a game on now, teal one still to play, faint no game.
+  A game played wears its score's color by the league's scoring (green 24+, yellow 15+, red below, as on the Team tab; dim gray when they didn't play); in the game log's muted tones; bright red is a game on now, light gray one still to play, faint no game.
   Hovering a mark shows a card: the game, its score (or tip-off time), and how many games are left; sorting by the column sorts by games left.
   The schedule is the week's GraphQL `scores` (already loaded for the Team tab's week, else one query per week); the scores come from the week's stat rows, which Best and Worst already load.
 - Team picker: beside Find player, every league team with its avatar and name (All teams first); picking one narrows the list to that team's players through Sleeper's own owner filter (the one in its filter section), so the Week strip scans a whole roster. Ticking Free agents lets the pick go. It's remembered with the rest of the view.

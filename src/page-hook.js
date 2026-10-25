@@ -843,11 +843,11 @@
     ${PLAYERS_PANEL} .snp-week { display: flex; gap: 2px; height: 14px; align-items: stretch; font-size: 12px; }
     ${PLAYERS_PANEL} .snp-week i { flex: 0 0 5px; border-radius: 1.5px; background: rgba(255, 255, 255, 0.06); }
     ${PLAYERS_PANEL} .snp-week i.live { background: #ff5b6e; }
-    ${PLAYERS_PANEL} .snp-week i.left { background: #00ceb8; }
+    ${PLAYERS_PANEL} .snp-week i.left { background: rgba(225, 232, 242, 0.85); }
     ${PLAYERS_PANEL} .snp-week i.done { background: rgba(185, 196, 212, 0.6); }
-    ${PLAYERS_PANEL} .snp-week i.done.green { background: #4caf74; }
-    ${PLAYERS_PANEL} .snp-week i.done.yellow { background: #d8b73e; }
-    ${PLAYERS_PANEL} .snp-week i.done.red { background: #d85a74; }
+    ${PLAYERS_PANEL} .snp-week i.done.green { background: rgb(84, 132, 100); }
+    ${PLAYERS_PANEL} .snp-week i.done.yellow { background: rgb(128, 122, 78); }
+    ${PLAYERS_PANEL} .snp-week i.done.red { background: rgb(150, 72, 96); }
     ${PLAYERS_PANEL} .snp-week i.done.dnp { background: rgba(185, 196, 212, 0.3); }
     ${PLAYERS_PANEL} .snp-week i[data-tip] { cursor: default; }
     ${PLAYERS_PANEL} .snp-week i[data-tip]:hover { outline: 1px solid rgba(255, 255, 255, 0.8); outline-offset: 1px; }
