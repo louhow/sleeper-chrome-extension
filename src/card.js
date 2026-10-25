@@ -305,6 +305,6 @@
     </section>`;
   }
 
-  // The stat table helpers live in ui.js; they're here too for the cards that share them.
+  // gameLog, careerRow and seasonLabel for the unit tests.
   return { render, gameLog, careerRow, seasonLabel };
 })();

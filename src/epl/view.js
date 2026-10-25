@@ -3,7 +3,7 @@
 (globalThis.SEP ||= {}).view = (() => {
   const { esc, teamName, notice } = globalThis.SEP.ui;
   // The API tab and the log-back-in message are the same as NBA and NFL's.
-  const { apiView, sessionExpired } = globalThis.SNP.view;
+  const { apiView, sessionExpired } = globalThis.SNP.ui;
   const PAGES = [['match', 'Match'], ['team', 'Team'], ['players', 'Players'], ['league', 'League']];
 
   function render(s, log) {

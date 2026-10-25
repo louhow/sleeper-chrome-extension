@@ -29,7 +29,7 @@ It reads off `SNP` where the rule or helper is the same for every sport:
 - the API client (`src/api.js`);
 - the lineup solver, win probability, game state, where a lineup saves, claim checks and standings ranks (`SNP.model`);
 - escaping, number, team, date and player helpers, the player card's stat-table helpers, and the loading and error messages (`SNP.ui`);
-- the API tab and the log-back-in message (`SNP.view`);
+- the API tab and the log-back-in message (`SNP.ui`);
 - save notices (`SNP.shared.flasher`) and league users (`SNP.loaders.usersById`).
 
 It never changes `SNP` or the NBA and NFL pages.

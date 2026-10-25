@@ -3,16 +3,15 @@
 // player, any team or matchup from the picker. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflpanel = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
-    shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
+    shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
   const { scoreTier, spotRefs, swapTargets, winProbability, gameState } = globalThis.SNP.model;
   const nfl = globalThis.SNP.nfl;
-  const view = globalThis.SNP.view;
   // Sleeper's apps list bench players by position in this order.
   const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
 
   function render(s, log) {
-    const body = s.tab === 'api' ? view.apiView(s, log)
-      : s.sessionExpired ? view.sessionExpired()
+    const body = s.tab === 'api' ? apiView(s, log)
+      : s.sessionExpired ? sessionExpired()
       : s.error ? errorMsg(s.error)
       : s.page === 'matchup' ? matchupView(s)
       : teamView(s);

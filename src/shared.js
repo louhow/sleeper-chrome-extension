@@ -137,8 +137,8 @@
   // Matchup tab the week's matchups (the picker's order, by their left team),
   // else every team A to Z, yours too.
   function teamOrder(state) {
-    const { ui, view } = globalThis.SNP;
-    const pairs = state.page === 'matchup' ? view.matchupPairs(state) : [];
+    const { ui } = globalThis.SNP;
+    const pairs = state.page === 'matchup' ? ui.matchupPairs(state) : [];
     if (pairs.length) return pairs;
     return [...state.rosters].sort((a, b) => ui.teamName(state, a).localeCompare(ui.teamName(state, b))).map((r) => [r]);
   }

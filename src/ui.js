@@ -510,6 +510,61 @@
     return `<div class="app${cls ? ` ${cls}` : ''}${whatIf ? ' whatif' : ''}">${toolbar(s, log, tools)}${whatIf ? whatIfBanner(s) : ''}<div class="body">${body}</div>${s.tab === 'api' || s.modal ? '' : notice(s)}</div>`;
   }
 
+  // The API calls tab: every call the session made, newest first, each opening onto its request and response.
+  const PREVIEW_CHARS = 20000;
+
+  function apiView(s, log) {
+    if (!log.length) return '<p class="msg">No calls yet.</p>';
+    return `<ol class="calls">${log.map((e) => callItem(s, e)).join('')}</ol>`;
+  }
+
+  function callItem(s, e) {
+    const kind = e.status === 'pending' ? 'pending'
+      : e.status === 'cache' ? 'cache'
+      : typeof e.status === 'number' && e.status < 400 && !e.error ? 'ok' : 'bad';
+    const meta = [
+      e.ms != null && e.status !== 'cache' ? `${Math.round(e.ms)} ms` : '',
+      e.bytes != null ? size(e.bytes) : '',
+      new Date(e.at).toLocaleTimeString(),
+    ].filter(Boolean).join(' · ');
+    const open = s.openCalls.has(e.id);
+    const detail = !open ? '' : [
+      e.request ? `<pre class="request">${esc(e.request.trim())}</pre>` : '',
+      e.error ? `<pre class="error">${esc(e.error)}</pre>` : '',
+      e.json !== undefined ? `<pre>${esc(preview(e))}</pre>` : '',
+    ].join('');
+    return `<li><details data-call="${e.id}" ${open ? 'open' : ''}>
+      <summary><span class="status ${kind}">${esc(e.status)}</span><span class="call"><code>${esc(e.path)}</code><span class="meta">${e.auth ? '<span class="auth">auth</span> · ' : ''}${meta}</span></span></summary>
+      ${detail}
+      ${e.request ? '' : `<a href="${esc(e.url)}" target="_blank" rel="noreferrer">Open raw response ↗</a>`}
+    </details></li>`;
+  }
+
+  function preview(e) {
+    if (e.preview == null) {
+      const text = JSON.stringify(e.json, null, 2);
+      e.preview = text.length > PREVIEW_CHARS
+        ? `${text.slice(0, PREVIEW_CHARS)}\n… truncated (${size(text.length)} total).`
+        : text;
+    }
+    return e.preview;
+  }
+
+  function size(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  }
+
+  // In place of a sport's tabs when Sleeper turned down the page's login (NBA, NFL and EPL).
+  function sessionExpired() {
+    return `<div class="session-expired" role="alert">
+      <h3>Log back in to Sleeper</h3>
+      <p>Sleeper turned down this browser's login, so your lineup, matchup and claims can't load correctly.</p>
+      <p>Log out of Sleeper, log back in, then reload this page.</p>
+    </div>`;
+  }
+
   // The team shown: a picker with each team's avatar, name and owner, A to Z,
   // and, while it's someone else's, a one-click way back to your own.
   function teamPicker(s) {
@@ -649,7 +704,7 @@
     dash, num, height, ago, newsSource, heat, scaler, tierClass,
     avatarImg, teamCard, teamSideOf, teamSide, matchupPair, rowHead, swapHint, swapClass, emptyCard,
     muRow, muEmpty, muStarters, muSection,
-    PAGES, pageTitle, toolbar, shell, teamPicker, matchupPicker, matchupPairs,
+    PAGES, pageTitle, toolbar, shell, apiView, sessionExpired, teamPicker, matchupPicker, matchupPairs,
     howTip, planSummary, optimizeDialog, applyAll, applyChange, slotPlayer, subArrow,
   };
 })();
