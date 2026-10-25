@@ -3,7 +3,7 @@
 // and latest news and the depth chart on the right. Pure: state -> HTML.
 (globalThis.SNP ||= {}).card = (() => {
   const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, pct: share, tierClass,
-    dash, num, height, ago, heat, scaler } = globalThis.SNP.ui;
+    dash, num, height, ago, newsSource, heat, scaler } = globalThis.SNP.ui;
   const { scoreStats } = globalThis.SNP.scoring;
   const { scoreTier } = globalThis.SNP.model;
 
@@ -19,7 +19,6 @@
     UTA: ['Jazz', '#002b5c'], WAS: ['Wizards', '#002b5c'],
   };
   const DEPTH_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
-  const NEWS_SOURCES = { fantasy_pros: 'Fantasy Pros', rotowire: 'Rotowire', rotoworld: 'Rotoworld' };
 
   const seasonLabel = (season) => `'${String(season).slice(2)}-'${String(Number(season) + 1).slice(2)}`;
 
@@ -274,7 +273,7 @@
       const md = n.metadata || {};
       return `<article class="pc-news">
         <h3>${esc(md.title || '')}</h3>
-        <div class="pc-news-meta">${esc(ago(n.published, s.now))} via ${esc(NEWS_SOURCES[n.source] || n.source || '')}</div>
+        <div class="pc-news-meta">${esc(ago(n.published, s.now))} via ${esc(newsSource(n.source))}</div>
         ${md.description ? `<p>${esc(md.description)}</p>` : ''}
         ${md.analysis ? `<p><b>Analysis:</b> ${esc(md.analysis)}</p>` : ''}
       </article>`;
@@ -307,5 +306,5 @@
   }
 
   // The stat table helpers live in ui.js; they're here too for the cards that share them.
-  return { render, gameLog, careerRow, seasonLabel, dash, num, height, ago, heat, scaler };
+  return { render, gameLog, careerRow, seasonLabel };
 })();

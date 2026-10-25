@@ -5,40 +5,14 @@
   const { playerGames, weekTotals, started } = globalThis.SEP.model;
   const { scoreStats, breakdown } = globalThis.SEP.scoring;
   const { esc, f2, f1, teamLogo, headshot, teamName, ownerOf, owns, playerOf, positions, injuryTag, weekday, shortDate, gameTime, pct, versus } = globalThis.SEP.ui;
-  const { height } = globalThis.SNP.card;
+  // The stat-table helpers are the same as NBA and NFL's player card.
+  const { dash, num, height, ago, newsSource, heat, scaler } = globalThis.SNP.ui;
   const TABS = [['summary', 'Summary'], ['log', 'Game Log'], ['history', 'History']];
-  // Game log columns: stat key, header, whether it's shown for goalkeepers only / outfield only.
+  // Game log columns: stat key, header, and whether fewer is better (shaded green when low).
   const LOG_COLS = [
     ['min', 'MIN'], ['g', 'G'], ['at', 'AST'], ['sot', 'SOT'], ['kp', 'KP'], ['sm', 'DRB'], ['tkw', 'TKW'], ['int', 'INT'],
-    ['cs', 'CS'], ['ga', 'GA'], ['sv', 'SV'], ['yc', 'YC'], ['rc', 'RC'],
+    ['cs', 'CS'], ['ga', 'GA', true], ['sv', 'SV'], ['yc', 'YC', true], ['rc', 'RC', true],
   ];
-  const NEWS_SOURCES = { rotowire: 'RotoWire', rotoworld: 'Rotoworld', fantasy_pros: 'FantasyPros' };
-
-  const dash = (v) => (v == null || v === '' ? '-' : v);
-  const num = (v, digits = 0) => (v == null || Number.isNaN(v) ? '-' : Number(v).toFixed(digits));
-  function ago(ms, now) {
-    const s = Math.max(0, (now - ms) / 1000);
-    const [n, unit] = s < 3600 ? [Math.round(s / 60), 'minute'] : s < 86400 ? [Math.round(s / 3600), 'hour'] : [Math.round(s / 86400), 'day'];
-    if (unit === 'minute' && n < 1) return 'just now';
-    return `${n} ${unit}${n === 1 ? '' : 's'} ago`;
-  }
-
-  // Heat color for a cell, as Sleeper shades stat tables: red (low) through olive to green (high).
-  function heat(t) {
-    if (t == null || Number.isNaN(t)) return '';
-    const stops = [[150, 72, 96], [128, 122, 78], [84, 132, 100]];
-    const x = Math.min(1, Math.max(0, t)) * 2;
-    const [a, b] = x <= 1 ? [stops[0], stops[1]] : [stops[1], stops[2]];
-    const f = x <= 1 ? x : x - 1;
-    const c = a.map((v, i) => Math.round(v + (b[i] - v) * f));
-    return ` style="background:rgba(${c.join(',')},.5)"`;
-  }
-  function scaler(rows, key) {
-    const vals = rows.map((r) => r[key]).filter((v) => v != null && !Number.isNaN(v));
-    const lo = Math.min(...vals);
-    const hi = Math.max(...vals);
-    return (v) => (v == null || Number.isNaN(v) || !vals.length ? null : hi === lo ? 0.5 : (v - lo) / (hi - lo));
-  }
 
   function render(s) {
     const m = s.modal;
@@ -104,7 +78,7 @@
           <h4>${esc(n.metadata?.title || '')}</h4>
           <p>${esc(n.metadata?.description || '')}</p>
           ${n.metadata?.analysis ? `<p class="sub">${esc(n.metadata.analysis)}</p>` : ''}
-          <div class="sub src">${esc(NEWS_SOURCES[n.source] || n.source || '')} · ${esc(ago(n.published, s.now))}</div>
+          <div class="sub src">${esc(newsSource(n.source))} · ${esc(ago(n.published, s.now))}</div>
         </article>`).join('');
     return `
       <h3>Upcoming match <span class="sub">${research ? `${pct(research.started)} start · ${pct(research.owned)} rostered` : ''}</span></h3>
@@ -177,7 +151,7 @@
     const cols = LOG_COLS.filter(([key]) => (gk ? !['sm', 'kp', 'sot', 'g', 'at'].includes(key) || key === 'g' : !['sv', 'ga'].includes(key) || key === 'ga'));
     const rows = gameLog(log, scoring, s);
     const fpts = scaler(rows.filter((r) => r.played), 'fpts');
-    const scalers = Object.fromEntries(cols.map(([key]) => [key, scaler(rows.filter((r) => r.played), key)]));
+    const scalers = Object.fromEntries(cols.map(([key, , fewer]) => [key, scaler(rows.filter((r) => r.played), key, fewer)]));
     const body = rows.map((r) => `<tr class="${r.played ? 'played' : 'future'}">
       <td>${r.week}</td>
       <td>${r.away ? '@' : ''}${esc(r.opp)}</td>

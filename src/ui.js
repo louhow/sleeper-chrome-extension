@@ -279,6 +279,10 @@
     return n ? `${Math.floor(n / 12)}'${n % 12}"` : '-';
   }
 
+  // Where a news item comes from, as its source spells itself.
+  const NEWS_SOURCES = { fantasy_pros: 'FantasyPros', rotowire: 'RotoWire', rotoworld: 'Rotoworld' };
+  const newsSource = (source) => NEWS_SOURCES[source] || source || '';
+
   function ago(ms, now) {
     const s = Math.max(0, (now - ms) / 1000);
     const [n, unit] = s < 3600 ? [Math.round(s / 60), 'minute'] : s < 86400 ? [Math.round(s / 3600), 'hour'] : [Math.round(s / 86400), 'day'];
@@ -636,7 +640,7 @@
     esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
     lineup, rosterParts, opponentOf, taxiRule, owns, real, playerOf, playerName, padTo, pct, researchLine,
-    dash, num, height, ago, heat, scaler, tierClass,
+    dash, num, height, ago, newsSource, heat, scaler, tierClass,
     avatarImg, teamCard, teamSideOf, teamSide, matchupPair, rowHead, swapHint, swapClass, emptyCard,
     muRow, muEmpty, muStarters, muSection,
     PAGES, pageTitle, toolbar, shell, teamPicker, matchupPicker, matchupPairs,
