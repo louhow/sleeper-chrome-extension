@@ -129,6 +129,14 @@ test("win probability matches Sleeper's (37% vs 63% at 157.23 vs 181.21)", () =>
   assert.equal(lo, 0.01, 'clamped to 1-99%');
 });
 
+test('win probability: a settled tie is a coin flip, missing numbers count as 0, no projection stays finite', () => {
+  assert.deepEqual(plain(model.winProbability(0, 0, 0, 0)), [0.5, 0.5], 'no points and no projections');
+  assert.deepEqual(plain(model.winProbability(40, 40, 40, 40)), [0.5, 0.5], 'a finished tie');
+  assert.deepEqual(plain(model.winProbability(null, null, 10, 10)), [0, 1], 'side one has nothing, side two is settled at 10');
+  assert.deepEqual(plain(model.winProbability(undefined, 20, 0, 20)), plain(model.winProbability(0, 20, 0, 20)));
+  for (const p of model.winProbability(5, 0, 0, 10)) assert.ok(Number.isFinite(p), 'a projection of 0 never divides by zero');
+});
+
 test('standings ranks use roster_standings, else record then waiver order', () => {
   const rosters = [
     { roster_id: 1, settings: { wins: 0, waiver_position: 14 } },
@@ -635,6 +643,16 @@ test('NFL best lineup: a bye week projects nothing and IDP flex takes any defend
     { dl1: 'DL', lb1: 'LB', db1: 'DB', k1: 'K', k2: 'K' },
     { dl1: 7, lb1: 6, db1: 9, k2: 8 });
   assert.deepEqual(plain(model.bestNflLineup(l).starters), ['dl1', 'db1', 'k2'], 'k1 is on bye');
+});
+
+test('lineup solver: any sport, ties broken by `later` past 99.99 points, negative worth still starts', () => {
+  const players = { a: { positions: ['X'] }, b: { positions: ['X'] }, c: { positions: ['Y'] } };
+  const base = { slots: ['X'], starters: ['a', 'c'], bench: ['b'], players, worth: () => 10 };
+  const later = { a: 120, b: 150, c: 200 };
+  const plan = model.solveLineup({ ...base, later: (id) => later[id], fits: (slot, p) => slot === 'BN' || p.positions.includes(slot) || slot === 'ANY', openSlot: 'ANY' });
+  assert.deepEqual(plain(plan.starters), ['b', 'c'], 'b is worth more later, and the slot past `slots` is ANY');
+  const negative = model.solveLineup({ ...base, starters: ['a'], bench: [], worth: () => -2 });
+  assert.deepEqual(plain(negative.starters), ['a'], 'a slot never goes empty to dodge a negative projection');
 });
 
 test('game state: done, live (on now, or past its start while still to come) or left; nothing without a game', () => {

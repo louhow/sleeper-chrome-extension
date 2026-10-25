@@ -138,6 +138,7 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 - Clicking a matchup opens it on the Matchup tab, that team on the left, through Sleeper's own MATCHUP tab; clicking a team's avatar, owner or name opens that team on the Team tab.
 
 Win probability is Sleeper's own formula, ported from its web app: each side is a normal distribution centred on its projection, narrowing as the score approaches it.
+Once both sides are settled (score equals projection) the score decides it, and a tie is 50% each, where Sleeper's formula gives 0% to both.
 Rank comes from `roster_standings`; before any games are played, it falls back to the standings order (record, points, then waiver order), which is what Sleeper shows then.
 
 ### Players tab

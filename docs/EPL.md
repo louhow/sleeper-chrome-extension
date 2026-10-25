@@ -24,7 +24,14 @@ If Sleeper turns down the page's login, it shows how to log back in instead of t
 ## How it works
 
 The EPL code lives in `src/epl/` under its own namespace (`globalThis.SEP`) and its own content-script entry in `manifest.json`, loaded after the NBA and NFL entry (`globalThis.SNP`).
-It reads off `SNP` where the rule or helper is the same for every sport: the API client (`src/api.js`), the Hungarian solver, claim checks and standings ranks (`SNP.model`), escaping and a few render helpers (`SNP.ui`), the API tab (`SNP.view`).
+It reads off `SNP` where the rule or helper is the same for every sport:
+
+- the API client (`src/api.js`);
+- the lineup solver, win probability, game state, where a lineup saves, claim checks and standings ranks (`SNP.model`);
+- escaping, number, team, date and player helpers, the player card's stat-table helpers, and the loading and error messages (`SNP.ui`);
+- the API tab and the log-back-in message (`SNP.view`);
+- save notices (`SNP.shared.flasher`) and league users (`SNP.loaders.usersById`).
+
 It never changes `SNP` or the NBA and NFL pages.
 
 The NBA and NFL entry reads every league's sport first and publishes it on the page as `html[data-snp-league-sport]` (`<league id>:<sport>`).
@@ -35,7 +42,8 @@ The panel waits for that attribute to name the league as `clubsoccer:epl` before
   Checked against Sleeper's own `pts_std` for standard-scoring leagues.
 - `src/epl/model.js`: pure rules.
   Matches per gameweek (a club can play twice), weekly totals, which positions each slot accepts (`FM_FLEX` takes F or M, and so on), lineup and IR moves, formations, the lineup optimizer, standings, club form and a best guess at waiver status.
-  The Hungarian solver, Sleeper's win-probability formula, and the FAAB and roster-room checks for claims come from `SNP.model`.
+  The optimizer is `SNP.model.solveLineup` given soccer's slot rules; like NBA and NFL it never leaves a slot empty to dodge a negative projection.
+  Sleeper's win-probability formula and the FAAB and roster-room checks for claims come from `SNP.model` too.
 - `src/epl/ui.js`: shared render helpers and the resolved lineup for a roster and week.
 - `src/epl/team.js`, `matchup.js`, `league.js`, `players.js`, `card.js`, `dialogs.js`, `view.js`: pure state -> HTML render functions.
 - `src/epl/content.js`: one session per league (survives Sleeper's in-page navigation), data loading, saves and events.

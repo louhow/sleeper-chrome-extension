@@ -4,7 +4,8 @@
 // league, rendered into a shadow root in place of Sleeper's placeholder, with
 // dialogs in a separate page-level host.
 (() => {
-  const { createApi } = globalThis.SNP;
+  // The API client, save notices and league users work as they do for NBA and NFL.
+  const { createApi, shared, loaders } = globalThis.SNP;
   const { view, model, scoring, ui, dialogs, card } = globalThis.SEP;
   const SPORT = 'clubsoccer:epl';
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
@@ -13,7 +14,6 @@
   const PLAYERS_KEY = 'players:epl:v1';
   const PLAYERS_TTL_MS = 12 * 3600e3;
   const FLOAT_AFTER_MS = 4000;
-  const NOTICE_MS = 3500;
   const CLOCK_MS = 60e3;
   const CAREER_SEASONS = 5;
   const TRANSACTION_FIELDS = 'adds drops leg roster_ids settings status status_updated transaction_id type created creator metadata';
@@ -325,7 +325,7 @@
       const myRoster = ui.myRoster({ me, rosters });
       Object.assign(state, {
         league,
-        usersById: Object.fromEntries(users.map((u) => [u.user_id, u])),
+        usersById: loaders.usersById(users),
         rosters,
         players,
         pool: null,
@@ -497,7 +497,8 @@
 
     async function saveStarters(starters) {
       const { league, rosterId } = state;
-      if (league.status === 'in_season') {
+      // Where Sleeper's own Team component saves it (model.lineupOnLeg): the week's leg, else the roster.
+      if (model.lineupOnLeg(league)) {
         await saveLeg(rosterId, starters);
       } else {
         const data = await api.graphql('roster_update_starters', `mutation roster_update_starters {
@@ -534,15 +535,7 @@
       }
     }
 
-    function flash(text) {
-      const notice = { kind: 'ok', text };
-      state.notice = notice;
-      setTimeout(() => {
-        if (state.notice !== notice) return;
-        state.notice = null;
-        schedule();
-      }, NOTICE_MS);
-    }
+    const flash = shared.flasher(state, schedule);
 
     // Moves players between two spots. IR goes in three steps so no save ever
     // has a player both starting and on IR.

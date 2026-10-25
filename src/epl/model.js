@@ -3,7 +3,7 @@
 (globalThis.SEP ||= {}).model = (() => {
   // The same rules as NBA and NFL, from the core model (loaded before this entry).
   const core = globalThis.SNP.model;
-  const { cheapestAssignment, standingsRanks, FAAB, rosterRoom, faabLeft, claimError, sortClaims } = core;
+  const { cheapestAssignment, winProbability, lineupOnLeg, standingsRanks, FAAB, rosterRoom, faabLeft, claimError, sortClaims } = core;
 
   // GraphQL `scores` rows (or /schedule rows) -> games, earliest first.
   function gamesFromScores(rows) {
@@ -39,7 +39,8 @@
     return out;
   }
 
-  const started = (game, now) => game.status !== 'pre_game' || (game.start != null && game.start <= now);
+  // Kicked off (or past its kickoff time), as core's model.gameState has it for NBA and NFL.
+  const started = (game, now) => core.gameState(game, now) !== 'left';
   const finished = (game) => game.status === 'complete';
 
   // A player's games this week, in order: the game, home/away, opponent, projection and result.
@@ -271,49 +272,10 @@
   // sits at F and the flex stays open for anyone.
   const slotSpecificity = (slot) => 5 - slotAccepts(slot).length;
 
-  // The starting lineup with the highest total worth: every movable player is
-  // matched to an open slot they fit, or to the bench. Ties keep players where
-  // they are, then put them in their most specific slot.
-  function solveLineup({ slots, starters: current, bench, players, worth, fixedReason }) {
-    const real = (id) => id && id !== '0';
-    const fixed = [];
-    const open = [];
-    current.forEach((id, i) => {
-      const reason = real(id) && fixedReason(id);
-      if (reason) fixed.push({ id, reason });
-      else open.push(i);
-    });
-    const benchFixed = bench.filter((id) => fixedReason(id));
-    fixed.push(...benchFixed.map((id) => ({ id, reason: fixedReason(id) })));
-    const pool = [...current.filter((id, i) => real(id) && open.includes(i)), ...bench.filter((id) => !benchFixed.includes(id))];
-    const slotOf = (i) => slots[i] ?? 'FLEX';
-    const weight = (id, i) => Math.round(worth(id) * 100) * 1e6 + (current[i] === id ? 1000 : 0) + slotSpecificity(slotOf(i));
-    const NO = 1e15;
-    const cost = pool.map((id) => [
-      ...open.map((i) => (fits(slotOf(i), players[id] || {}) ? -weight(id, i) : NO)),
-      ...pool.map(() => 0),
-    ]);
-    const starters = current.map((id, i) => (open.includes(i) ? '0' : id));
-    if (pool.length) {
-      cheapestAssignment(cost).forEach((col, k) => {
-        if (col < open.length) starters[open[col]] = pool[k];
-      });
-    }
-    const where = (list, id) => {
-      const i = list.indexOf(id);
-      return i < 0 ? 'BN' : slotOf(i);
-    };
-    const changes = [...new Set([...current, ...starters])]
-      .filter((id) => real(id) && current.indexOf(id) !== starters.indexOf(id))
-      .map((id) => ({ id, from: where(current, id), to: where(starters, id) }))
-      .sort((a, b) => (starters.includes(a.id) ? starters.indexOf(a.id) : 100 + current.indexOf(a.id)) -
-        (starters.includes(b.id) ? starters.indexOf(b.id) : 100 + current.indexOf(b.id)));
-    const total = (list) => list.reduce((sum, id) => sum + (real(id) ? worth(id) : 0), 0);
-    return { starters, changes, fixed, before: total(current), after: total(starters) };
-  }
-
-  // A player's worth this week: projected points for games not yet played
-  // (plus whatever they already scored). Players whose game has kicked off stay put.
+  // The best lineup through the core solver (SNP.model.solveLineup) with
+  // soccer's slots. A player's worth this week: projected points for games not
+  // yet played (plus whatever they already scored). Players whose game has
+  // kicked off stay put.
   function bestLineup(l, now = Date.now()) {
     if (!l.week) return null;
     const look = {};
@@ -325,23 +287,14 @@
     };
     l.starters.forEach((id) => id && id !== '0' && consider(id));
     l.bench.forEach(consider);
-    const plan = solveLineup({
+    const plan = core.solveLineup({
       slots: l.slots, starters: l.starters, bench: l.bench, players: l.players,
       worth: (id) => look[id].value,
       fixedReason: (id) => look[id].fixed,
+      fits, specificity: slotSpecificity, openSlot: 'FLEX',
     });
     plan.changes = plan.changes.map((c) => ({ ...c, proj: look[c.id].value, left: look[c.id].left }));
     return plan;
-  }
-
-  // Sleeper's win probability (core's port of its web app), for any numbers:
-  // missing ones count as 0, and level teams with nothing left to play are a
-  // coin flip (core says [0, 0], which the win bar would show as 0% each).
-  function winProbability(current1, proj1, current2, proj2) {
-    const [c1, p1, c2, p2] = [current1, proj1, current2, proj2].map((n) => n || 0);
-    const r2 = (n) => n.toFixed(2);
-    if (r2(c1) === r2(p1) && r2(c2) === r2(p2) && r2(c1) === r2(c2)) return [0.5, 0.5];
-    return core.winProbability(c1, p1, c2, p2);
   }
 
   // Standings order: record, then points for, then waiver order. Returns rosters sorted.
@@ -413,7 +366,7 @@
     gamesFromScores, gamesByTeam, pointsByGame, playerGames, weekTotals, started, finished,
     slotAccepts, fits, reserveEligible, spotOf, spotRefs, swapTargets, applyMove, describeMove,
     parseFormation, savedFormation, slotLabels, formationOf, FORMATION_ORDER,
-    cheapestAssignment, solveLineup, bestLineup, winProbability,
+    cheapestAssignment, bestLineup, winProbability, lineupOnLeg,
     standings, standingsRanks, pointsFor, pointsAgainst, streak,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims, waiverGuess,
   };

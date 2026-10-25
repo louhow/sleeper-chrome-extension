@@ -66,7 +66,7 @@
     return { m, l, next };
   }
 
-  const movedText = (l, changes) => shared.movedText(changes, (id) => l.players[id]?.name || `Player #${id}`, 3);
+  const movedText = (l, changes) => shared.movedText(changes, (id) => ui.playerName(l.players, id), 3);
 
   // Saves starters through Sleeper's own Team component. With `stay`, the
   // dialog stays open on the plan from the saved lineup, saying what saved.
@@ -86,7 +86,7 @@
       // Sleeper's component shows the saved lineup; until it does, it's worked out here.
       const read = lineup(true);
       const saved = read && JSON.stringify(read.starters) === JSON.stringify(starters) ? read
-        : { ...l, starters, bench: [...l.starters, ...l.bench].filter((id) => id && id !== '0' && !starters.includes(id)) };
+        : { ...l, starters, bench: [...l.starters, ...l.bench].filter((id) => ui.real(id) && !starters.includes(id)) };
       Object.assign(m, { lineup: saved, ...plan(saved), done: okText });
     } else {
       state.modal = null;

@@ -2,15 +2,15 @@
 // transactions, as the mobile app's League tab shows them. Pure: state -> HTML.
 (globalThis.SEP ||= {}).league = (() => {
   const { winProbability, standings, pointsFor, pointsAgainst, streak, faabLeft, FAAB } = globalThis.SEP.model;
-  const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, teamSide, weekNav, headshot, positions, owns, playerOf } = globalThis.SEP.ui;
+  const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, teamSide, weekNav, headshot, positions, owns, playerOf, loading, errorMsg } = globalThis.SEP.ui;
 
   function render(s) {
-    if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
-    if (!s.rosters || !s.players) return '<p class="msg">Loading…</p>';
+    if (s.error) return errorMsg(s.error);
+    if (!s.rosters || !s.players) return loading();
     const week = s.weeks?.[s.week];
     return `
       <div class="section-head"><h3>Matchups</h3>${weekNav(s)}</div>
-      ${week ? matchups(s, week) : '<p class="msg">Loading week…</p>'}
+      ${week ? matchups(s, week) : loading('Loading week…')}
       <div class="section-head"><h3>Standings</h3></div>
       ${standingsTable(s)}
       <div class="section-head"><h3>Transactions <span class="sub">week ${s.week}</span></h3></div>
@@ -62,7 +62,7 @@
 
   function transactions(s, week) {
     const list = week.transactions;
-    if (list == null) return '<p class="msg">Loading…</p>';
+    if (list == null) return loading();
     if (!list.length) return '<p class="msg">No transactions this week.</p>';
     const byRoster = Object.fromEntries(s.rosters.map((r) => [r.roster_id, r]));
     const player = (id, sign) => {

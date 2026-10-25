@@ -3,7 +3,7 @@
 // Pure: state -> HTML.
 (globalThis.SEP ||= {}).dialogs = (() => {
   const { playerGames, weekTotals, rosterRoom, faabLeft, sortClaims, FAAB, started } = globalThis.SEP.model;
-  const { esc, f2, headshot, positions, injuryTag, slotBadge, lineup, nextGameText, dialog, dialogErrors, myRoster, shortName, playerOf } = globalThis.SEP.ui;
+  const { esc, f2, headshot, positions, injuryTag, slotBadge, lineup, nextGameText, dialog, dialogErrors, myRoster, shortName, playerOf, real, loading } = globalThis.SEP.ui;
 
   function render(s) {
     const m = s.modal;
@@ -40,7 +40,7 @@
     const played = (id) => lockPlayed && gamesOf(s, id).some((g) => started(g.game, s.now));
     const row = (slot, id, label) => playerRow(s, slot, id, { button: true, selected: drops.has(id), disabled: !drops.has(id) && played(id), label });
     return [
-      ...l.starters.map((id, i) => (id && id !== '0' ? row(l.slots[i] ?? 'FLEX', id, l.labels[i]) : '')),
+      ...l.starters.map((id, i) => (real(id) ? row(l.slots[i] ?? 'FLEX', id, l.labels[i]) : '')),
       ...l.bench.map((id) => row('BN', id)),
       ...l.reserve.map((id) => row('IR', id)),
     ].join('');
@@ -55,7 +55,7 @@
     const [title, description] = !waiver ? ['Add Player', `Add ${p.name} to your roster`]
       : faab ? ['Make Waiver Bid', `Bid for ${p.name}`]
       : ['Make Waiver Claim', `${p.name} will be added to your roster once waivers clear`];
-    if (!s.ready) return dialog(title, description, '<p class="msg">Loading…</p>');
+    if (!s.ready) return dialog(title, description, loading());
     if (!roster) return dialog(title, description, `<p class="msg">Log in to Sleeper with a team in this league to ${waiver ? 'bid' : 'add players'}.</p>`);
     const room = rosterRoom(s.league, roster);
     const banner = room <= 0
@@ -136,7 +136,7 @@
     return dialog('Waiver Claims', description, `
       <div class="dialog-body">
         ${dialogErrors(m.errors)}
-        ${s.claims == null ? '<p class="msg">Loading…</p>'
+        ${s.claims == null ? loading()
           : items ? `<ol class="claims">${items}</ol>`
           : '<p class="msg">No pending claims. Use + next to a player on the Players tab to bid.</p>'}
       </div>`);

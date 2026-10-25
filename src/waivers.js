@@ -1,16 +1,14 @@
 // Waiver dialogs: the add/bid form Sleeper's web app shows for NFL players, and
 // the owner's pending claims (edit a bid or cancel). Pure: state -> HTML.
 (globalThis.SNP ||= {}).waivers = (() => {
-  const { playerDays, lockInDefault, rosterRoom, faabLeft, sortClaims, FAAB } = globalThis.SNP.model;
-  const { esc, f2, headshot, injuryTag, teamTag, slotBadge, lineup, nextGame, dialog, dialogErrors, owns, real, playerOf, loading } = globalThis.SNP.ui;
+  const { playerDays, gameState, lockInDefault, rosterRoom, faabLeft, sortClaims, FAAB } = globalThis.SNP.model;
+  const { esc, f2, headshot, injuryTag, teamTag, slotBadge, lineup, nextGame, dialog, dialogErrors, myRoster, real, playerOf, loading } = globalThis.SNP.ui;
 
   function render(s) {
     const m = s.modal;
     if (!m) return '';
     return m.kind === 'claims' ? claimsDialog(s, m) : bidDialog(s, m);
   }
-
-  const myRoster = (s) => s.rosters?.find((r) => owns(s, r)) ?? null;
 
   // The current week's games for a player, for projections and "next game".
   function daysOf(s, id) {
@@ -23,7 +21,7 @@
   // A player whose game today has started can't be dropped for a free agent.
   function playedToday(s, days) {
     const today = days.find((d) => d.date === s.today);
-    return Boolean(today?.game && (today.game.status !== 'pre_game' || (today.game.start != null && today.game.start <= s.now)));
+    return Boolean(today?.game) && gameState(today.game, s.now) !== 'left';
   }
 
   function playerRow(s, slot, id, { button = false, selected = false, disabled = false } = {}) {
@@ -132,5 +130,5 @@
       </div>`);
   }
 
-  return { render, myRoster };
+  return { render };
 })();

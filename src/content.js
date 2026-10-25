@@ -609,7 +609,7 @@
       const toReserve = new Set(next.reserve.filter((id) => !lineup.reserve.includes(id)));
       const benched = lineup.starters.map((id) => (toReserve.has(id) ? '0' : id));
       const startersChanged = !same(next.starters, lineup.starters);
-      const moved = shared.movedText(model.describeMove(lineup, next), (id) => ui.shortName(state.players[id] || { name: `Player #${id}` }));
+      const moved = shared.movedText(model.describeMove(lineup, next), (id) => ui.shortName(ui.playerOf(state.players, id)));
       state.swap = null;
       return save(async () => {
         if (taxiChanged) await saveRosterList('taxi', lineup.roster.roster_id, next.taxi);
@@ -634,10 +634,10 @@
         return schedule();
       }
       const locks = { ...lineup.locks, [playerId]: st.current.game.id };
-      const name = player?.name || `Player #${playerId}`;
+      const name = ui.playerName(state.players, playerId);
       return save(
         () => saveLeg('lock_in', rosterId, lineup.starters, locks),
-        `Locked ${name}: ${(st.current.actual ?? 0).toFixed(2)}`,
+        `Locked ${name}: ${ui.f2(st.current.actual ?? 0)}`,
         `Couldn't lock ${name}`,
       );
     }

@@ -42,6 +42,9 @@ test('lineup: without a leg in season it is read-only, from the public matchup, 
   s.weeks[1].legs = [];
   const l = pick(ui.lineup(s));
   assert.deepEqual([l.starters, l.editable, l.locks], [['b', 'a', '0'], false, {}]);
+  const playoffs = { ...s, league: { ...s.league, status: 'post_season' } };
+  assert.equal(ui.lineup(playoffs).editable, false, 'playoff lineups save to the leg too (model.lineupOnLeg)');
+  assert.equal(ui.lineup({ ...s, league: { ...s.league, status: 'complete' } }).editable, true, 'off season: the roster');
   const noWeek = pick(ui.lineup({ ...league(), me: 'u1', weeks: undefined }));
   assert.deepEqual([noWeek.starters, noWeek.editable], [['a', 'b', '0'], false]);
   assert.equal(ui.lineup({ ...league(), players: null }), null, 'waits for the players');
@@ -63,6 +66,20 @@ test('small helpers: open spots, unknown players, names, tags and games', () => 
   assert.equal(ui.weekday(Date.parse('2026-10-24T16:00:00Z')), 'Sat', 'a time in ms');
   assert.equal(ui.pct(22.1), '23%');
   assert.equal(ui.pct(null), '–');
+});
+
+test('null-safe helpers: no number, roster or date renders a placeholder, never a throw', () => {
+  const s = { me: 'u1', usersById: {} };
+  assert.equal(ui.f2(NaN), '–');
+  assert.equal(ui.f2(undefined), '–');
+  assert.equal(ui.f2('3'), '3.00');
+  assert.equal(ui.teamName(s, undefined), 'Team ?');
+  assert.equal(ui.ownerName(s, null), '');
+  assert.equal(ui.avatar(s, null), null);
+  assert.equal(ui.record(null), '0-0');
+  assert.equal(ui.owns(s, null), false);
+  assert.equal(ui.weekday(null), '');
+  assert.equal(ui.weekday(''), '');
 });
 
 test('avatars: the image, else the plain circle (or the team initial in pickers)', () => {

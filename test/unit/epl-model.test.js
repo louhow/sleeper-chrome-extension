@@ -263,7 +263,7 @@ test('club form: results from the record after each match, last five', () => {
 
 test('the rules that are the same as NBA and NFL come from the core model', () => {
   const { SEP: sep, SNP } = loadSep();
-  for (const name of ['cheapestAssignment', 'standingsRanks', 'FAAB', 'rosterRoom', 'faabLeft', 'claimError', 'sortClaims']) {
+  for (const name of ['cheapestAssignment', 'winProbability', 'lineupOnLeg', 'standingsRanks', 'FAAB', 'rosterRoom', 'faabLeft', 'claimError', 'sortClaims']) {
     assert.equal(sep.model[name], SNP.model[name], name);
   }
 });

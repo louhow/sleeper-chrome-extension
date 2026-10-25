@@ -7,7 +7,7 @@ const { ui, model, scoring, view } = SEP;
 const plain = (x) => JSON.parse(JSON.stringify(x));
 
 test('helpers that are the same as NBA and NFL come from the core', () => {
-  for (const name of ['esc', 'CDN', 'shortName', 'gameTime', 'dialogErrors', 'notice']) assert.equal(ui[name], SNP.ui[name], name);
+  for (const name of ['esc', 'f2', 'CDN', 'teamName', 'ownerName', 'avatar', 'record', 'owns', 'myRoster', 'ownerOf', 'real', 'loading', 'errorMsg', 'weekday', 'shortName', 'gameTime', 'dialogErrors', 'notice']) assert.equal(ui[name], SNP.ui[name], name);
 });
 
 const NOW = Date.parse('2026-10-24T12:00:00Z');

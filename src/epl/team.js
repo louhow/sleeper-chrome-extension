@@ -2,13 +2,13 @@
 // player's match and points, then bench and injured reserve. Pure: state -> HTML.
 (globalThis.SEP ||= {}).team = (() => {
   const { playerGames, weekTotals, spotRefs, swapTargets, started } = globalThis.SEP.model;
-  const { esc, f2, teamName, ownerName, avatarImg, record, slotBadge, weekNav, lineup, teamTotals, reserveRule, nextGameText, gameChips, playerLine, playerOf, pct, roleName } = globalThis.SEP.ui;
+  const { esc, f2, teamName, ownerName, avatarImg, record, slotBadge, weekNav, lineup, teamTotals, reserveRule, nextGameText, gameChips, playerLine, playerOf, pct, roleName, real, loading, errorMsg } = globalThis.SEP.ui;
 
   function render(s) {
-    if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
+    if (s.error) return errorMsg(s.error);
     const l = lineup(s);
-    if (!l) return '<p class="msg">Loading…</p>';
-    if (!l.week) return `${teamCard(s, l)}<p class="msg">Loading week…</p>`;
+    if (!l) return loading();
+    if (!l.week) return `${teamCard(s, l)}${loading('Loading week…')}`;
     const { editable } = l;
     const targets = new Set(editable && s.swap ? swapTargets(s.swap, l) : []);
     const movable = new Set(editable ? spotRefs(l).filter((ref) => swapTargets(ref, l).length) : []);
@@ -113,7 +113,7 @@
     const { s, l, editable, movable } = ctx;
     const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
     const cls = cardClass(ctx, spot);
-    if (!id || id === '0') {
+    if (!real(id)) {
       return `<article class="card empty${cls}">${slotBadge(slot, button, label)}<div class="headshot"></div><div class="info"><span class="name">Empty</span></div></article>`;
     }
     const p = playerOf(s, id);

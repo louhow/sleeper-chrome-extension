@@ -4,7 +4,7 @@
 (globalThis.SNP ||= {}).nflpanel = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
     shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
-  const { scoreTier, spotRefs, swapTargets, winProbability } = globalThis.SNP.model;
+  const { scoreTier, spotRefs, swapTargets, winProbability, gameState } = globalThis.SNP.model;
   const nfl = globalThis.SNP.nfl;
   const view = globalThis.SNP.view;
   // Sleeper's apps list bench players by position in this order.
@@ -32,17 +32,19 @@
     return { ...parts, mine, players: s.players, editable: mine && s.editableWeek === s.week };
   }
 
-  // The player's game this week and where it stands: 'bye', 'pre', 'live' or 'done'.
+  // The player's game this week and where it stands: 'bye', else model.gameState's 'left', 'live' or 'done'.
   function gameOf(s, id) {
     const week = s.weeks[s.week];
     const team = week.teamOf[id] ?? s.players[id]?.team;
     const g = team && week.games[team];
     if (!g) return { state: 'bye', team };
-    const state = g.status === 'complete' ? 'done' : g.status === 'in_game' || (g.start != null && g.start <= s.now) ? 'live' : 'pre';
+    const state = gameState(g, s.now);
     const home = g.home === team;
     return { ...g, state, team, homeSide: home, opponent: home ? g.away : g.home, mine: home ? g.homeScore : g.awayScore, theirs: home ? g.awayScore : g.homeScore };
   }
   const kickedOff = (g) => g.state === 'live' || g.state === 'done';
+  // The game's class: panel.css still calls a game to come `.pre`.
+  const gameClass = (g) => (g.state === 'left' ? 'pre' : g.state);
 
   // Points so far (Sleeper's stats, scored with the league's settings), and the
   // projection: the game's, until it's on; then what's scored plus the
@@ -110,7 +112,7 @@
     const custom = l.leg?.custom_points ?? l.matchup?.custom_points;
     const points = custom ?? live.reduce((sum, x) => sum + (x.actual ?? 0), 0);
     const any = custom != null || live.some((x) => kickedOff(x.g));
-    return { points: any ? points : null, proj: live.reduce((sum, x) => sum + x.now, 0), toPlay: live.filter((x) => x.g.state === 'pre').length };
+    return { points: any ? points : null, proj: live.reduce((sum, x) => sum + x.now, 0), toPlay: live.filter((x) => x.g.state === 'left').length };
   }
 
   // Points once the game kicks off (– until then), a finished game's in its score color.
@@ -178,7 +180,7 @@
         <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${teamTag(p)}${nfl.injury(p)}</div>
         ${researchLine(week.research[id])}
       </div>
-      <div class="nfl-game ${n.g.state}">
+      <div class="nfl-game ${gameClass(n.g)}">
         <b>${esc(gameText(n.g))}</b>
         <span>${esc(statLine(week.stats[id], p.position))}</span>
       </div>
@@ -217,14 +219,14 @@
     const n = numbers(s, id);
     const { g } = n;
     const at = g.state === 'bye' ? 'Bye' : `${g.homeSide ? 'vs' : '@'} ${g.opponent}`;
-    const when = g.state === 'done' ? `Final ${g.mine ?? 0}-${g.theirs ?? 0}` : g.state === 'live' ? liveText(g) : g.state === 'pre' ? kickoff(g.start) : '';
+    const when = g.state === 'done' ? `Final ${g.mine ?? 0}-${g.theirs ?? 0}` : g.state === 'live' ? liveText(g) : g.state === 'left' ? kickoff(g.start) : '';
     return `<div class="mp nfl ${cls}">
       ${photo(id, p)}
       <div class="mp-id">
         <div class="name"><button data-player="${esc(id)}">${esc(shortName(p))}</button>${nfl.injury(p)}</div>
         <div class="sub">${teamTag(p, { sep: '•' })}</div>
       </div>
-      <div class="mp-game ${g.state}"><b>${esc(at)}</b><span class="sub">${esc(when)}</span></div>
+      <div class="mp-game ${gameClass(g)}"><b>${esc(at)}</b><span class="sub">${esc(when)}</span></div>
       <div class="mp-pts">${points(s, p, n)}<span>proj ${f2(n.proj)}</span></div>
     </div>`;
   }

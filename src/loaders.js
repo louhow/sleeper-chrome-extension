@@ -1,11 +1,11 @@
 // League data both sports load the same way: rosters, who is logged in, a
 // week's matchup legs and games, and the league's own score colors.
 (globalThis.SNP ||= {}).loaders = (() => {
-  const { model, scoring } = globalThis.SNP;
+  const { model, scoring, ui } = globalThis.SNP;
   const TRANSACTION_FIELDS = 'adds drops leg roster_ids settings status transaction_id type created creator';
 
-  // The logged-in user's roster (as owner or co-owner), or undefined.
-  const myRoster = (rosters, me) => (me ? rosters.find((r) => r.owner_id === me || (r.co_owners || []).includes(me)) : undefined);
+  // The logged-in user's roster (as owner or co-owner), or null.
+  const myRoster = (rosters, me) => ui.myRoster({ rosters, me });
 
   // League users by user id.
   const usersById = (users) => Object.fromEntries(users.map((u) => [u.user_id, u]));
@@ -116,7 +116,7 @@
         return [[], []];
       })));
       for (const [matchups, rows] of loads) {
-        const starters = new Set((matchups || []).flatMap((m) => m.starters || []).filter((id) => id && id !== '0'));
+        const starters = new Set((matchups || []).flatMap((m) => m.starters || []).filter(ui.real));
         samples.push(...model.tierSamples(rows, starters, settings, scoring.scoreStats, positionOf));
       }
     }

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 
-const { card } = loadSnp();
+const { card, ui } = loadSnp();
 const scoring = { pts: 1, reb: 1.2 };
 
 test('game log merges projections with played games, in date order', () => {
@@ -39,8 +39,9 @@ test('career rows turn season totals into per-game averages and percentages', ()
 
 test('labels: NBA seasons span two years, heights in feet and inches', () => {
   assert.equal(card.seasonLabel(2026), "'26-'27");
-  assert.equal(card.height('79'), '6\'7"');
-  assert.equal(card.height(null), '-');
+  assert.equal(ui.height('79'), '6\'7"');
+  assert.equal(ui.height(null), '-');
+  assert.deepEqual([ui.newsSource('fantasy_pros'), ui.newsSource('rotowire'), ui.newsSource('espn'), ui.newsSource(null)], ['FantasyPros', 'RotoWire', 'espn', '']);
 });
 
 test('game log colors fantasy points by score tier', () => {

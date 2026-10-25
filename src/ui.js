@@ -3,7 +3,7 @@
 (globalThis.SNP ||= {}).ui = (() => {
   const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESCAPES[c]);
-  const f2 = (n) => (n == null ? '–' : n.toFixed(2));
+  const f2 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(2));
   const CDN = 'https://sleepercdn.com';
   // Combo slots take the colors of the positions they accept.
   const SLOT_PARTS = { G: ['pg', 'sg'], F: ['sf', 'pf'] };
@@ -27,18 +27,21 @@
   const headshot = (id) => `${CDN}/content/nba/players/thumb/${encodeURIComponent(id)}.jpg`;
   const teamLogo = (team) => `${CDN}/images/team_logos/nba/${encodeURIComponent(String(team).toLowerCase())}.webp`;
 
+  // Team helpers take a missing roster too (a bye, a matchup not loaded yet).
   function teamName(s, roster) {
-    const user = s.usersById?.[roster.owner_id];
-    return user?.metadata?.team_name || user?.display_name || `Team ${roster.roster_id}`;
+    const user = roster && s.usersById?.[roster.owner_id];
+    return user?.metadata?.team_name || user?.display_name || `Team ${roster?.roster_id ?? '?'}`;
   }
 
+  const ownerName = (s, roster) => s.usersById?.[roster?.owner_id]?.display_name || '';
+
   function avatar(s, roster) {
-    const owner = s.usersById?.[roster.owner_id];
+    const owner = s.usersById?.[roster?.owner_id];
     return owner?.metadata?.avatar || (owner?.avatar && `${CDN}/avatars/thumbs/${owner.avatar}`) || null;
   }
 
   function record(roster) {
-    const st = roster.settings || {};
+    const st = roster?.settings || {};
     return `${st.wins ?? 0}-${st.losses ?? 0}${st.ties ? `-${st.ties}` : ''}`;
   }
 
@@ -65,9 +68,9 @@
 
   const gameTime = (ms) =>
     new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
-  // A date ("2026-10-24", read at noon so no time zone moves it) or a time in ms.
-  const weekday = (date, style = 'short') =>
-    (typeof date === 'number' ? new Date(date) : new Date(`${date}T12:00:00`)).toLocaleDateString(undefined, { weekday: style });
+  // A date ("2026-10-24", read at noon so no time zone moves it) or a time in ms; '' for none.
+  const weekday = (date, style = 'short') => (date == null || date === '' ? '' :
+    (typeof date === 'number' ? new Date(date) : new Date(`${date}T12:00:00`)).toLocaleDateString(undefined, { weekday: style }));
   // A game from a player's side, e.g. "Thu @ MIA".
   const gameLabel = (d) => `${weekday(d.date)} ${d.home ? 'vs' : '@'} ${d.opponent}`;
 
@@ -136,7 +139,11 @@
   const loading = (text = 'Loading…') => `<p class="msg">${esc(text)}</p>`;
   const errorMsg = (text) => `<p class="msg error">${esc(text)}</p>`;
 
-  const owns = (s, roster) => s.me != null && (roster.owner_id === s.me || (roster.co_owners || []).includes(s.me));
+  const owns = (s, roster) => s.me != null && roster != null && (roster.owner_id === s.me || (roster.co_owners || []).includes(s.me));
+  // The logged-in user's roster (as owner or co-owner), or null.
+  const myRoster = (s) => s.rosters?.find((r) => owns(s, r)) ?? null;
+  // The roster a player is on, or null.
+  const ownerOf = (s, playerId) => s.rosters?.find((r) => (r.players || []).includes(playerId)) ?? null;
 
   // Where one roster's players are for the shown week: starters by slot, then
   // bench (by primary position in `order`), IR and taxi. The logged-in matchup
@@ -172,10 +179,11 @@
     const parts = s.players ? rosterParts(s, rosterId) : null;
     if (!parts) return null;
     const { roster, week, leg, taxi, reserve } = parts;
-    const inSeason = s.league.status === 'in_season';
+    // A lineup that saves to the week's matchup leg can only change once that leg has loaded.
+    const onLeg = globalThis.SNP.model.lineupOnLeg(s.league);
     const current = Boolean(week) && s.week >= (s.currentWeek ?? s.week);
     const mine = owns(s, roster);
-    const editable = mine && current && (!inSeason || Boolean(leg));
+    const editable = mine && current && (!onLeg || Boolean(leg));
     const settings = s.league.settings || {};
     // Active roster = everyone not on IR or taxi; it can hold one player per roster position.
     const active = (roster.players || []).length - reserve.length - taxi.length;
@@ -189,7 +197,7 @@
       mine,
       editable,
       // Locks only exist on an in-season matchup leg. A lock is real points, so not under what-if scoring.
-      lockable: mine && current && inSeason && Boolean(leg) && !whatIfOn(s),
+      lockable: mine && current && onLeg && Boolean(leg) && !whatIfOn(s),
       // Taxi belongs to the roster, not a week, so it's edited from the current week.
       taxiEditable: editable && (settings.taxi_slots || 0) > 0 && s.week === s.currentWeek,
       taxiOpen: globalThis.SNP.model.taxiOpen(settings, s.seasonType, s.currentWeek, weekStarted(s)),
@@ -204,7 +212,7 @@
   // Whether any game of the current week has tipped off.
   function weekStarted(s) {
     const games = s.weeks?.[s.currentWeek]?.games || [];
-    return games.some((g) => g.status !== 'pre_game' || (g.start != null && g.start <= s.now));
+    return games.some((g) => globalThis.SNP.model.gameState(g, s.now) !== 'left');
   }
 
   // One-line summary of the league's taxi rules and whether taxi is open now.
@@ -275,6 +283,10 @@
     const n = Number(inches);
     return n ? `${Math.floor(n / 12)}'${n % 12}"` : '-';
   }
+
+  // Where a news item comes from, as its source spells itself.
+  const NEWS_SOURCES = { fantasy_pros: 'FantasyPros', rotowire: 'RotoWire', rotoworld: 'Rotoworld' };
+  const newsSource = (source) => NEWS_SOURCES[source] || source || '';
 
   function ago(ms, now) {
     const s = Math.max(0, (now - ms) / 1000);
@@ -347,7 +359,7 @@
     return {
       rosterId: roster.roster_id,
       avatar: avatar(s, roster),
-      owner: s.usersById?.[roster.owner_id]?.display_name,
+      owner: ownerName(s, roster),
       team: teamName(s, roster),
       record: record(roster),
       ...numbers,
@@ -630,10 +642,10 @@
 
   return {
     reserveRule, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
-    esc, f2, CDN, headshot, teamLogo, teamName, avatar, record, shortName, injuryTag, positions, teamTag,
+    esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
-    lineup, rosterParts, opponentOf, taxiRule, owns, real, playerOf, playerName, padTo, pct, researchLine,
-    dash, num, height, ago, heat, scaler, tierClass,
+    lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, researchLine,
+    dash, num, height, ago, newsSource, heat, scaler, tierClass,
     avatarImg, teamCard, teamSideOf, teamSide, matchupPair, rowHead, swapHint, swapClass, emptyCard,
     muRow, muEmpty, muStarters, muSection,
     PAGES, pageTitle, toolbar, shell, teamPicker, matchupPicker, matchupPairs,

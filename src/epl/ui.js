@@ -1,9 +1,8 @@
 // Rendering helpers shared by every view. Pure: data in, HTML strings out.
 (globalThis.SEP ||= {}).ui = (() => {
-  const { playerGames, weekTotals, started, finished, slotAccepts, savedFormation, slotLabels, formationOf } = globalThis.SEP.model;
-  // The same helpers as NBA and NFL. The rest differ by sport, or take a missing roster or date where core's don't.
-  const { esc, CDN, shortName, gameTime, dialogErrors, notice } = globalThis.SNP.ui;
-  const f2 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(2));
+  const { playerGames, weekTotals, started, finished, slotAccepts, savedFormation, slotLabels, formationOf, lineupOnLeg } = globalThis.SEP.model;
+  // The same helpers as NBA and NFL; the rest differ by sport.
+  const { esc, f2, CDN, teamName, ownerName, avatar, record, owns, myRoster, ownerOf, real, weekday, shortName, gameTime, dialogErrors, notice, loading, errorMsg } = globalThis.SNP.ui;
   const f1 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(1));
   const INJURY_SEVERE = /^(out|ir|sus)/i;
   // Sleeper's apps list players by position in this order.
@@ -13,31 +12,12 @@
   const headshot = (id) => `${CDN}/content/clubsoccer/players/thumb/${encodeURIComponent(id)}.jpg`;
   const teamLogo = (teamId) => (teamId ? `${CDN}/images/team_logos/clubsoccer/${encodeURIComponent(teamId)}.png` : '');
 
-  function teamName(s, roster) {
-    const user = roster && s.usersById?.[roster.owner_id];
-    return user?.metadata?.team_name || user?.display_name || `Team ${roster?.roster_id ?? '?'}`;
-  }
-
-  function ownerName(s, roster) {
-    return s.usersById?.[roster?.owner_id]?.display_name || '';
-  }
-
-  function avatar(s, roster) {
-    const owner = s.usersById?.[roster?.owner_id];
-    return owner?.metadata?.avatar || (owner?.avatar && `${CDN}/avatars/thumbs/${owner.avatar}`) || null;
-  }
-
-  const playerOf = (s, id) => s.players?.[id] || { name: `Player #${id}`, positions: [] };
+  const playerOf = (s, id) => globalThis.SNP.ui.playerOf(s.players, id);
 
   const avatarImg = (s, roster, cls = 'avatar') => {
     const src = avatar(s, roster);
     return src ? `<img class="${cls}" src="${esc(src)}" alt="">` : `<div class="${cls}"></div>`;
   };
-
-  function record(roster) {
-    const st = roster?.settings || {};
-    return `${st.wins ?? 0}-${st.losses ?? 0}${st.ties ? `-${st.ties}` : ''}`;
-  }
 
   function injuryTag(p) {
     return p?.injury ? `<span class="inj ${INJURY_SEVERE.test(p.injury) ? 'severe' : ''}">${esc(p.injury)}</span>` : '';
@@ -47,7 +27,6 @@
     return (p?.positions || []).map((pos) => `<span class="pos ${esc(pos.toLowerCase())}">${esc(pos)}</span>`).join('');
   }
 
-  const weekday = (date, style = 'short') => (date ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: style }) : '');
   const shortDate = (date) => (date ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }) : '');
 
   // Slot badge: F, M, D, GK in their colors; flex slots split the colors they
@@ -140,11 +119,6 @@
   const roleRank = (label) => (ROLE_ORDER.includes(label) ? ROLE_ORDER.indexOf(label) : ROLE_ORDER.length);
   const roleName = (label, n) => (n === 1 && label !== 'GK' ? ROLE_NAMES[label]?.replace(/s$/, '') : ROLE_NAMES[label]) || label;
 
-  const owns = (s, roster) => s.me != null && roster != null && (roster.owner_id === s.me || (roster.co_owners || []).includes(s.me));
-  const myRoster = (s) => s.rosters?.find((r) => owns(s, r)) ?? null;
-
-  const ownerOf = (s, playerId) => s.rosters?.find((r) => (r.players || []).includes(playerId)) ?? null;
-
   // Everything about one roster's lineup for the shown week. The logged-in
   // matchup leg is authoritative; the roster's own starters are the fallback.
   function lineup(s, rosterId = s.rosterId) {
@@ -159,17 +133,18 @@
     const bench = (roster.players || [])
       .filter((id) => !placed.has(id))
       .sort((a, b) => positionRank(s.players[a]) - positionRank(s.players[b]));
-    const inSeason = s.league.status === 'in_season';
+    // A lineup that saves to the week's matchup leg can only change once that leg has loaded.
+    const onLeg = lineupOnLeg(s.league);
     const current = Boolean(week) && s.week >= (s.currentWeek ?? s.week);
     const mine = owns(s, roster);
-    const editable = mine && current && (!inSeason || Boolean(leg));
+    const editable = mine && current && (!onLeg || Boolean(leg));
     const settings = s.league.settings || {};
     const active = (roster.players || []).length - reserve.length;
     // Players whose club has kicked off this week can't move (Sleeper locks them).
     const locked = new Set();
     if (week) {
       for (const id of [...starters, ...bench]) {
-        if (id && id !== '0' && playerGames(week, s.players[id]?.team, id).some((g) => started(g.game, s.now))) locked.add(id);
+        if (real(id) && playerGames(week, s.players[id]?.team, id).some((g) => started(g.game, s.now))) locked.add(id);
       }
     }
     const labels = slotLabels(slots, starters, s.players, savedFormation(roster, s.week));
@@ -193,7 +168,7 @@
     let yetToPlay = 0;
     let any = false;
     for (const id of l.starters) {
-      if (!id || id === '0') continue;
+      if (!real(id)) continue;
       const g = playerGames(l.week, s.players[id]?.team, id);
       const t = weekTotals(g, s.now);
       games[id] = { games: g, ...t };
@@ -236,7 +211,7 @@
 
   return {
     esc, f2, f1, CDN, headshot, teamLogo, teamName, ownerName, avatar, avatarImg, record, shortName, playerOf, injuryTag, positions,
-    gameTime, weekday, shortDate, slotBadge, versus, nextMatch, nextGameText, gameChips, teamSide, dialog, dialogErrors, weekNav, notice,
-    owns, myRoster, ownerOf, lineup, teamTotals, reserveRule, pct, playerLine, positionRank, roleName,
+    gameTime, weekday, shortDate, slotBadge, versus, nextMatch, nextGameText, gameChips, teamSide, dialog, dialogErrors, weekNav, notice, loading, errorMsg,
+    owns, myRoster, real, ownerOf, lineup, teamTotals, reserveRule, pct, playerLine, positionRank, roleName,
   };
 })();
