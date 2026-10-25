@@ -21,10 +21,11 @@
   }
 
   // In place of the tab while Sleeper rejects the page's login.
+  // In place of a sport's tabs when Sleeper turned down the page's login (NBA, NFL and EPL).
   function sessionExpired() {
     return `<div class="session-expired" role="alert">
       <h3>Log back in to Sleeper</h3>
-      <p>Sleeper turned down this browser's login, so your lineups, <span class="nowrap">Lock-In</span> picks and scores can't load correctly.</p>
+      <p>Sleeper turned down this browser's login, so your lineup, matchup and claims can't load correctly.</p>
       <p>Log out of Sleeper, log back in, then reload this page.</p>
     </div>`;
   }

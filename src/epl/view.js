@@ -2,8 +2,8 @@
 // and the body for the shown tab. Pure: (state, api log) -> HTML.
 (globalThis.SEP ||= {}).view = (() => {
   const { esc, teamName, notice } = globalThis.SEP.ui;
-  // The API tab is the same as NBA and NFL's.
-  const { apiView } = globalThis.SNP.view;
+  // The API tab and the log-back-in message are the same as NBA and NFL's.
+  const { apiView, sessionExpired } = globalThis.SNP.view;
   const PAGES = [['match', 'Match'], ['team', 'Team'], ['players', 'Players'], ['league', 'League']];
 
   function render(s, log) {
@@ -30,14 +30,6 @@
         <button class="icon" data-action="refresh" title="Refetch everything" aria-label="Refresh">↻</button>
       </div>
     </nav>`;
-  }
-
-  function sessionExpired() {
-    return `<div class="session-expired" role="alert">
-      <h3>Log back in to Sleeper</h3>
-      <p>Sleeper turned down this browser's login, so your lineup, matchup and claims can't load correctly.</p>
-      <p>Log out of Sleeper, log back in, then reload this page.</p>
-    </div>`;
   }
 
   return { render };
