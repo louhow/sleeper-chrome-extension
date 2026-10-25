@@ -24,13 +24,16 @@
   // Designations that still let a player suit up, so they're worth a second look when starting.
   const WATCH = new Set(['Questionable', 'Doubtful']);
 
-  function slotBadge(slot) {
+  // With `spot`, the badge is the lineup button for that spot (see model.spotRefs).
+  function slotBadge(slot, spot = null) {
     const letters = FLEX_LETTERS[slot];
+    const tag = spot ? 'button' : 'span';
+    const button = spot ? ` data-spot="${esc(spot)}" aria-label="Move ${esc(slot)}"` : '';
     if (letters) {
-      return `<span class="slot nfl flex" aria-label="${esc(slot)}">${letters.map((l) => `<i class="${LETTER_POSITION[l]}">${l}</i>`).join('')}</span>`;
+      return `<${tag} class="slot nfl flex"${button || ` aria-label="${esc(slot)}"`}>${letters.map((l) => `<i class="${LETTER_POSITION[l]}">${l}</i>`).join('')}</${tag}>`;
     }
     const cls = slot === 'IDP_FLEX' ? 'idp' : slot.toLowerCase();
-    return `<span class="slot nfl ${esc(cls)}">${esc(slot === 'IDP_FLEX' ? 'IDP' : slot)}</span>`;
+    return `<${tag} class="slot nfl ${esc(cls)}"${button}>${esc(slot === 'IDP_FLEX' ? 'IDP' : slot)}</${tag}>`;
   }
 
   // Team defenses use the team logo; everyone else their headshot.
@@ -178,5 +181,5 @@
       <path d="M7 4v16"/><path d="M3 8l4-4 4 4"/><path d="M17 20V4"/><path d="M13 16l4 4 4-4"/>
     </svg></div><div class="btn-text">OPTIMIZE</div>`;
 
-  return { render, league, slotBadge, BUTTON, HOW };
+  return { render, league, side, slotBadge, headshot, injury, BUTTON, HOW };
 })();

@@ -215,6 +215,22 @@ Sleeper's rows only fit 9 stat columns at 60px, so with these two every column n
 Sleeper prints every stat with one decimal, so adminDelta's cell gets a badge on top; the list on screen is read from Sleeper's list component (`players`).
 The value is Sleeper's FPTS plus the changed settings scored on their own (`snp:admin-score-request`, answered by the extension), so it never drifts from Sleeper's number; the rank shifts come back with it (`model.rankShift`).
 
+### NFL: Team and Matchup tabs
+
+The extension's own Team and Matchup tabs take the place of Sleeper's, laid out like the NBA ones.
+Sleeper's own tab stays on the page, hidden: its Team component saves lineups and feeds Optimize lineup.
+The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), and "⇄ Compact view" beside Sleeper's tab row comes back.
+
+- Team: the team card (avatar, record, opponent, points, live projection, week picker), then starters slot by slot, bench, IR and taxi.
+  Each row: slot, headshot, name, position and team, injury, start and rostered %; the game (opponent, kickoff, or the clock and score while it's on, or the final), the stat line; points, in their [score color](#score-colors) once the game is over, and the projection.
+- Any team from the picker (A to Z, with avatars); the arrow keys go through them and stop at the ends.
+- Your own lineup, for the week Sleeper's Team tab shows: tap a slot badge, then one of the highlighted players. Players whose game has kicked off stay put, as Sleeper locks them. Saves go through Sleeper's own Team component (`updateMatchupLeg`), as Optimize's do.
+- Optimize lineup sits in the toolbar, as on the NBA Team tab, and opens the same dialog.
+- Matchup: the League tab's matchup card on top (avatars, scores, win chance and bar, record, projection), then both lineups slot by slot, bench, IR and taxi. The picker picks a matchup (both teams), as on the NBA Matchup tab.
+- Points are Sleeper's stats scored with the league's settings; the live projection is what's scored plus the projection for the game time left. Win chance is Sleeper's own formula (see the League tab).
+- The data: `/v1/league/<id>/matchups/<week>` (logged in, `matchup_legs`) for who's starting, `/projections/nfl/<season>/<week>` and `/stats/nfl/<season>/<week>` for players, projections and points, GraphQL `scores` for each game, `/players/nfl/research/...` for start and rostered %.
+  While a game of the current week is on, stats and games are read again every 90 seconds (only while the tab is visible); otherwise once the next kickoff comes.
+
 ### NFL: League tab
 
 - The week's matchups drawn as the NBA League tab draws them (yours first and framed; avatars, owners, team names, scores, win chance and bar, record, projection), in place of Sleeper's own cards.
@@ -236,7 +252,7 @@ Sleeper's own NFL Players table, with these additions (the same hooks as the NBA
 
 ### NFL: Optimize lineup
 
-Sleeper's web app already runs NFL leagues, so the extension adds only one thing there: an **OPTIMIZE** button on your own Team tab, left of Sleeper's WAIVER and TRADE buttons (it reuses their classes, so it looks like them).
+**Optimize lineup** sits in the compact Team tab's toolbar; on Sleeper's own Team tab (⇄) it's an **OPTIMIZE** button left of Sleeper's WAIVER and TRADE buttons (it reuses their classes, so it looks like them).
 It opens the same dialog as the NBA version, with no warnings to tick through: one row per starting slot in lineup order, a change leading with who comes in beside who they replace, each with an Apply button (slots tied together apply together; the dialog stays open on what's left), slots that stay dimmed ("No change", "Started"), and Apply all.
 
 - Worth: Sleeper's projection for this week's game, scored with the league's settings (the same number the Team tab shows). A bye week or a player ruled Out (Out, IR, PUP, Sus, NA) is worth 0.

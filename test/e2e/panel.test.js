@@ -320,7 +320,10 @@ ${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchu
 </script>`;
 };
 
-const nflTeamTab = () => `<!doctype html><title>Sleeper</title>
+// `wrapped`: inside Sleeper's tab frame (its tab row and scroll container), which
+// the extension's own Team and Matchup tabs take the place of. `token`: logged in.
+const nflTeamTab = ({ wrapped = false, rosterId = 4, round = 7, token = false } = {}) => `<!doctype html><title>Sleeper</title>
+${token ? `<script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>` : "<script>localStorage.removeItem('token')</script>"}
 <style>
   body { margin: 0; background: rgb(16, 33, 49); font-family: Lato, Arial, sans-serif; color: #fff; }
   .user-tab-menu { width: 680px; margin: 40px; padding: 20px; background: rgb(36, 45, 60); border-radius: 12px; }
@@ -330,12 +333,17 @@ const nflTeamTab = () => `<!doctype html><title>Sleeper</title>
   .btn { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 40px; background: rgb(58, 70, 91); }
   .btn-text { margin-top: 4px; font-size: 10px; }
   .team-roster-item { padding: 6px 0; }
+  .postdraft-panel { display: flex; flex-direction: column; width: 800px; height: 760px; margin: 20px 0 0 260px; background: rgb(36, 45, 60); border-radius: 12px; }
+  .center-tab-selector { display: flex; gap: 8px; padding: 20px 24px; }
+  .scrollbar-container { flex: 1; min-height: 0; overflow: auto; }
 </style>
+${wrapped ? '<div class="postdraft-panel"><div class="center-tab-selector"><span class="item-tab">MATCHUP</span><span class="item-tab">TEAM</span></div><div class="scrollbar-container"><div class="team-panel">' : ''}
 <div class="user-tab-menu"><div class="row"><b>Lou Point Conversion</b><div class="actions">
   <div class="btn-container space"><div class="btn">W</div><div class="btn-text">WAIVER</div></div>
   <div class="btn-container space"><div class="btn">T</div><div class="btn-text">TRADE</div></div>
 </div></div></div>
 <div class="team-roster"></div>
+${wrapped ? '</div></div></div>' : ''}
 <script>
   window.__nflSaves = [];
   window.__nflFail = null;
@@ -343,9 +351,9 @@ const nflTeamTab = () => `<!doctype html><title>Sleeper</title>
   const scoring = { rec_yd: 0.1 };
   const team = {
     memoizedProps: {
-      sport: 'nfl', leagueId: '${NFL_LEAGUE}', round: 7, rosterId: 4, isTeamOwner: true, disableEdit: false,
+      sport: 'nfl', leagueId: '${NFL_LEAGUE}', round: ${round}, rosterId: ${rosterId}, isTeamOwner: true, disableEdit: false,
       league: { status: 'in_season' },
-      roster: { roster_id: 4, players: Object.keys(players), reserve: [], taxi: [] },
+      roster: { roster_id: ${rosterId}, players: Object.keys(players), reserve: [], taxi: [] },
       hasTeamPlayedMap: { DET: 'complete' },
       playersMap: Object.fromEntries(Object.entries(players).map(([id, [name, pos, nflTeam, , injury]]) => [id, {
         first_name: name.split(' ')[0], last_name: name.split(' ')[1], position: pos, fantasy_positions: [pos], team: nflTeam, injury_status: injury || null,
@@ -502,6 +510,10 @@ async function answerGraphql(route) {
       });
     await sleeper.rostersLoading;
   }
+  if (/query league_rosters\b/.test(query) && query.includes(NFL_LEAGUE)) {
+    return json({ data: { league_rosters: await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json() } });
+  }
+  if (/query matchup_legs\b/.test(query) && query.includes(NFL_LEAGUE)) return json({ data: { matchup_legs: null } });
   if (/query league_rosters\b/.test(query)) return json({ data: { league_rosters: sleeper.rosters } });
   if (/query league_transactions_filtered\b/.test(query)) {
     return json({ data: { league_transactions_filtered: sleeper.claims.filter((c) => c.status === 'pending') } });
@@ -2344,6 +2356,121 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
   await context.unroute(/api\.sleeper\.app\/stats\/nfl\/2026\/\d+/);
   await context.unroute('https://api.sleeper.app/v1/state/nfl');
   await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('snp:players-view:')).forEach((k) => localStorage.removeItem(k)));
+  documentBody = LOGGED_OUT;
+});
+
+const nflPanel = (sel = '') => `#sleeper-nfl-panel ${sel}`;
+
+test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from the picker, and Sleeper\'s own view a click away', async () => {
+  documentBody = nflTeamTab({ wrapped: true });
+  await page.goto(NFL_TEAM_URL);
+  await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+  assert.equal(await page.locator('.postdraft-panel > .scrollbar-container').isVisible(), false, "Sleeper's own tab is hidden, still on the page");
+  assert.equal(await page.locator('.team-roster').count(), 1);
+  const [rosters, users, league] = await Promise.all(['rosters', 'users', ''].map(async (x) => (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}${x ? `/${x}` : ''}`)).json()));
+  const slots = league.roster_positions.filter((p) => p !== 'BN');
+  // A row per starter, slot by slot, then the bench; every player named.
+  const starters = page.locator(nflPanel('.card.nfl')).filter({ has: page.locator('.slot:not(.bn):not(.ir):not(.tx)') });
+  assert.equal(await starters.count(), slots.length);
+  assert.equal(await page.locator(nflPanel('.card.nfl .name')).filter({ hasText: /^Player #/ }).count(), 0, 'names from Sleeper\'s rows');
+  // Compact: a row is two short lines.
+  const heights = await page.locator(nflPanel('.card.nfl')).evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+  assert.ok(Math.max(...heights) <= 48, `rows at most 48px, as on NBA (${Math.max(...heights)})`);
+  assert.match(await page.locator(nflPanel('.card.nfl .line2')).first().textContent(), /\d+% Start\s*\|\s*\d+% Rostered/);
+  await page.screenshot({ path: `${OUT}nfl-team.png` });
+  // Last week: every game final, points in their score colors.
+  await page.locator(nflPanel('.week-nav [data-action="prev"]')).click();
+  await page.locator(nflPanel('.week-label b')).filter({ hasText: 'Week 6' }).waitFor({ timeout: 30000 });
+  await page.locator(nflPanel('.nfl-game.done')).first().waitFor({ timeout: 30000 });
+  assert.match(await page.locator(nflPanel('.nfl-game.done b')).first().textContent(), /· Final [WLT] \d+-\d+$/);
+  assert.ok(await page.locator(nflPanel('.week-pts b[class^="tier-"]')).count() > 0, 'finished games in their score colors');
+  // Any team from the picker, with its avatar and name, A to Z; arrow keys go through them.
+  const name = (r) => users.find((u) => u.user_id === r.owner_id)?.metadata?.team_name || users.find((u) => u.user_id === r.owner_id)?.display_name;
+  const teams = rosters.map(name).sort((a, b) => a.localeCompare(b)).map((x) => x.trim());
+  await page.locator(nflPanel('.tp-button')).click();
+  assert.deepEqual((await page.locator(nflPanel('.tp-menu [data-pick-roster] b')).allTextContents()).map((x) => x.trim()), teams);
+  await page.locator(nflPanel('.tp-menu [data-pick-roster]')).nth(2).click();
+  await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: teams[2] }).waitFor();
+  await page.keyboard.press('ArrowDown');
+  await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: teams[3] }).waitFor();
+  // Logged out, nothing to edit.
+  assert.equal(await page.locator(nflPanel('button.slot, .optimize')).count(), 0);
+  // Sleeper's own tab, and back.
+  await page.locator(nflPanel('[data-action="sleeper-view"]')).click();
+  await page.locator('.postdraft-panel > .scrollbar-container').waitFor();
+  assert.equal(await page.locator('#sleeper-nfl-panel').count(), 0);
+  await page.reload();
+  await page.locator('#snp-nfl-back').waitFor({ timeout: 30000 });
+  assert.equal(await page.locator('#sleeper-nfl-panel').count(), 0, 'remembered');
+  await page.locator('#snp-nfl-back').click();
+  await page.locator(nflPanel('.team-card')).waitFor();
+  assert.equal(await page.locator('.postdraft-panel > .scrollbar-container').isVisible(), false);
+  documentBody = LOGGED_OUT;
+});
+
+test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimize lineup sits in the toolbar, as on NBA', async () => {
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
+  const me = users.find((u) => u.display_name === 'louhow');
+  const mine = rosters.find((r) => r.owner_id === me.user_id);
+  sleeper.me = me.user_id;
+  // Sleeper's Team tab on next week, when nobody has kicked off.
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
+  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: 8, token: true });
+  await page.goto(NFL_TEAM_URL);
+  await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+  assert.match(await page.locator(nflPanel('.team-card .team-name')).textContent(), new RegExp(me.metadata?.team_name || me.display_name));
+  // Week 7 isn't the one Sleeper's Team tab shows, so it can't be edited from here.
+  assert.equal(await page.locator(nflPanel('button.slot')).count(), 0);
+  await page.locator(nflPanel('.week-nav [data-action="next"]')).click();
+  await page.locator(nflPanel('.week-label b')).filter({ hasText: 'Week 8' }).waitFor();
+  await page.locator(nflPanel('button.slot')).first().waitFor({ timeout: 30000 });
+  // Optimize lineup, in the toolbar as on the NBA Team tab, opens the dialog.
+  const optimize = page.locator(nflPanel('.tools button.optimize'));
+  assert.equal(await optimize.textContent(), 'Optimize lineup');
+  await optimize.click();
+  await page.locator(nflDialog('.os-row')).first().waitFor();
+  await page.keyboard.press('Escape');
+  await page.locator(nflDialog('.modal')).waitFor({ state: 'detached' });
+  // A swap: a starter's badge, then one of the highlighted players.
+  await page.locator(nflPanel('.card.nfl button.slot')).first().click();
+  await page.locator(nflPanel('.card.nfl.target')).first().waitFor();
+  assert.match(await page.locator(nflPanel('.rhead .hint')).first().textContent(), /Pick a player to swap with .+ · Esc to cancel/);
+  await page.screenshot({ path: `${OUT}nfl-team-swap.png` });
+  const before = await page.evaluate(() => window.__nflSaves.length);
+  await page.locator(nflPanel('.card.nfl.target button.slot')).first().click();
+  await page.locator(nflPanel('.notice.ok')).waitFor({ timeout: 30000 });
+  const saves = await page.evaluate(() => window.__nflSaves);
+  assert.equal(saves.length, before + 1);
+  const [leagueId, rosterId, round] = saves.at(-1);
+  assert.deepEqual([leagueId, rosterId, round], [NFL_LEAGUE, mine.roster_id, 8], "through Sleeper's own updateMatchupLeg");
+  assert.notDeepEqual(saves.at(-1)[4], mine.starters, 'the lineup changed');
+  await context.unroute('https://api.sleeper.app/v1/state/nfl');
+  sleeper.me = null;
+  documentBody = LOGGED_OUT;
+});
+
+test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup, rows slot by slot', async () => {
+  documentBody = nflTeamTab({ wrapped: true });
+  await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/matchup`);
+  const head = page.locator(nflPanel('.lg-match.nfl-mu-head'));
+  await head.waitFor({ timeout: 30000 });
+  assert.equal(await head.locator('.mu-team').count(), 2, 'both teams, as on the League tab');
+  assert.match(await head.locator('.mu-meta').first().textContent(), /\d+% WIN/);
+  const league = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}`)).json();
+  const slots = league.roster_positions.filter((p) => p !== 'BN');
+  assert.ok(await page.locator(nflPanel('.mu-row')).count() >= slots.length);
+  assert.equal(await page.locator(nflPanel('.mu-row')).first().locator('.mp.nfl').count(), 2);
+  await page.screenshot({ path: `${OUT}nfl-matchup.png` });
+  // The picker lists matchups, both teams each.
+  const pick = page.locator(nflPanel('.pair-pick'));
+  await pick.locator('.tp-button').click();
+  const options = pick.locator('.tp-menu [data-pick-roster]');
+  assert.equal(await options.count(), league.settings.num_teams / 2);
+  const [a, b] = (await options.nth(3).locator('.tp-name').allTextContents()).map((x) => x.trim());
+  await options.nth(3).click();
+  await head.locator('.mu-team.mine .team-name').filter({ hasText: a }).waitFor();
+  assert.equal((await head.locator('.mu-team.theirs .team-name').textContent()).trim(), b);
   documentBody = LOGGED_OUT;
 });
 

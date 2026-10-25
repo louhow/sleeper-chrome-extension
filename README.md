@@ -22,7 +22,9 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 - Admin tools (off unless `?snp-admin=1`): what-if scoring on the Team and Matchup tabs and player card, adminFPTS and adminDelta columns on the Players tab.
 
 **NFL**
-- Optimize lineup button on Sleeper's own Team tab, slot by slot like the NBA one; apply one row or all of them.
+- Team tab, compact like the NBA one: a row per player (game, live clock and score, stat line, start and rostered %, points in their score color), any team from the picker, lineup swaps from the slot badges, Optimize lineup in the toolbar. Sleeper's own tab is a click away (⇄).
+- Matchup tab: the League tab's matchup card on top, both lineups slot by slot; the picker picks a matchup.
+- Optimize lineup, slot by slot like the NBA one; apply one row or all of them.
 - League tab matchups drawn like the NBA ones, with Sleeper's own live numbers.
 - Players tab: a Last 5 column (the last five weeks played, a mark each in its score's color, scores on hover; sorts by points per game), a team picker, team avatars on rostered players.
 

@@ -3014,3 +3014,90 @@ button.danger.solid:hover:not(:disabled) {
   outline: 2px solid var(--whatif);
   outline-offset: -1px;
 }
+
+/* NFL Team and Matchup tabs (nflpanel.js): the NBA layout, one game a week. */
+#sleeper-nfl-panel {
+  display: flex;
+}
+.card.nfl,
+.rhead.nfl {
+  grid-template-columns: 40px 30px minmax(0, 1fr) minmax(150px, 210px) 54px;
+}
+.rhead.nfl .nfl-game-h {
+  align-self: end;
+}
+.headshot.logo {
+  object-fit: contain;
+  border-radius: 6px;
+  background: none;
+}
+.nfl-game {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.nfl-game b {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+.nfl-game span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+.nfl-game.pre b,
+.mp-game.pre b {
+  color: var(--muted);
+}
+.nfl-game.live b,
+.mp-game.live .sub {
+  color: var(--danger);
+}
+.nfl-game.bye b {
+  color: var(--muted);
+  font-weight: 400;
+}
+/* A finished game's points in its score color, as in the game log. */
+.nfl-panel :is(.week-pts, .mp-pts) b[class^="tier-"] {
+  padding: 0 4px;
+  border-radius: 4px;
+}
+.nfl-panel b.tier-green { background: var(--score-green); }
+.nfl-panel b.tier-yellow { background: var(--score-yellow); }
+.nfl-panel b.tier-red { background: var(--score-red); }
+.nfl-panel .msg.quiet {
+  margin: 6px 0 0 8px;
+  font-size: 12px;
+  text-align: left;
+}
+.nfl-panel .team-card {
+  margin-top: 4px;
+}
+.nfl-panel .team-card .week-nav {
+  flex: none;
+}
+/* The Matchup tab: the League tab's card on top, rows without a lock column. */
+.nfl-mu-head {
+  margin: 4px 0 0;
+  cursor: default;
+}
+.mp.nfl {
+  grid-template-columns: 26px minmax(0, 1fr) 84px 52px;
+  grid-template-areas: "hs id game pts";
+}
+.mp.nfl.theirs {
+  grid-template-columns: 52px 84px minmax(0, 1fr) 26px;
+  grid-template-areas: "pts game id hs";
+}
+.mp.nfl .mp-id .name {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.mp.nfl.theirs .mp-id .name {
+  justify-content: flex-end;
+}

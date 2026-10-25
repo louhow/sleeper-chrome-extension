@@ -4,7 +4,7 @@
 // On every page of an NBA league it also answers Sleeper's waiver and add
 // buttons (see page-hook.js) with a bid dialog.
 (() => {
-  const { createApi, view, model, scoring, ui, waivers, optimize, card, nfl, whatif } = globalThis.SNP;
+  const { createApi, view, model, scoring, ui, waivers, optimize, card, nfl, nflpanel, whatif } = globalThis.SNP;
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
   const PANEL_PAGES = new Set(['team', 'matchup', 'league']);
   const PLAYERS_PATH = '/v1/players/nba';
@@ -206,6 +206,8 @@
     }
 
     function schedule() {
+      // An NFL league's calls show in its own panel's API tab.
+      if (nflSession) return nflSession.refresh();
       if (frame || destroyed) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
@@ -1781,8 +1783,426 @@
       document.documentElement.dataset.snpPlayersLeague = leagueId;
       // Page-hook waits for this to know the extension is in (admin tools are NBA-only).
       document.dispatchEvent(new CustomEvent('snp:admin-scoring', { detail: JSON.stringify({ leagueId, enabled: false, changed: false }) }));
+      await loadPanel();
     }
-    loadNfl().catch((err) => console.warn('[sleeper-nfl] league data unavailable', err));
+    loadNfl().catch(panelFail);
+
+    // ---- Team and Matchup tabs: the extension's own, in place of Sleeper's ----
+    // Sleeper's own tab stays on the page, hidden (its Team component saves
+    // lineups and feeds Optimize); the ⇄ button shows it instead, remembered
+    // in the page's storage.
+    const SLEEPER_VIEW = 'snp:nfl-sleeper-view';
+    const NFL_PAGES = new Set(['team', 'matchup']);
+    // The NFL regular season and playoffs.
+    const NFL_WEEKS = 18;
+    // While a game is on, the week's stats and games are read again this often (tab visible).
+    const LIVE_READ_MS = 90e3;
+    const panelHost = document.createElement('div');
+    panelHost.id = 'sleeper-nfl-panel';
+    const panelShadow = panelHost.attachShadow({ mode: 'open' });
+    panelShadow.innerHTML = '<style></style><div class="root"></div>';
+    const panelRoot = panelShadow.querySelector('.root');
+    stylesheet.then((css) => {
+      panelShadow.querySelector('style').textContent = css;
+      schedulePanel();
+    });
+    const hideSleeper = Object.assign(document.createElement('style'), {
+      textContent: 'html[data-snp-nfl-panel] .postdraft-panel > .scrollbar-container { display: none !important; }',
+    });
+    Object.assign(state, {
+      tab: 'page', now: Date.now(), league, usersById: null, rosters: null, me: null, rosterId: null,
+      week: null, currentWeek: null, minWeek: league.settings?.start_week || 1, maxWeek: NFL_WEEKS,
+      weeks: {}, players: {}, tiers: null, swap: null, saving: false, rosterMenu: false, ready: false, error: null,
+      sessionExpired: false, editableWeek: null, optimizable: false, failedAvatars: new Set(), openCalls: new Set(),
+    });
+    let sleeperView = false;
+    try {
+      sleeperView = localStorage.getItem(SLEEPER_VIEW) === '1';
+    } catch {
+      sleeperView = false;
+    }
+    function panelFail(err) {
+      if (destroyed) return;
+      console.error('[sleeper-nfl]', err);
+      state.error = String(err.message || err);
+      state.ready = true;
+      schedulePanel();
+    }
+
+    let panelFrame = 0;
+    function schedulePanel() {
+      if (panelFrame || destroyed) return;
+      panelFrame = requestAnimationFrame(() => {
+        panelFrame = 0;
+        if (destroyed) return;
+        state.now = Date.now();
+        state.sessionExpired = api.sessionExpired();
+        state.tiers = weekData.tiers;
+        if (!state.ready || !panelHost.isConnected) return;
+        const top = panelRoot.querySelector('.body')?.scrollTop ?? 0;
+        panelRoot.innerHTML = nflpanel.render(state, api.log);
+        const body = panelRoot.querySelector('.body');
+        if (body) body.scrollTop = top;
+      });
+    }
+
+    // Ours goes in place of Sleeper's tab content, once the first load is in.
+    function attachPanel() {
+      const wrapper = NFL_PAGES.has(state.page) && state.ready && !sleeperView ? document.querySelector('.postdraft-panel > .scrollbar-container') : null;
+      if (!wrapper) {
+        panelHost.remove();
+        document.documentElement.removeAttribute('data-snp-nfl-panel');
+        return;
+      }
+      if (!hideSleeper.isConnected) (document.head || document.documentElement).append(hideSleeper);
+      if (panelHost.previousElementSibling !== wrapper) {
+        wrapper.after(panelHost);
+        schedulePanel();
+      }
+      document.documentElement.setAttribute('data-snp-nfl-panel', '');
+      // Optimize and swaps save through Sleeper's Team component, for the week it shows.
+      const own = state.page === 'team' ? lineup(false) : null;
+      const editableWeek = own?.editable ? own.round : null;
+      if (editableWeek !== state.editableWeek || Boolean(own?.editable) !== state.optimizable) {
+        state.editableWeek = editableWeek;
+        state.optimizable = Boolean(own?.editable);
+        schedulePanel();
+      }
+    }
+
+    async function loadPanel(force = false) {
+      const rosterKey = `roster:${leagueId}`;
+      const [users, rosters, me, prefs] = await Promise.all([
+        api.get(`/v1/league/${leagueId}/users`),
+        loadNflRosters(),
+        loadNflMe(),
+        chrome.storage.local.get(rosterKey),
+      ]);
+      if (destroyed) return;
+      const mine = me && rosters.find((r) => r.owner_id === me || (r.co_owners || []).includes(me));
+      const saved = rosters.find((r) => r.roster_id === prefs[rosterKey]);
+      Object.assign(state, {
+        usersById: Object.fromEntries(users.map((u) => [u.user_id, u])),
+        rosters,
+        me,
+        rosterId: state.rosterId ?? (mine || saved || rosters[0])?.roster_id ?? null,
+        currentWeek: weekData.currentWeek,
+      });
+      if (force) state.weeks = {};
+      state.week ??= weekData.currentWeek;
+      await loadPanelWeek(state.week);
+      state.ready = true;
+      attachPanel();
+      schedulePanel();
+    }
+
+    async function loadNflRosters() {
+      if (api.loggedIn()) {
+        try {
+          const data = await api.graphql('league_rosters', `query league_rosters {
+  league_rosters(league_id: ${JSON.stringify(leagueId)}) {
+    roster_id owner_id co_owners players starters reserve taxi settings metadata
+  }
+}`, { auth: true });
+          if (data?.league_rosters?.length) return data.league_rosters;
+        } catch (err) {
+          console.warn('[sleeper-nfl] league_rosters unavailable, using the public endpoint', err);
+        }
+      }
+      return api.get(`/v1/league/${leagueId}/rosters`);
+    }
+    async function loadNflMe() {
+      if (!api.loggedIn()) return null;
+      try {
+        return (await api.graphql('me', 'query me { me { user_id } }', { auth: true }))?.me?.user_id ?? null;
+      } catch {
+        return null;
+      }
+    }
+    async function loadNflLegs(week) {
+      if (!api.loggedIn()) return null;
+      try {
+        const data = await api.graphql(`matchup_legs (week ${week})`, `query matchup_legs {
+  matchup_legs(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)}) {
+    leg matchup_id roster_id round starters points proj_points custom_points
+  }
+}`, { auth: true });
+        return data?.matchup_legs ?? null;
+      } catch {
+        return null;
+      }
+    }
+
+    // A week: who's starting (the logged-in legs, else the public matchups),
+    // Sleeper's projections and stats scored with the league's settings, each
+    // team's game, and rostered and started percentages. Players' names,
+    // positions, teams and injuries come with the projection and stat rows.
+    async function loadPanelWeek(week, force = false) {
+      if (state.weeks[week] && !force) return;
+      const season = league.season;
+      const type = league.settings?.type ?? 0;
+      const [matchups, projRows, statRows, scores, research, legs] = await Promise.all([
+        api.get(`/v1/league/${leagueId}/matchups/${week}`),
+        api.get(`/projections/nfl/${season}/${week}?season_type=regular`),
+        week <= weekData.currentWeek ? api.get(`/stats/nfl/${season}/${week}?season_type=regular`) : [],
+        api.graphql(`scores (week ${week})`, `query scores {
+  scores(sport: "nfl", season_type: "regular", season: ${JSON.stringify(String(season))}, week: ${Number(week)}) {
+    game_id metadata status start_time
+  }
+}`).then((data) => data?.scores || []).catch(() => []),
+        api.get(`/players/nfl/research/regular/${season}/${week}?league_type=${type}`).catch(() => ({})),
+        loadNflLegs(week),
+      ]);
+      if (destroyed) return;
+      const settings = league.scoring_settings || {};
+      const teamOf = {};
+      const proj = {};
+      const actual = {};
+      const stats = {};
+      for (const row of [...(projRows || []), ...(statRows || [])]) {
+        const id = String(row.player_id);
+        const pl = row.player;
+        if (pl && !state.players[id]) {
+          const defense = pl.position === 'DEF';
+          state.players[id] = {
+            name: defense ? `${pl.first_name || ''} ${pl.last_name || ''}`.trim() || id : `${pl.first_name || ''} ${pl.last_name || ''}`.trim(),
+            first: pl.first_name, last: pl.last_name, position: pl.position,
+            positions: pl.fantasy_positions || [pl.position], team: pl.team, injury: pl.injury_status || null,
+          };
+        }
+        if (row.team) teamOf[id] = row.team;
+      }
+      for (const row of projRows || []) proj[row.player_id] = scoring.scoreStats(settings, row.stats || {});
+      for (const row of statRows || []) {
+        if (!model.playedGame(row.stats)) continue;
+        actual[row.player_id] = scoring.scoreStats(settings, row.stats);
+        stats[row.player_id] = row.stats;
+      }
+      const games = {};
+      const days = new Set();
+      for (const g of scores) {
+        const m = g.metadata || {};
+        const home = typeof m.home_team === 'string' ? m.home_team : m.home_team?.team;
+        const away = typeof m.away_team === 'string' ? m.away_team : m.away_team?.team;
+        if (!home || !away) continue;
+        if (m.day || m.date_time) days.add(String(m.day || m.date_time).slice(0, 10));
+        const q = Number(m.quarter_num) || 0;
+        const [mm, ss] = String(m.time_remaining || '15:00').split(':').map(Number);
+        const elapsed = q ? Math.min(60, (q - 1) * 15 + (15 - (mm || 0) - (ss || 0) / 60)) : 0;
+        const clock = !q ? 'Live' : m.quarter === 'Half' || m.quarter === 'half' ? 'Half' : q > 4 ? `OT ${m.time_remaining || ''}`.trim() : `Q${q} ${m.time_remaining || ''}`.trim();
+        const game = { id: g.game_id, start: g.start_time, status: g.status, home, away, homeScore: m.home_score, awayScore: m.away_score, clock, left: Math.max(0, 1 - elapsed / 60) };
+        games[home] = game;
+        games[away] = game;
+      }
+      state.weeks[week] = { matchups: matchups || [], legs, teamOf, proj, actual, stats, games, days: [...days].sort(), research: research || {} };
+      planLiveRead();
+      schedulePanel();
+    }
+
+    // While a game of the week shown is on, its stats and games are read again;
+    // otherwise once the next kickoff comes. Only while the tab is visible.
+    let liveTimer = null;
+    let lastLiveRead = Date.now();
+    function planLiveRead() {
+      clearTimeout(liveTimer);
+      const week = state.weeks[state.week];
+      if (!week || state.week !== weekData.currentWeek || destroyed) return;
+      const now = Date.now();
+      const list = Object.values(week.games);
+      const live = list.some((g) => g.status === 'in_game' || (g.status === 'pre_game' && g.start != null && g.start <= now));
+      const next = Math.min(...list.filter((g) => g.status === 'pre_game' && g.start > now).map((g) => g.start));
+      const at = live ? now + LIVE_READ_MS : Number.isFinite(next) ? next + 60e3 : null;
+      if (at == null) return;
+      liveTimer = setTimeout(liveRead, Math.max(LIVE_READ_MS / 3, at - now));
+    }
+    function liveRead() {
+      if (destroyed) return;
+      if (document.visibilityState !== 'visible' || !NFL_PAGES.has(state.page)) return planLiveRead();
+      lastLiveRead = Date.now();
+      loadPanelWeek(state.week, true).catch(() => planLiveRead());
+    }
+    function onPanelVisible() {
+      if (document.visibilityState === 'visible' && state.ready && Date.now() - lastLiveRead > LIVE_READ_MS) liveRead();
+    }
+    document.addEventListener('visibilitychange', onPanelVisible);
+
+    function setPanelWeek(week) {
+      if (week < state.minWeek || week > state.maxWeek || state.saving) return;
+      state.week = week;
+      state.swap = null;
+      schedulePanel();
+      loadPanelWeek(week).catch(panelFail);
+    }
+
+    function setPanelRoster(rosterId) {
+      state.rosterMenu = false;
+      state.swap = null;
+      if (rosterId === state.rosterId) return schedulePanel();
+      state.rosterId = rosterId;
+      chrome.storage.local.set({ [`roster:${leagueId}`]: rosterId });
+      schedulePanel();
+    }
+
+    // A swap on your own Team tab: tap a slot badge, then one of the spots it
+    // can trade places with. Saved through Sleeper's Team component.
+    function pickSpot(ref) {
+      const l = nflpanel.lineup(state);
+      if (!l?.editable || state.saving) return;
+      if (!state.swap) {
+        state.swap = ref;
+        return schedulePanel();
+      }
+      if (state.swap === ref) {
+        state.swap = null;
+        return schedulePanel();
+      }
+      const ml = nflpanel.moveLineup(state, l);
+      if (!nflpanel.targetsOf(state.swap, ml).includes(ref)) {
+        state.swap = ref;
+        return schedulePanel();
+      }
+      const { starters } = model.applyMove(state.swap, ref, ml);
+      const moves = model.describeMove({ ...ml, starters: l.starters }, { ...ml, starters });
+      state.swap = null;
+      saveStarters(l, starters, `Saved: ${moves.map(({ id, to }) => `${state.players[id]?.name || `Player #${id}`} to ${to}`).join(', ')}`);
+    }
+
+    function saveStarters(l, starters, okText) {
+      state.saving = true;
+      schedulePanel();
+      const done = (e) => {
+        document.removeEventListener('snp:nfl-lineup-saved', done);
+        if (destroyed) return;
+        const result = JSON.parse(e.detail);
+        state.saving = false;
+        if (result.ok) {
+          setStarters(l.roster.roster_id, starters);
+          panelFlash('ok', okText);
+        } else {
+          panelFlash('error', result.error);
+        }
+        schedulePanel();
+      };
+      document.addEventListener('snp:nfl-lineup-saved', done);
+      document.dispatchEvent(new CustomEvent('snp:nfl-lineup-save', {
+        detail: JSON.stringify({ leagueId, rosterId: l.roster.roster_id, round: state.week, starters }),
+      }));
+    }
+
+    // A saved lineup shows at once (the public matchups lag minutes behind it).
+    function setStarters(rosterId, starters) {
+      const week = state.weeks[state.week];
+      if (!week) return;
+      for (const list of [week.legs || [], week.matchups]) {
+        const entry = list.find((m) => m.roster_id === rosterId);
+        if (entry) entry.starters = [...starters];
+      }
+    }
+
+    function panelFlash(kind, text) {
+      const shown = { kind, text };
+      state.notice = shown;
+      setTimeout(() => {
+        if (state.notice !== shown) return;
+        state.notice = null;
+        render();
+        schedulePanel();
+      }, NOTICE_MS);
+    }
+
+    panelRoot.addEventListener('click', (e) => {
+      if (state.rosterMenu && !e.target.closest('.team-pick')) state.rosterMenu = false;
+      const tab = e.target.closest('[data-tab]')?.dataset.tab;
+      if (tab) {
+        state.tab = tab;
+        return schedulePanel();
+      }
+      const pick = e.target.closest('[data-pick-roster]');
+      if (pick) return setPanelRoster(Number(pick.dataset.pickRoster));
+      const spot = e.target.closest('[data-spot]')?.dataset.spot;
+      if (spot) return pickSpot(spot);
+      const action = e.target.closest('[data-action]')?.dataset.action;
+      if (action === 'roster-menu') state.rosterMenu = !state.rosterMenu;
+      if (action === 'prev') return setPanelWeek(state.week - 1);
+      if (action === 'next') return setPanelWeek(state.week + 1);
+      if (action === 'optimize') return open();
+      if (action === 'refresh') {
+        state.weeks = {};
+        return loadPanel(true).catch(panelFail);
+      }
+      if (action === 'sleeper-view') {
+        sleeperView = true;
+        try {
+          localStorage.setItem(SLEEPER_VIEW, '1');
+        } catch {
+          // Storage off: just for now.
+        }
+        attachPanel();
+        attachBack();
+      }
+      schedulePanel();
+    });
+    // Avatars the CDN doesn't have draw as the plain circle from then on (image errors don't bubble).
+    panelRoot.addEventListener('error', (e) => {
+      if (e.target.tagName !== 'IMG') return;
+      if (e.target.classList.contains('avatar') && !state.failedAvatars.has(e.target.src)) {
+        state.failedAvatars.add(e.target.src);
+        schedulePanel();
+      } else e.target.classList.add('missing');
+    }, true);
+
+    // Sleeper's own tab, while it's shown, gets a way back to ours.
+    const BACK_ID = 'snp-nfl-back';
+    function attachBack() {
+      const tabs = sleeperView && NFL_PAGES.has(state.page) ? document.querySelector('.postdraft-panel > .center-tab-selector') : null;
+      const el = document.getElementById(BACK_ID);
+      if (!tabs) return el?.remove();
+      if (el && el.parentElement === tabs) return;
+      const button = el || Object.assign(document.createElement('button'), {
+        id: BACK_ID,
+        type: 'button',
+        textContent: '⇄ Compact view',
+        title: 'Back to the extension\'s compact view',
+      });
+      button.style.cssText = 'margin-left:auto;align-self:center;height:28px;padding:0 12px;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:none;color:#b9c4d4;font:700 12px Poppins,sans-serif;cursor:pointer';
+      button.onclick = () => {
+        sleeperView = false;
+        try {
+          localStorage.removeItem(SLEEPER_VIEW);
+        } catch {
+          // Storage off: just for now.
+        }
+        attachBack();
+        attachPanel();
+      };
+      tabs.append(button);
+    }
+
+    function onPanelKey(e) {
+      if (!panelHost.isConnected || state.modal) return;
+      if (e.key === 'Escape' && (state.swap || state.rosterMenu)) {
+        state.swap = null;
+        state.rosterMenu = false;
+        return schedulePanel();
+      }
+      if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      if (e.composedPath().some((el) => el instanceof Element && el.matches('input, select, textarea, [contenteditable]'))) return;
+      if (state.tab !== 'page' || !state.rosters?.length) return;
+      // Through the matchups on the Matchup tab, the teams on the Team tab, A to Z, stopping at the ends.
+      const order = state.page === 'matchup' ? view.matchupPairs(state).map((p) => p) : [...state.rosters]
+        .sort((a, b) => ui.teamName(state, a).localeCompare(ui.teamName(state, b))).map((r) => [r]);
+      const at = order.findIndex((p) => p.some((r) => r?.roster_id === state.rosterId));
+      const next = order[at + (e.key === 'ArrowDown' ? 1 : -1)];
+      if (at < 0 || !next) return;
+      e.preventDefault();
+      setPanelRoster(next[0].roster_id);
+    }
+    document.addEventListener('keydown', onPanelKey);
+    // Whatever saved the lineup (a swap here or Optimize), Sleeper's own numbers follow.
+    function onLineupSaved(e) {
+      if (JSON.parse(e.detail).ok && state.ready) setTimeout(() => loadPanelWeek(state.week, true).catch(() => {}), 1500);
+    }
+    document.addEventListener('snp:nfl-lineup-saved', onLineupSaved);
 
     // The Last 5 column: the five weeks played through `week` (the week on now
     // counts once a game in it has kicked off), each player's score per week
@@ -1846,6 +2266,8 @@
     function attach() {
       if (destroyed) return;
       attachLeague();
+      attachPanel();
+      attachBack();
       const actions = state.page === 'team' ? document.querySelector('.user-tab-menu .actions') : null;
       const button = document.getElementById(BUTTON_ID);
       if (!actions || !lineup(false)?.editable) return button?.remove();
@@ -1863,6 +2285,11 @@
     }
 
     function show(next) {
+      if (state.page !== next) {
+        state.swap = null;
+        state.rosterMenu = false;
+        schedulePanel();
+      }
       state.page = next;
       if (next !== 'team') close();
       attach();
@@ -1894,6 +2321,15 @@
     function destroy() {
       destroyed = true;
       document.removeEventListener('snp:recent-weeks-request', recentWeeks);
+      document.removeEventListener('visibilitychange', onPanelVisible);
+      document.removeEventListener('keydown', onPanelKey);
+      document.removeEventListener('snp:nfl-lineup-saved', onLineupSaved);
+      clearTimeout(liveTimer);
+      cancelAnimationFrame(panelFrame);
+      panelHost.remove();
+      hideSleeper.remove();
+      document.getElementById(BACK_ID)?.remove();
+      document.documentElement.removeAttribute('data-snp-nfl-panel');
       if (document.documentElement.dataset.snpPlayersLeague === leagueId) delete document.documentElement.dataset.snpPlayersLeague;
       leagueWatch.disconnect();
       leagueHost.remove();
@@ -1906,7 +2342,7 @@
     }
 
     attach();
-    return { attach, show, destroy };
+    return { attach, show, destroy, refresh: schedulePanel };
   }
 
   // Score colors from the league itself (see model.scoreTiers): its starters'

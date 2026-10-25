@@ -1127,7 +1127,7 @@
     const p = f?.memoizedProps;
     if (!p || p.sport !== 'nfl' || String(p.leagueId) !== leagueId) return null;
     const editable = Boolean((p.isTeamOwner || p.isTeamCoOwner) && !p.disableEdit);
-    if (!full) return { editable };
+    if (!full) return { editable, round: p.round };
     const shown = f.stateNode?.state?.starters || [];
     const roster = p.roster || {};
     const starters = shown.map((s) => s.playerId || '0');

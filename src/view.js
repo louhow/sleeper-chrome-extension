@@ -381,5 +381,5 @@
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   }
 
-  return { render, matchupPairs };
+  return { render, matchupPairs, teamPicker, matchupPicker, apiView, sessionExpired };
 })();
