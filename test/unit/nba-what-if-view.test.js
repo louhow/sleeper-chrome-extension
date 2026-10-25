@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 
-const { whatif, scoring, ui, view, matchup, model } = loadSnp();
+const { nbaWhatIfView: whatif, scoring, ui, nbaPanelView: view, nbaMatchupView: matchup, model } = loadSnp();
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const LEAGUE = { pts: 0.5, reb: 1, blk: 2, fgm: 0, sp: 0, custom_stat: 0 };
 const state = (whatIf = {}) => ({

@@ -2,7 +2,7 @@
 // each with the change model.bestLineup proposes (or why it stays), the
 // finished games worth locking in, and any score benching would throw away.
 // Nothing saves until the owner applies a row or all of them. Pure: state -> HTML.
-(globalThis.SNP ||= {}).optimize = (() => {
+(globalThis.SNP ||= {}).nbaOptimizeView = (() => {
   const { playerDays, scoreTier, applySlot } = globalThis.SNP.model;
   const { esc, f2, headshot, injuryTag, teamTag, slotBadge, weekday, gameTime, gameLabel, nextGame, lockIcon, shortName, real, playerOf, playerName,
     optimizeDialog, planSummary, applyAll, applyChange, slotPlayer, tierClass } = globalThis.SNP.ui;

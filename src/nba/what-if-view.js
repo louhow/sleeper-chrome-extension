@@ -2,7 +2,7 @@
 // scoring settings on the Team and Matchup tabs and the player card. Collapsed,
 // it switches between the league's scoring and the what-if values; open, it
 // edits the values. Nothing is saved to the league. Pure: state -> HTML.
-(globalThis.SNP ||= {}).whatif = (() => {
+(globalThis.SNP ||= {}).nbaWhatIfView = (() => {
   const { esc, whatIfOn } = globalThis.SNP.ui;
   const { settingsList } = globalThis.SNP.scoring;
 

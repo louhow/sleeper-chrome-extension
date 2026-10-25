@@ -1,4 +1,4 @@
-// An NFL league's state as content.js builds it for nflpanel.js: two teams in
+// An NFL league's state as nfl/panel.js builds it for nfl/panel-view.js: two teams in
 // one matchup, a game finished, one live, one still to kick off, and a bye.
 const at = (iso) => Date.parse(iso);
 export const NOW = at('2026-10-25T18:30:00Z');

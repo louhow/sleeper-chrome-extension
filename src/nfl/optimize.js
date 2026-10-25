@@ -1,12 +1,12 @@
 // NFL Optimize lineup: the OPTIMIZE button beside Sleeper's own WAIVER and
-// TRADE buttons on its Team tab, and the dialog (src/nfl.js draws it), which
+// TRADE buttons on its Team tab, and the dialog (optimize-view.js draws it), which
 // the compact Team tab's toolbar opens too. It saves through Sleeper's own
 // Team component (page-hook.js reads and writes the lineup).
 //   ctx: { lineup(full), nflSave(detail), notify(text) }; notify shows a save
 //   notice where the user is (the compact tab) and says whether it did, else
 //   the dialog's own layer shows it.
-(globalThis.SNP ||= {}).nflDialog = ({ lineup, nflSave, notify }) => {
-  const { model, scoring, nfl, ui, shared } = globalThis.SNP;
+(globalThis.SNP ||= {}).nflOptimize = ({ lineup, nflSave, notify }) => {
+  const { model, scoring, nflOptimizeView, ui, shared } = globalThis.SNP;
   const BUTTON_ID = 'snp-optimize';
   const state = { modal: null, notice: null };
   const layer = shared.shadowHost('sleeper-nfl-dialog', render);
@@ -26,7 +26,7 @@
     if (!state.modal && !state.notice) return host.remove();
     if (!host.isConnected) document.documentElement.appendChild(host);
     const scroll = root.querySelector('.dialog-body')?.scrollTop ?? 0;
-    root.innerHTML = `<div class="page-layer">${nfl.render(state)}${ui.notice(state)}</div>`;
+    root.innerHTML = `<div class="page-layer">${nflOptimizeView.render(state)}${ui.notice(state)}</div>`;
     const body = root.querySelector('.dialog-body');
     if (body) body.scrollTop = scroll;
   }
@@ -120,7 +120,7 @@
     const el = button || Object.assign(document.createElement('div'), {
       id: BUTTON_ID,
       className: 'btn-container space',
-      innerHTML: nfl.BUTTON,
+      innerHTML: nflOptimizeView.BUTTON,
       title: 'Propose the best starting lineup for this week',
       tabIndex: 0,
     });

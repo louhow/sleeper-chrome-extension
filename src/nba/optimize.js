@@ -1,4 +1,4 @@
-// The NBA Optimize lineup dialog (src/optimize.js draws it): the best lineup
+// The NBA Optimize lineup dialog (optimize-view.js draws it): the best lineup
 // for the shown week, worked out again right before every save, saved all at
 // once or a row at a time, with the finished games worth locking in.
 //   ctx: { state, schedule, modalSave, saveStarters, saveLeg }

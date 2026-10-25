@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 import { state } from './nfl-fixture.js';
 
-const { nflpanel, nfl } = loadSnp();
+const { nflPanelView, nflOptimizeView, nflLeagueView } = loadSnp();
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-const render = (overrides) => nflpanel.render(state(overrides), []);
+const render = (overrides) => nflPanelView.render(state(overrides), []);
 
 test('team card: record, opponent, points so far and the live projection', () => {
   const out = text(render());
@@ -17,7 +17,7 @@ test('team card: record, opponent, points so far and the live projection', () =>
 test('team card: – before any starter kicks off, as on NBA', () => {
   const s = state();
   s.weeks[7].matchups[0].starters = ['wr1'];
-  assert.match(text(nflpanel.render(s, [])), /vs Blitz – proj 11\.50/);
+  assert.match(text(nflPanelView.render(s, [])), /vs Blitz – proj 11\.50/);
 });
 
 test('rows: game state, box score, research and points in their score color', () => {
@@ -68,7 +68,7 @@ test('the toolbar: Sleeper\'s own view a click away, errors and the API log', ()
   assert.match(render(), /data-action="sleeper-view" title="Show Sleeper's own Team tab"/);
   assert.match(text(render({ error: 'Nope' })), /Nope/);
   assert.match(text(render({ weeks: {} })), /Loading…/);
-  assert.match(text(nflpanel.render(state({ tab: 'api' }), [{ id: 1, at: 0, path: '/v1/state/nfl', status: 200 }])), /\/v1\/state\/nfl/);
+  assert.match(text(nflPanelView.render(state({ tab: 'api' }), [{ id: 1, at: 0, path: '/v1/state/nfl', status: 200 }])), /\/v1\/state\/nfl/);
 });
 
 test('NFL optimize dialog: names open the player card, like NBA', () => {
@@ -78,7 +78,7 @@ test('NFL optimize dialog: names open the player card, like NBA', () => {
     projections: { r1: { opponent: 'PHI' } },
   };
   const plan = { starters: ['q1', 'r1'], before: 20, after: 29, changes: [{ id: 'r1', to: 'FLEX' }] };
-  const html = nfl.render({ modal: { lineup, plan, proj: { q1: 20, r1: 9 }, errors: [], saving: false, busy: null } });
+  const html = nflOptimizeView.render({ modal: { lineup, plan, proj: { q1: 20, r1: 9 }, errors: [], saving: false, busy: null } });
   assert.match(html, /<button class="name" data-player="r1">Run Back<\/button> <span class="team">RB - DAL<\/span>/);
   assert.match(html, /<img class="headshot" src="[^"]+" alt="" data-player="q1">/);
   assert.match(text(html), /Run Back is Questionable\. Check the news before kickoff\./);
@@ -87,7 +87,7 @@ test('NFL optimize dialog: names open the player card, like NBA', () => {
 
 test('NFL league cards: Sleeper\'s own numbers, broken avatars as the plain circle', () => {
   const side = (team, win, avatar = null) => ({ avatar, owner: team.toLowerCase(), team, score: '25.90', win, record: '1-0', proj: '100.00', bar: 90 });
-  const html = nfl.league([{ own: true, sides: [side('Mine', '90%', 'https://x/a.png'), side('Theirs', '10%', 'https://x/b.png')] }], new Set(['https://x/b.png']));
+  const html = nflLeagueView.render([{ own: true, sides: [side('Mine', '90%', 'https://x/a.png'), side('Theirs', '10%', 'https://x/b.png')] }], new Set(['https://x/b.png']));
   assert.match(text(html), /@mine Mine 25\.90 90% WIN 1-0 100\.00 VS @theirs Theirs 25\.90 10% WIN/);
   assert.match(html, /<img class="avatar" src="https:\/\/x\/a\.png" alt="">/);
   assert.match(html, /<div class="avatar"><\/div>\s*<div class="mu-who">\s*<div class="sub">@theirs/);
@@ -96,7 +96,7 @@ test('NFL league cards: Sleeper\'s own numbers, broken avatars as the plain circ
 
 test("League tab cards: Sleeper's own text as read, a card with no teams yet, and win text that isn't a number", () => {
   const side = (team, win) => ({ avatar: '', owner: team.toLowerCase(), team, score: '12.30', win, record: '3-3', proj: '40.10' });
-  const out = text(nfl.league([
+  const out = text(nflLeagueView.render([
     { own: true, sides: [side('Gridiron', '57%'), side('Blitz', '43%')] },
     { own: false, sides: [] },
     { own: false, sides: [side('Hail', '--'), side('Mary', '')] },

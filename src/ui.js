@@ -239,7 +239,7 @@
     return `${names} players can move to IR.`;
   }
 
-  // What-if scoring (see whatif.js) applies once the admin tools are enabled
+  // What-if scoring (see nba/what-if-view.js) applies once the admin tools are enabled
   // (?snp-admin=1), a value differs from the league's, and it's switched on.
   const whatIfOn = (s) => Boolean(s.whatIf?.enabled && s.whatIf.on && Object.keys(s.whatIf.overrides || {}).length);
 
@@ -630,7 +630,7 @@
     return pairs.sort((x, y) => (owns(s, y[0]) - owns(s, x[0])) || name(x[0]).localeCompare(name(y[0])));
   }
 
-  // ---- Optimize lineup (NBA optimize.js, NFL nfl.js) ----
+  // ---- Optimize lineup (nba/optimize-view.js, nfl/optimize-view.js) ----
 
   // The "How it picks" tag beside the title; `how`: its tooltip, plain text.
   const howTip = (how) => `<span class="how" tabindex="0" aria-describedby="how-tip">How it picks<span class="how-tip" id="how-tip" role="tooltip">${esc(how)}</span></span>`;

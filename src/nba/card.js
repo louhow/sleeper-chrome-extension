@@ -1,6 +1,6 @@
 // The NBA player card's data: bio, game logs, career, news, depth chart and
 // transaction history, each part loading on its own and rendering as it
-// arrives (src/card.js draws it). Kept for the session in `state.cards`.
+// arrives (card-view.js draws it). Kept for the session in `state.cards`.
 (globalThis.SNP ||= {}).nbaCard = ({ state, api, leagueId, schedule }) => {
   const { loaders } = globalThis.SNP;
   // Career seasons fetched for the player card (one request each).

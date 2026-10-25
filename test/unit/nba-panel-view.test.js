@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 
-const { view, model, scoring } = loadSnp();
-const { render } = view;
+const { nbaPanelView, model, scoring } = loadSnp();
+const { render } = nbaPanelView;
 
 const player = (name, positions, team, injury) => ({ name, position: positions[0], positions, team, injury });
 const games = [

@@ -1,11 +1,11 @@
 // NFL Team and Matchup tabs, drawn like the NBA ones in place of Sleeper's own
 // (which stay on the page, hidden, so its saves still work): a compact row per
 // player, any team or matchup from the picker. Pure: state -> HTML.
-(globalThis.SNP ||= {}).nflpanel = (() => {
+(globalThis.SNP ||= {}).nflPanelView = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
     shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
   const { scoreTier, spotRefs, swapTargets, winProbability, gameState } = globalThis.SNP.model;
-  const nfl = globalThis.SNP.nfl;
+  const { slotBadge, headshot, injury } = globalThis.SNP.nflUi;
   // Sleeper's apps list bench players by position in this order.
   const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
 
@@ -118,7 +118,7 @@
     return `<b${tier ? ` class="${tierClass(tier).trim()}"` : ''}>${kickedOff(g) ? f2(actual ?? 0) : '–'}</b>`;
   }
 
-  const photo = (id, p) => `<img class="headshot${p.position === 'DEF' ? ' logo' : ''}" src="${nfl.headshot(id, p)}" alt="" data-player="${esc(id)}">`;
+  const photo = (id, p) => `<img class="headshot${p.position === 'DEF' ? ' logo' : ''}" src="${headshot(id, p)}" alt="" data-player="${esc(id)}">`;
 
   // ---- Team tab ----
 
@@ -166,15 +166,15 @@
     const { s, editable, targets, movable } = ctx;
     const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
     const cls = swapClass(s, editable, spot, targets);
-    if (!real(id)) return emptyCard(nfl.slotBadge(slot, button), cls, 'nfl');
+    if (!real(id)) return emptyCard(slotBadge(slot, button), cls, 'nfl');
     const p = playerOf(s.players, id);
     const week = s.weeks[s.week];
     const n = numbers(s, id);
     return `<article class="card nfl${cls}">
-      ${nfl.slotBadge(slot, button)}
+      ${slotBadge(slot, button)}
       ${photo(id, p)}
       <div class="info">
-        <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${teamTag(p)}${nfl.injury(p)}</div>
+        <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${teamTag(p)}${injury(p)}</div>
         ${researchLine(week.research[id])}
       </div>
       <div class="nfl-game ${n.g.state}">
@@ -200,7 +200,7 @@
     const [p1, p2] = b ? winProbability(a.points ?? 0, a.proj, b.points ?? 0, b.proj) : [null, null];
     const team = (l, t, p) => teamSideOf(s, l.roster, { points: t.points, win: p, proj: t.proj });
     const settings = s.league.settings || {};
-    const row = (slot, idA, idB) => muRow(side(s, idA, 'mine'), nfl.slotBadge(slot), theirs ? side(s, idB, 'theirs') : null);
+    const row = (slot, idA, idB) => muRow(side(s, idA, 'mine'), slotBadge(slot), theirs ? side(s, idB, 'theirs') : null);
     const section = (title, slot, x, y, count) => muSection(title, x, y || [], count, (idA, idB) => row(slot, idA, idB));
     return `${matchupPair(team(mine, a, p1), theirs && team(theirs, b, p2), { cls: 'lg-match nfl-mu-head', failed: s.failedAvatars })}
       ${muStarters(`${a.toPlay} yet to play${b ? ` · ${b.toPlay} for them` : ''}`, weekNav(s, mine.week))}
@@ -220,7 +220,7 @@
     return `<div class="mp nfl ${cls}">
       ${photo(id, p)}
       <div class="mp-id">
-        <div class="name"><button data-player="${esc(id)}">${esc(shortName(p))}</button>${nfl.injury(p)}</div>
+        <div class="name"><button data-player="${esc(id)}">${esc(shortName(p))}</button>${injury(p)}</div>
         <div class="sub">${teamTag(p, { sep: '•' })}</div>
       </div>
       <div class="mp-game ${g.state}"><b>${esc(at)}</b><span class="sub">${esc(when)}</span></div>

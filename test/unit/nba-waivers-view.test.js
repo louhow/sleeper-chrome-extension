@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 
-const { model, waivers, scoring } = loadSnp();
+const { model, nbaWaiversView: waivers, scoring } = loadSnp();
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 // Five roster spots; six players with one on IR and one on taxi leaves four active, so one open spot.

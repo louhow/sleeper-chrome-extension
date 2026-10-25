@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 
-const { matchup, model, scoring } = loadSnp();
+const { nbaMatchupView: matchup, model, scoring } = loadSnp();
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 const games = [

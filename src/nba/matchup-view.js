@@ -1,6 +1,6 @@
 // Matchup view: the selected team (left) against its opponent (right), slot by
 // slot, with Lock-In status and the lock control for the logged-in owner.
-(globalThis.SNP ||= {}).matchup = (() => {
+(globalThis.SNP ||= {}).nbaMatchupView = (() => {
   const { playerDays, lockState, lockInDefault, winProbability } = globalThis.SNP.model;
   const { esc, f2, headshot, teamLogo, teamName, shortName, injuryTag, teamTag, gameTime, weekday, gameLabel, slotBadge, weekNav, lineup, real, playerOf,
     whatIfOn, loading, errorMsg, opponentOf, teamSideOf, matchupPair, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;

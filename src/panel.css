@@ -2411,7 +2411,7 @@ button.danger.solid:hover:not(:disabled) {
   outline-offset: -1px;
 }
 
-/* NFL Team and Matchup tabs (nflpanel.js): the NBA layout, one game a week. */
+/* NFL Team and Matchup tabs (nfl/panel-view.js): the NBA layout, one game a week. */
 #sleeper-nfl-panel {
   display: flex;
 }

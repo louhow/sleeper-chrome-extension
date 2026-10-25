@@ -1,7 +1,7 @@
 // Player card, laid out like Sleeper's NFL player card: a team-colored hero
 // (bio, rankings), then game logs, career and transaction history on the left
 // and latest news and the depth chart on the right. Pure: state -> HTML.
-(globalThis.SNP ||= {}).card = (() => {
+(globalThis.SNP ||= {}).nbaCardView = (() => {
   const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, ownerOf, pct: share, tierClass,
     dash, num, height, ago, newsSource, heat, scaler } = globalThis.SNP.ui;
   const { scoreStats } = globalThis.SNP.scoring;

@@ -5,7 +5,7 @@ import { loadSnp } from './load.js';
 const { ui } = loadSnp();
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
-// ui.lineup feeds content.js's saves, so its output is pinned field by field.
+// ui.lineup feeds nba/session.js's saves, so its output is pinned field by field.
 const league = () => ({
   rosterId: 1, week: 1, currentWeek: 1, seasonType: 'regular', now: 0,
   league: { status: 'in_season', roster_positions: ['PG', 'G', 'UTIL', 'BN', 'BN'], settings: { reserve_slots: 2, taxi_slots: 1, taxi_deadline: 0 } },

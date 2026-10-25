@@ -1,8 +1,8 @@
 // NBA waivers: the bid or add dialog that Sleeper's W and ADD buttons open
 // (page-hook.js hands their clicks over), and the Team tab's list of pending
-// claims, to rebid or cancel (src/waivers.js draws both).
+// claims, to rebid or cancel (waivers-view.js draws both).
 //   ctx: { state, api, leagueId, schedule, modalSave, reloadRosters }
-(globalThis.SNP ||= {}).nbaClaims = ({ state, api, leagueId, schedule, modalSave, reloadRosters }) => {
+(globalThis.SNP ||= {}).nbaWaivers = ({ state, api, leagueId, schedule, modalSave, reloadRosters }) => {
   const { model, ui, loaders } = globalThis.SNP;
   const FIELDS = loaders.TRANSACTION_FIELDS;
   const league = JSON.stringify(leagueId);

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 
-const { card, ui } = loadSnp();
+const { nbaCardView: card, ui } = loadSnp();
 const scoring = { pts: 1, reb: 1.2 };
 
 test('game log merges projections with played games, in date order', () => {

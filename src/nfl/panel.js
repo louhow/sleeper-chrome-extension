@@ -1,4 +1,4 @@
-// NFL Team and Matchup tabs: the extension's own (src/nflpanel.js draws them),
+// NFL Team and Matchup tabs: the extension's own (panel-view.js draws them),
 // in place of Sleeper's. Sleeper's own tab stays on the page, hidden (its Team
 // component saves lineups and feeds Optimize); the ⇄ button shows it instead,
 // remembered in the page's storage, and "⇄ Compact view" beside Sleeper's tab
@@ -7,8 +7,8 @@
 // so nothing shifts.
 //   ctx: { leagueId, api, league, info: { currentWeek, tiers }, lineup(full),
 //   nflSave(detail), openDialog(), dialogOpen() }
-(globalThis.SNP ||= {}).nflTeam = ({ leagueId, api, league, info, lineup, nflSave, openDialog, dialogOpen }) => {
-  const { model, scoring, ui, nflpanel, loaders, shared, bridge } = globalThis.SNP;
+(globalThis.SNP ||= {}).nflPanel = ({ leagueId, api, league, info, lineup, nflSave, openDialog, dialogOpen }) => {
+  const { model, scoring, ui, nflPanelView, loaders, shared, bridge } = globalThis.SNP;
   const SLEEPER_VIEW = 'snp:nfl-sleeper-view';
   const BACK_ID = 'snp-nfl-back';
   const PAGES = new Set(['team', 'matchup']);
@@ -51,7 +51,7 @@
       state.tiers = info.tiers;
       if (!state.ready || !panel.styled || !host.isConnected) return;
       const top = root.querySelector('.body')?.scrollTop ?? 0;
-      root.innerHTML = nflpanel.render(state, api.log);
+      root.innerHTML = nflPanelView.render(state, api.log);
       const body = root.querySelector('.body');
       if (body) body.scrollTop = top;
     });
@@ -220,7 +220,7 @@
   // A swap on your own Team tab: tap a slot badge, then one of the spots it
   // can trade places with. Saved through Sleeper's Team component.
   function pickSpot(ref) {
-    const l = nflpanel.lineup(state);
+    const l = nflPanelView.lineup(state);
     if (!l?.editable || state.saving) return;
     if (!state.swap) {
       state.swap = ref;
@@ -230,8 +230,8 @@
       state.swap = null;
       return schedule();
     }
-    const ml = nflpanel.moveLineup(state, l);
-    if (!nflpanel.targetsOf(state.swap, ml).includes(ref)) {
+    const ml = nflPanelView.moveLineup(state, l);
+    if (!nflPanelView.targetsOf(state.swap, ml).includes(ref)) {
       state.swap = ref;
       return schedule();
     }

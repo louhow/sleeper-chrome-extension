@@ -1,6 +1,6 @@
 // Waiver dialogs: the add/bid form Sleeper's web app shows for NFL players, and
 // the owner's pending claims (edit a bid or cancel). Pure: state -> HTML.
-(globalThis.SNP ||= {}).waivers = (() => {
+(globalThis.SNP ||= {}).nbaWaiversView = (() => {
   const { playerDays, gameState, lockInDefault, rosterRoom, faabLeft, sortClaims, FAAB } = globalThis.SNP.model;
   const { esc, f2, headshot, injuryTag, teamTag, slotBadge, lineup, nextGame, dialog, dialogErrors, myRoster, real, playerOf, loading } = globalThis.SNP.ui;
 

@@ -1,5 +1,6 @@
-// Pure render functions: (state, api log) -> HTML string for the shadow root.
-(globalThis.SNP ||= {}).view = (() => {
+// The NBA panel: its shell around the tab shown, and the Team tab itself (the
+// Matchup and League tabs are in matchup-view.js). Pure: (state, api log) -> HTML.
+(globalThis.SNP ||= {}).nbaPanelView = (() => {
   const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId, scoreTier, gameState } = globalThis.SNP.model;
   const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule,
     whatIfOn, playerOf, teamTag, researchLine, padTo, real, loading, errorMsg, shell, teamCard, rowHead, swapHint, swapClass, emptyCard, apiView, sessionExpired } = globalThis.SNP.ui;
@@ -7,11 +8,11 @@
   function render(state, log) {
     // Sleeper's League tab keeps its own content; the week's matchups go on top of it.
     if (state.page === 'league') {
-      return `<div class="app league">${state.sessionExpired ? sessionExpired() : globalThis.SNP.matchup.league(state)}</div>`;
+      return `<div class="app league">${state.sessionExpired ? sessionExpired() : globalThis.SNP.nbaMatchupView.league(state)}</div>`;
     }
     const body = state.tab === 'api' ? apiView(state, log)
       : state.sessionExpired ? sessionExpired()
-      : state.page === 'matchup' ? globalThis.SNP.matchup.render(state)
+      : state.page === 'matchup' ? globalThis.SNP.nbaMatchupView.render(state)
       : teamView(state);
     // Optimize lineup: only on the owner's editable Team tab, once the week's games are in.
     const l = state.ready && state.page === 'team' && state.tab === 'page' && !state.error && !state.sessionExpired ? lineup(state) : null;
