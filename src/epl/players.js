@@ -2,14 +2,14 @@
 // search, each with an add (or drop) button. Pure: state -> HTML.
 (globalThis.SEP ||= {}).players = (() => {
   const { playerGames, weekTotals } = globalThis.SEP.model;
-  const { esc, f2, f1, pct, teamName, ownerOf, owns, playerLine } = globalThis.SEP.ui;
+  const { esc, f2, f1, pct, teamName, ownerOf, owns, playerLine, loading, errorMsg } = globalThis.SEP.ui;
   const TABS = [['available', 'Available'], ['trending', 'Trending'], ['leaders', 'Leaders'], ['mine', 'My Team'], ['all', 'All']];
   const POSITIONS = ['ALL', 'F', 'M', 'D', 'GK'];
   const PAGE = 50;
 
   function render(s) {
-    if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
-    if (!s.players || !s.rosters) return '<p class="msg">Loading…</p>';
+    if (s.error) return errorMsg(s.error);
+    if (!s.players || !s.rosters) return loading();
     const t = s.playersTab;
     const list = listFor(s);
     const shown = list.slice(0, t.shown || PAGE);
@@ -27,7 +27,7 @@
         <div class="chips-row">${chips}</div>
         ${trendToggle}${faLabel}
       </div>
-      ${s.season == null && (t.mode === 'leaders' || t.mode === 'all') ? '<p class="msg">Loading season stats…</p>' : ''}
+      ${s.season == null && (t.mode === 'leaders' || t.mode === 'all') ? loading('Loading season stats…') : ''}
       <div class="plist-head"><span>Player</span><span class="col">Owner</span><span class="col num">Proj</span><span class="col num" title="Fantasy points this season">FPTS</span><span class="col num">Own%</span><span class="col act"></span></div>
       ${shown.length ? shown.map((row) => playerRow(s, row)).join('') : '<p class="msg">No players match.</p>'}
       ${list.length > shown.length ? `<button class="more" data-more>Show more (${list.length - shown.length} left)</button>` : ''}`;

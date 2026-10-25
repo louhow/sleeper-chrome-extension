@@ -8,7 +8,7 @@
 //   ctx: { leagueId, api, league, info: { currentWeek, tiers }, lineup(full),
 //   nflSave(detail), openDialog(), dialogOpen() }
 (globalThis.SNP ||= {}).nflTeam = ({ leagueId, api, league, info, lineup, nflSave, openDialog, dialogOpen }) => {
-  const { model, scoring, nflpanel, loaders, shared, bridge } = globalThis.SNP;
+  const { model, scoring, ui, nflpanel, loaders, shared, bridge } = globalThis.SNP;
   const SLEEPER_VIEW = 'snp:nfl-sleeper-view';
   const BACK_ID = 'snp-nfl-back';
   const PAGES = new Set(['team', 'matchup']);
@@ -238,7 +238,7 @@
     const { starters } = model.applyMove(state.swap, ref, ml);
     const moves = model.describeMove({ ...ml, starters: l.starters }, { ...ml, starters });
     state.swap = null;
-    saveStarters(l, starters, `Saved: ${shared.movedText(moves, (id) => state.players[id]?.name || `Player #${id}`)}`);
+    saveStarters(l, starters, `Saved: ${shared.movedText(moves, (id) => ui.playerName(state.players, id))}`);
   }
 
   async function saveStarters(l, starters, okText) {

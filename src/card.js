@@ -2,7 +2,7 @@
 // (bio, rankings), then game logs, career and transaction history on the left
 // and latest news and the depth chart on the right. Pure: state -> HTML.
 (globalThis.SNP ||= {}).card = (() => {
-  const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, pct: share, tierClass,
+  const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, ownerOf, pct: share, tierClass,
     dash, num, height, ago, newsSource, heat, scaler } = globalThis.SNP.ui;
   const { scoreStats } = globalThis.SNP.scoring;
   const { scoreTier } = globalThis.SNP.model;
@@ -81,7 +81,7 @@
     const team = bio?.team || p.team;
     const [nick, color] = TEAMS[team] || ['Free Agent', '#3a4256'];
     const position = (bio?.fantasy_positions || p.positions || [])[0] || p.position || '';
-    const owner = s.rosters?.find((r) => (r.players || []).includes(id));
+    const owner = ownerOf(s, id);
     const ownerName = owner ? s.usersById?.[owner.owner_id]?.display_name || `Team ${owner.roster_id}` : null;
     const latest = (c.career || []).find((r) => r.stats?.rank_std != null);
     const research = s.weeks?.[s.currentWeek]?.research?.[id];

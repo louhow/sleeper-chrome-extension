@@ -3,14 +3,14 @@
 // claims, to rebid or cancel (src/waivers.js draws both).
 //   ctx: { state, api, leagueId, schedule, modalSave, reloadRosters }
 (globalThis.SNP ||= {}).nbaClaims = ({ state, api, leagueId, schedule, modalSave, reloadRosters }) => {
-  const { model, waivers, loaders } = globalThis.SNP;
+  const { model, ui, loaders } = globalThis.SNP;
   const FIELDS = loaders.TRANSACTION_FIELDS;
   const league = JSON.stringify(leagueId);
-  const nameOf = (id) => state.players[id]?.name || `Player #${id}`;
+  const nameOf = (id) => ui.playerName(state.players, id);
 
   // The logged-in owner's pending waiver claims, as Sleeper's waiver list loads them.
   async function load() {
-    const roster = waivers.myRoster(state);
+    const roster = ui.myRoster(state);
     if (!roster || !api.loggedIn()) return;
     try {
       const data = await api.graphql('league_transactions_filtered (pending waivers)', `query league_transactions_filtered {
@@ -43,7 +43,7 @@
   // Submits the bid dialog: a waiver claim (with a FAAB bid) or a free-agent add, plus drops.
   function submit() {
     const m = state.modal;
-    const roster = waivers.myRoster(state);
+    const roster = ui.myRoster(state);
     if (m?.kind !== 'bid' || m.saving || !roster || !state.ready) return;
     const waiver = m.status === 'waiver';
     const error = model.claimError({ league: state.league, roster, waiver, bid: m.bid, drops: m.drops });
@@ -84,7 +84,7 @@
 
   function updateBid(id, value) {
     const claim = claimById(id);
-    const roster = waivers.myRoster(state);
+    const roster = ui.myRoster(state);
     if (!claim || !roster) return;
     // Validate like a new bid; the claim's own add needs no extra roster room.
     const error = model.claimError({ league: state.league, roster: { ...roster, players: [] }, waiver: true, bid: value, drops: [] });

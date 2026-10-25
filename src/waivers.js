@@ -2,15 +2,13 @@
 // the owner's pending claims (edit a bid or cancel). Pure: state -> HTML.
 (globalThis.SNP ||= {}).waivers = (() => {
   const { playerDays, gameState, lockInDefault, rosterRoom, faabLeft, sortClaims, FAAB } = globalThis.SNP.model;
-  const { esc, f2, headshot, injuryTag, teamTag, slotBadge, lineup, nextGame, dialog, dialogErrors, owns, real, playerOf, loading } = globalThis.SNP.ui;
+  const { esc, f2, headshot, injuryTag, teamTag, slotBadge, lineup, nextGame, dialog, dialogErrors, myRoster, real, playerOf, loading } = globalThis.SNP.ui;
 
   function render(s) {
     const m = s.modal;
     if (!m) return '';
     return m.kind === 'claims' ? claimsDialog(s, m) : bidDialog(s, m);
   }
-
-  const myRoster = (s) => s.rosters?.find((r) => owns(s, r)) ?? null;
 
   // The current week's games for a player, for projections and "next game".
   function daysOf(s, id) {
@@ -132,5 +130,5 @@
       </div>`);
   }
 
-  return { render, myRoster };
+  return { render };
 })();

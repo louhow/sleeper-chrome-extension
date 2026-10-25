@@ -2,7 +2,7 @@
 (globalThis.SEP ||= {}).ui = (() => {
   const { playerGames, weekTotals, started, finished, slotAccepts, savedFormation, slotLabels, formationOf, lineupOnLeg } = globalThis.SEP.model;
   // The same helpers as NBA and NFL; the rest differ by sport.
-  const { esc, f2, CDN, teamName, ownerName, avatar, record, owns, weekday, shortName, gameTime, dialogErrors, notice } = globalThis.SNP.ui;
+  const { esc, f2, CDN, teamName, ownerName, avatar, record, owns, myRoster, ownerOf, real, weekday, shortName, gameTime, dialogErrors, notice, loading, errorMsg } = globalThis.SNP.ui;
   const f1 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(1));
   const INJURY_SEVERE = /^(out|ir|sus)/i;
   // Sleeper's apps list players by position in this order.
@@ -12,7 +12,7 @@
   const headshot = (id) => `${CDN}/content/clubsoccer/players/thumb/${encodeURIComponent(id)}.jpg`;
   const teamLogo = (teamId) => (teamId ? `${CDN}/images/team_logos/clubsoccer/${encodeURIComponent(teamId)}.png` : '');
 
-  const playerOf = (s, id) => s.players?.[id] || { name: `Player #${id}`, positions: [] };
+  const playerOf = (s, id) => globalThis.SNP.ui.playerOf(s.players, id);
 
   const avatarImg = (s, roster, cls = 'avatar') => {
     const src = avatar(s, roster);
@@ -119,10 +119,6 @@
   const roleRank = (label) => (ROLE_ORDER.includes(label) ? ROLE_ORDER.indexOf(label) : ROLE_ORDER.length);
   const roleName = (label, n) => (n === 1 && label !== 'GK' ? ROLE_NAMES[label]?.replace(/s$/, '') : ROLE_NAMES[label]) || label;
 
-  const myRoster = (s) => s.rosters?.find((r) => owns(s, r)) ?? null;
-
-  const ownerOf = (s, playerId) => s.rosters?.find((r) => (r.players || []).includes(playerId)) ?? null;
-
   // Everything about one roster's lineup for the shown week. The logged-in
   // matchup leg is authoritative; the roster's own starters are the fallback.
   function lineup(s, rosterId = s.rosterId) {
@@ -148,7 +144,7 @@
     const locked = new Set();
     if (week) {
       for (const id of [...starters, ...bench]) {
-        if (id && id !== '0' && playerGames(week, s.players[id]?.team, id).some((g) => started(g.game, s.now))) locked.add(id);
+        if (real(id) && playerGames(week, s.players[id]?.team, id).some((g) => started(g.game, s.now))) locked.add(id);
       }
     }
     const labels = slotLabels(slots, starters, s.players, savedFormation(roster, s.week));
@@ -172,7 +168,7 @@
     let yetToPlay = 0;
     let any = false;
     for (const id of l.starters) {
-      if (!id || id === '0') continue;
+      if (!real(id)) continue;
       const g = playerGames(l.week, s.players[id]?.team, id);
       const t = weekTotals(g, s.now);
       games[id] = { games: g, ...t };
@@ -215,7 +211,7 @@
 
   return {
     esc, f2, f1, CDN, headshot, teamLogo, teamName, ownerName, avatar, avatarImg, record, shortName, playerOf, injuryTag, positions,
-    gameTime, weekday, shortDate, slotBadge, versus, nextMatch, nextGameText, gameChips, teamSide, dialog, dialogErrors, weekNav, notice,
-    owns, myRoster, ownerOf, lineup, teamTotals, reserveRule, pct, playerLine, positionRank, roleName,
+    gameTime, weekday, shortDate, slotBadge, versus, nextMatch, nextGameText, gameChips, teamSide, dialog, dialogErrors, weekNav, notice, loading, errorMsg,
+    owns, myRoster, real, ownerOf, lineup, teamTotals, reserveRule, pct, playerLine, positionRank, roleName,
   };
 })();

@@ -3,13 +3,13 @@
 (globalThis.SEP ||= {}).matchup = (() => {
   const { playerGames, weekTotals, winProbability } = globalThis.SEP.model;
   const { breakdown } = globalThis.SEP.scoring;
-  const { esc, f2, shortName, playerOf, injuryTag, positions, headshot, slotBadge, weekNav, lineup, teamTotals, gameChips, versus, nextMatch, teamSide } = globalThis.SEP.ui;
+  const { esc, f2, shortName, playerOf, injuryTag, positions, headshot, slotBadge, weekNav, lineup, teamTotals, gameChips, versus, nextMatch, teamSide, real, loading, errorMsg } = globalThis.SEP.ui;
 
   function render(s) {
-    if (s.error) return `<p class="msg error">${esc(s.error)}</p>`;
+    if (s.error) return errorMsg(s.error);
     const mine = lineup(s);
-    if (!mine) return '<p class="msg">Loading…</p>';
-    if (!mine.week) return `<div class="section-head"><h3>Match</h3>${weekNav(s)}</div><p class="msg">Loading week…</p>`;
+    if (!mine) return loading();
+    if (!mine.week) return `<div class="section-head"><h3>Match</h3>${weekNav(s)}</div>${loading('Loading week…')}`;
     const oppId = opponentOf(mine);
     const theirs = oppId != null ? lineup(s, oppId) : null;
     const left = { l: mine, ...teamTotals(s, mine) };
@@ -105,7 +105,7 @@
   }
 
   function playerSide(s, sd, id, cls) {
-    if (!id || id === '0') return `<div class="mp ${cls} empty"><div class="headshot"></div><div class="mp-id"><span class="name">Empty</span></div></div>`;
+    if (!real(id)) return `<div class="mp ${cls} empty"><div class="headshot"></div><div class="mp-id"><span class="name">Empty</span></div></div>`;
     const p = playerOf(s, id);
     const st = sd.games[id] ?? (() => {
       const games = playerGames(sd.l.week, p.team, id);

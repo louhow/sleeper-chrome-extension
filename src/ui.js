@@ -140,6 +140,10 @@
   const errorMsg = (text) => `<p class="msg error">${esc(text)}</p>`;
 
   const owns = (s, roster) => s.me != null && roster != null && (roster.owner_id === s.me || (roster.co_owners || []).includes(s.me));
+  // The logged-in user's roster (as owner or co-owner), or null.
+  const myRoster = (s) => s.rosters?.find((r) => owns(s, r)) ?? null;
+  // The roster a player is on, or null.
+  const ownerOf = (s, playerId) => s.rosters?.find((r) => (r.players || []).includes(playerId)) ?? null;
 
   // Where one roster's players are for the shown week: starters by slot, then
   // bench (by primary position in `order`), IR and taxi. The logged-in matchup
@@ -640,7 +644,7 @@
     reserveRule, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
     esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
-    lineup, rosterParts, opponentOf, taxiRule, owns, real, playerOf, playerName, padTo, pct, researchLine,
+    lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, researchLine,
     dash, num, height, ago, newsSource, heat, scaler, tierClass,
     avatarImg, teamCard, teamSideOf, teamSide, matchupPair, rowHead, swapHint, swapClass, emptyCard,
     muRow, muEmpty, muStarters, muSection,

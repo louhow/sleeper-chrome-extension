@@ -4,7 +4,7 @@
 //   ctx: { state, schedule, modalSave, saveStarters, saveLeg }
 (globalThis.SNP ||= {}).nbaOptimize = ({ state, schedule, modalSave, saveStarters, saveLeg }) => {
   const { model, ui, shared } = globalThis.SNP;
-  const shortOf = (id) => ui.shortName(state.players[id] || { name: `Player #${id}` });
+  const shortOf = (id) => ui.shortName(ui.playerOf(state.players, id));
   // Names a few moves; past that, just the count, so the notice stays one line.
   const movedText = (changes) => shared.movedText(changes, shortOf, 3);
 
@@ -76,7 +76,7 @@
     const locks = lineup.lockable ? plan.locks.filter((k) => k.on) : [];
     m.busy = 'all';
     if (!locks.length) return plan.changes.length ? modalSave(() => saveStarters(plan.starters), `Saved: ${moved}`) : undefined;
-    const lockedText = `Locked ${locks.map((k) => `${shortOf(k.id)} ${k.actual.toFixed(2)}`).join(', ')}`;
+    const lockedText = `Locked ${locks.map((k) => `${shortOf(k.id)} ${ui.f2(k.actual)}`).join(', ')}`;
     const startersGames = { ...lineup.locks, ...Object.fromEntries(locks.map((k) => [k.id, k.game.game.id])) };
     return modalSave(() => saveLeg('lock_in', lineup.roster.roster_id, plan.starters, startersGames),
       plan.changes.length ? `${lockedText} · Saved: ${moved}` : lockedText);
@@ -109,7 +109,7 @@
       return schedule();
     }
     m.busy = `lockout:${id}`;
-    return lockNow(lineup, id, st.current.game.id, `Locked ${shortOf(id)} ${(st.current.actual ?? 0).toFixed(2)}`);
+    return lockNow(lineup, id, st.current.game.id, `Locked ${shortOf(id)} ${ui.f2(st.current.actual ?? 0)}`);
   }
 
   // Locks one recommended game now.
@@ -120,7 +120,7 @@
     const k = plan.locks.find((x) => x.id === id && x.on);
     if (!k || !lineup.lockable) return;
     m.busy = `lock:${id}`;
-    return lockNow(lineup, id, k.game.game.id, `Locked ${shortOf(id)} ${k.actual.toFixed(2)}`);
+    return lockNow(lineup, id, k.game.game.id, `Locked ${shortOf(id)} ${ui.f2(k.actual)}`);
   }
 
   // The dialog's clicks; true when one was theirs.

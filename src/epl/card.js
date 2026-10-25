@@ -4,7 +4,7 @@
 (globalThis.SEP ||= {}).card = (() => {
   const { playerGames, weekTotals, started } = globalThis.SEP.model;
   const { scoreStats, breakdown } = globalThis.SEP.scoring;
-  const { esc, f2, f1, teamLogo, headshot, teamName, ownerOf, owns, playerOf, positions, injuryTag, weekday, shortDate, gameTime, pct, versus } = globalThis.SEP.ui;
+  const { esc, f2, f1, teamLogo, headshot, teamName, ownerOf, owns, playerOf, positions, injuryTag, weekday, shortDate, gameTime, pct, versus, loading } = globalThis.SEP.ui;
   // The stat-table helpers are the same as NBA and NFL's player card.
   const { dash, num, height, ago, newsSource, heat, scaler } = globalThis.SNP.ui;
   const TABS = [['summary', 'Summary'], ['log', 'Game Log'], ['history', 'History']];
@@ -73,7 +73,7 @@
       </div>
       ${next.played && next.stats ? statLine(scoring, next.stats) : projLine(week, id, next)}`;
     const projections = projectionsStrip(s, id, c);
-    const news = c.news == null ? '<p class="msg">Loading news…</p>' : !c.news.length ? '<p class="msg">No recent news.</p>'
+    const news = c.news == null ? loading('Loading news…') : !c.news.length ? '<p class="msg">No recent news.</p>'
       : c.news.slice(0, 6).map((n) => `<article class="news">
           <h4>${esc(n.metadata?.title || '')}</h4>
           <p>${esc(n.metadata?.description || '')}</p>
@@ -145,7 +145,7 @@
     const log = c.logs?.[season];
     const scoring = s.league.scoring_settings || {};
     const tabs = seasons.map((y) => `<button data-card-season="${y}" class="${y === season ? 'active' : ''}">${y}</button>`).join('');
-    if (!log) return `<div class="season-tabs">${tabs}</div><p class="msg">Loading game log…</p>`;
+    if (!log) return `<div class="season-tabs">${tabs}</div>${loading('Loading game log…')}`;
     const p = s.players[id] || {};
     const gk = (p.positions || []).includes('GK');
     const cols = LOG_COLS.filter(([key]) => (gk ? !['sm', 'kp', 'sot', 'g', 'at'].includes(key) || key === 'g' : !['sv', 'ga'].includes(key) || key === 'ga'));
@@ -187,7 +187,7 @@
   function historyView(s, id, c) {
     const byRoster = Object.fromEntries((s.rosters || []).map((r) => [r.roster_id, r]));
     const when = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    const history = c.history == null ? (c.historyError ? '<p class="msg">Log in to Sleeper to see transaction history.</p>' : '<p class="msg">Loading…</p>')
+    const history = c.history == null ? (c.historyError ? '<p class="msg">Log in to Sleeper to see transaction history.</p>' : loading())
       : !c.history.length ? '<p class="msg">No transactions in this league.</p>'
       : `<ul class="hist">${[...c.history].sort((a, b) => (b.status_updated || b.created) - (a.status_updated || a.created)).map((t) => {
         const added = t.adds?.[id];
@@ -203,7 +203,7 @@
         const kind = String(t.type || '').replace(/_/g, ' ');
         return `<li><span class="kind">${esc(kind)}</span><span>${esc(what)}</span><span class="sub">${esc(when(t.status_updated || t.created))}${t.status !== 'complete' ? ` · ${esc(t.status)}` : ''}</span></li>`;
       }).join('')}</ul>`;
-    const career = c.career == null ? '<p class="msg">Loading…</p>' : `<table class="career">
+    const career = c.career == null ? loading() : `<table class="career">
       <thead><tr><th>Season</th><th class="num">GP</th><th class="num">MIN</th><th class="num">G</th><th class="num">AST</th><th class="num">FPTS</th><th class="num">Rank</th></tr></thead>
       <tbody>${c.career.map((r) => `<tr><td>${r.season}</td><td class="num">${num(r.stats?.gp)}</td><td class="num">${num(r.stats?.min)}</td><td class="num">${num(r.stats?.g)}</td><td class="num">${num(r.stats?.at)}</td><td class="num">${r.stats ? f1(scoreStats(s.league.scoring_settings || {}, r.stats)) : '-'}</td><td class="num">${num(r.stats?.rank_std)}</td></tr>`).join('')}</tbody>
     </table>`;
