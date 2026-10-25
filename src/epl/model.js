@@ -39,7 +39,8 @@
     return out;
   }
 
-  const started = (game, now) => game.status !== 'pre_game' || (game.start != null && game.start <= now);
+  // Kicked off (or past its kickoff time), as core's model.gameState has it for NBA and NFL.
+  const started = (game, now) => core.gameState(game, now) !== 'left';
   const finished = (game) => game.status === 'complete';
 
   // A player's games this week, in order: the game, home/away, opponent, projection and result.

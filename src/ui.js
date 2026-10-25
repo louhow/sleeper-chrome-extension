@@ -208,7 +208,7 @@
   // Whether any game of the current week has tipped off.
   function weekStarted(s) {
     const games = s.weeks?.[s.currentWeek]?.games || [];
-    return games.some((g) => g.status !== 'pre_game' || (g.start != null && g.start <= s.now));
+    return games.some((g) => globalThis.SNP.model.gameState(g, s.now) !== 'left');
   }
 
   // One-line summary of the league's taxi rules and whether taxi is open now.

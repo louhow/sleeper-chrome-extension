@@ -1,6 +1,6 @@
 // Pure render functions: (state, api log) -> HTML string for the shadow root.
 (globalThis.SNP ||= {}).view = (() => {
-  const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId, scoreTier } = globalThis.SNP.model;
+  const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId, scoreTier, gameState } = globalThis.SNP.model;
   const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule,
     whatIfOn, playerOf, teamTag, researchLine, padTo, real, loading, errorMsg, shell, teamCard, rowHead, swapHint, swapClass, emptyCard,
     teamPicker, matchupPicker, matchupPairs } = globalThis.SNP.ui;
@@ -172,8 +172,9 @@
   function dayCell(d, s, mark, lockRef = null) {
     const lockable = mark === 'lockable' || mark === 'maybe';
     if (!d.game) return `<div class="day${d.date === s.today ? ' today' : ''}"><div class="cell"></div></div>`;
-    const done = d.game.status === 'complete';
-    const live = !done && (d.game.status === 'in_game' || (d.game.start != null && d.game.start <= s.now));
+    const where = gameState(d.game, s.now);
+    const done = where === 'done';
+    const live = where === 'live';
     const state = d.locked ? 'locked' : mark === 'lockable' ? 'lockable' : mark === 'maybe' ? 'lockable maybe'
       : done ? 'past' : live ? 'live' : d.date === s.today ? 'today' : 'future';
     const kind = done && d.actual != null ? `${state} tier-${scoreTier(d.actual, s.tiers)}` : state;
