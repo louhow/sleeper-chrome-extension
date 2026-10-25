@@ -22,7 +22,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 - Admin tools (off unless `?snp-admin=1`): what-if scoring on the Team and Matchup tabs and player card, adminFPTS and adminDelta columns on the Players tab.
 
 **NFL**
-- Optimize lineup button on Sleeper's own Team tab.
+- Optimize lineup button on Sleeper's own Team tab, slot by slot like the NBA one; apply one row or all of them.
 
 **Premier League (EPL)**
 - Match, Team, Players and League tabs in place of Sleeper's "not supported on web yet" page.

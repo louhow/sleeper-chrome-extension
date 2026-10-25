@@ -2078,21 +2078,28 @@ test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes a
   await page.locator('.user-tab-menu').screenshot({ path: `${OUT}nfl-button.png` });
 
   await button.click();
-  await page.locator(nflDialog('.op-row')).first().waitFor();
+  await page.locator(nflDialog('.os-row')).first().waitFor();
   assert.match(await page.locator(nflDialog('.op-sum')).textContent(), /51\.00\s*→\s*68\.00\s*\+17\.00/);
-  const rows = await page.locator(nflDialog('.op-row')).evaluateAll((els) => els.map((el) => el.querySelector('.dp-name b').textContent));
+  // One row per slot, in lineup order, like the NBA dialog: who comes in leads, beside who they replace.
+  assert.equal(await page.locator(nflDialog('.os-row')).count(), 5);
+  const names = (sel) => page.locator(nflDialog(`.os-row.swap ${sel} .dp-name b`)).allTextContents();
   // Alpha WR keeping WR with Gamma WR at FLEX adds up the same as swapping them, so nobody else moves.
-  assert.deepEqual(rows, ['Gamma WR', 'Beta QB', 'Beta RB', 'Beta WR']);
-  // Questionable can start, highlighted; Out and bye-week players don't; kicked-off players stay put.
-  const questionable = page.locator(nflDialog('.op-row.watch')).filter({ hasText: 'Beta QB' });
+  assert.deepEqual(await names('.os-p.in'), ['Gamma WR', 'Beta QB']);
+  assert.deepEqual(await names('.os-p.out'), ['Beta RB', 'Beta WR']);
+  // Questionable can start, flagged; Out and bye-week players don't; kicked-off players stay put.
+  const questionable = page.locator(nflDialog('.os-row.swap.warning')).filter({ hasText: 'Beta QB' });
   assert.equal(await questionable.locator('.nfl-inj.watch').textContent(), 'Q');
+  assert.match(await questionable.innerText(), /Questionable: check the news/);
   assert.match(await page.locator(nflDialog('.warn-banner')).textContent(), /Beta QB is Questionable/);
-  assert.match(await page.locator(nflDialog('.op-fixed')).textContent(), /Early RB \(game started\)/);
+  const started = page.locator(nflDialog('.os-row.same')).filter({ hasText: 'Early RB' });
+  assert.equal(await started.locator('.os-status').textContent(), 'Started');
+  assert.equal(await page.locator(nflDialog('.os-row.same button')).count(), 0, 'slots that stay have no button');
   assert.equal(await page.locator(nflDialog('.lose-banner, [data-op-ack]')).count(), 0, 'no warnings to confirm');
   await page.locator(nflDialog('.how')).hover();
   assert.match(await page.locator(nflDialog('.how-tip')).innerText(), /^How it picks:\n1\. Every player gets a number: their projected points/);
   await page.mouse.move(0, 0);
   await page.screenshot({ path: `${OUT}nfl-dialog.png` });
+  assert.equal(await page.locator(nflDialog('[data-action="apply-lineup"]')).textContent(), 'Apply all');
 
   // Cancel saves nothing.
   await page.locator(nflDialog('.op-foot button[data-action="close-modal"]')).click();
@@ -2106,12 +2113,23 @@ test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes a
   assert.match(await page.locator(nflDialog('.dialog-errors')).textContent(), /Player is locked/);
   await page.evaluate(() => { window.__nflFail = null; });
 
+  // One row on its own: the FLEX swap, and the dialog stays open on what's left.
+  const flex = page.locator(nflDialog('.os-row.swap')).filter({ has: page.locator('.os-p.in', { hasText: 'Gamma WR' }) });
+  await flex.locator('button.os-apply').click();
+  await flex.waitFor({ state: 'detached' });
+  let saves = await page.evaluate(() => window.__nflSaves);
+  assert.equal(saves.length, 2);
+  assert.deepEqual(saves[1], [NFL_LEAGUE, 4, 7, 7, ['qbA', 'rbPlayed', 'wrA', 'wrC', 'wrB']], "Sleeper's own updateMatchupLeg, in season, just that slot");
+  assert.match(await page.locator(nflDialog('.op-done')).textContent(), /^Saved: Gamma WR to FLEX, Beta RB to bench$/);
+  assert.equal(await page.locator(nflDialog('.os-row.swap')).count(), 1, 'the SUPER_FLEX change is left');
+  await page.screenshot({ path: `${OUT}nfl-row-applied.png` });
+  // Apply all saves the rest.
   await page.locator(nflDialog('[data-action="apply-lineup"]')).click();
   await page.locator(nflDialog('.modal')).waitFor({ state: 'detached' });
-  assert.match(await page.locator(nflDialog('.notice.ok')).textContent(), /^Saved: 4 lineup changes$/);
-  const saves = await page.evaluate(() => window.__nflSaves);
-  assert.equal(saves.length, 2);
-  assert.deepEqual(saves[1], [NFL_LEAGUE, 4, 7, 7, ['qbA', 'rbPlayed', 'wrA', 'wrC', 'qbB']], "Sleeper's own updateMatchupLeg, in season");
+  assert.match(await page.locator(nflDialog('.notice.ok')).textContent(), /^Saved: Beta QB to SUPER_FLEX, Beta WR to bench$/);
+  saves = await page.evaluate(() => window.__nflSaves);
+  assert.equal(saves.length, 3);
+  assert.deepEqual(saves[2], [NFL_LEAGUE, 4, 7, 7, ['qbA', 'rbPlayed', 'wrA', 'wrC', 'qbB']]);
   await page.screenshot({ path: `${OUT}nfl-saved.png` });
 
   // The saved lineup is the best one now; and the button is only for your own team.

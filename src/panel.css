@@ -1989,6 +1989,14 @@ button.optimize:hover:not(:disabled) {
   border: 1px solid var(--line);
   border-radius: 10px;
 }
+/* NFL: one number (this week's projection). */
+.os-head.nfl,
+.os-row.nfl {
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px 72px;
+}
+.os-row.nfl .slot {
+  width: 44px;
+}
 /* A slot that stays: one player across both player columns. */
 .os-row.same > .os-p,
 .os-row.lock > .os-p {
@@ -2029,7 +2037,8 @@ button.optimize:hover:not(:disabled) {
   color: var(--muted);
 }
 /* A change: who comes in first, then who they replace (faded, past a divider). */
-.os-p.in .dp-name button.name {
+.os-p.in .dp-name button.name,
+.os-p.in .dp-name > b {
   color: #8ec3ff;
 }
 .os-p.out {

@@ -1493,17 +1493,21 @@
       return data;
     }
 
-    // Sleeper's projections, scored with the league's settings exactly as its Team tab shows them.
+    // Sleeper's projections, scored with the league's settings exactly as its
+    // Team tab shows them, and the best lineup from them.
     function plan(l) {
       const proj = Object.fromEntries(Object.entries(l.projections).map(([id, p]) => [id, scoring.scoreStats(l.scoring || {}, p.stats)]));
-      return model.bestNflLineup({ ...l, proj });
+      return { plan: model.bestNflLineup({ ...l, proj }), proj };
     }
 
     function render() {
       if (destroyed || !styled) return;
       if (!state.modal && !state.notice) return layer.remove();
       if (!layer.isConnected) document.documentElement.appendChild(layer);
+      const scroll = root.querySelector('.dialog-body')?.scrollTop ?? 0;
       root.innerHTML = `<div class="page-layer">${nfl.render(state)}${ui.notice(state)}</div>`;
+      const body = root.querySelector('.dialog-body');
+      if (body) body.scrollTop = scroll;
     }
 
     function flash(text) {
@@ -1519,7 +1523,7 @@
     function open() {
       const l = lineup(true);
       if (!l?.editable) return;
-      state.modal = { lineup: l, plan: plan(l), errors: [], saving: false };
+      state.modal = { lineup: l, ...plan(l), errors: [], saving: false, busy: null, done: null };
       state.notice = null;
       render();
     }
@@ -1530,45 +1534,77 @@
       render();
     }
 
-    // Works the plan out again first: if a game kicked off while the dialog
-    // was open, it shows the new plan instead of saving one you haven't seen.
-    function apply() {
+    // The plan worked out again before a save: if a game kicked off while the
+    // dialog was open, it shows the new plan instead of saving one you haven't seen.
+    function fresh() {
       const m = state.modal;
-      if (!m || m.saving) return;
+      if (!m || m.saving) return null;
       const l = lineup(true);
-      const fresh = l?.editable ? plan(l) : null;
-      if (!fresh) {
+      const next = l?.editable ? plan(l) : null;
+      if (!next) {
         m.errors = ['The Team tab changed; open Optimize again.'];
-        return render();
+        render();
+        return null;
       }
-      if (JSON.stringify(fresh.starters) !== JSON.stringify(m.plan.starters) ||
-        JSON.stringify(fresh.changes) !== JSON.stringify(m.plan.changes)) {
-        Object.assign(m, { lineup: l, plan: fresh, errors: ['Games have kicked off since this opened. Review the updated changes.'] });
-        return render();
+      if (JSON.stringify(l.starters) !== JSON.stringify(m.lineup.starters) ||
+        JSON.stringify(next.plan.starters) !== JSON.stringify(m.plan.starters)) {
+        Object.assign(m, { lineup: l, ...next, errors: ['Games have kicked off since this opened. Review the updated changes.'] });
+        render();
+        return null;
       }
-      const name = (id) => l.players[id]?.name || `Player #${id}`;
-      const moved = fresh.changes.length > 3 ? `${fresh.changes.length} lineup changes`
-        : fresh.changes.map(({ id, to }) => `${name(id)} to ${to === 'BN' ? 'bench' : to}`).join(', ');
+      return { m, l, next };
+    }
+
+    const movedText = (l, changes) => (changes.length > 3 ? `${changes.length} lineup changes`
+      : changes.map(({ id, to }) => `${l.players[id]?.name || `Player #${id}`} to ${to === 'BN' ? 'bench' : to}`).join(', '));
+
+    // Saves starters through Sleeper's own Team component. With `stay`, the
+    // dialog stays open on the plan from the saved lineup, saying what saved.
+    function save(m, l, starters, okText, busy, stay) {
       m.saving = true;
+      m.busy = busy;
       m.errors = [];
+      m.done = null;
       render();
       const done = (e) => {
         document.removeEventListener('snp:nfl-lineup-saved', done);
         if (destroyed) return;
         const result = JSON.parse(e.detail);
-        if (result.ok) {
-          state.modal = null;
-          flash(`Saved: ${moved}`);
-        } else {
-          m.saving = false;
+        m.saving = false;
+        m.busy = null;
+        if (!result.ok) {
           m.errors = [result.error];
+        } else if (stay) {
+          // Sleeper's component shows the saved lineup; until it does, it's worked out here.
+          const read = lineup(true);
+          const saved = read && JSON.stringify(read.starters) === JSON.stringify(starters) ? read
+            : { ...l, starters, bench: [...l.starters, ...l.bench].filter((id) => id && id !== '0' && !starters.includes(id)) };
+          Object.assign(m, { lineup: saved, ...plan(saved), done: okText });
+        } else {
+          state.modal = null;
+          flash(okText);
         }
         render();
       };
       document.addEventListener('snp:nfl-lineup-saved', done);
       document.dispatchEvent(new CustomEvent('snp:nfl-lineup-save', {
-        detail: JSON.stringify({ leagueId, rosterId: l.rosterId, round: l.round, starters: fresh.starters }),
+        detail: JSON.stringify({ leagueId, rosterId: l.rosterId, round: l.round, starters }),
       }));
+    }
+
+    function apply() {
+      const f = fresh();
+      if (f) save(f.m, f.l, f.next.plan.starters, `Saved: ${movedText(f.l, f.next.plan.changes)}`, 'all', false);
+    }
+
+    // One slot's change (and any slot tied to it); the dialog stays open.
+    function applyRow(i) {
+      const f = fresh();
+      if (!f) return;
+      const { starters, slots } = model.applySlot(f.l.starters, f.next.plan.starters, i);
+      if (!slots.length) return;
+      const ids = new Set(slots.flatMap((k) => [f.l.starters[k], f.next.plan.starters[k]]));
+      save(f.m, f.l, starters, `Saved: ${movedText(f.l, f.next.plan.changes.filter((c) => ids.has(c.id)))}`, `row:${i}`, true);
     }
 
     // Sleeper re-renders its header now and then, so this runs on every page change.
@@ -1609,6 +1645,8 @@
     document.addEventListener('click', onClick);
     document.addEventListener('keydown', onKey);
     root.addEventListener('click', (e) => {
+      const row = e.target.closest('[data-op-row]');
+      if (row) return applyRow(Number(row.dataset.opRow));
       const action = e.target.closest('[data-action]')?.dataset.action;
       if (action === 'close-modal') close();
       if (action === 'apply-lineup') apply();
