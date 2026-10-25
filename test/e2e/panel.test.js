@@ -916,18 +916,35 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
   const back = page.locator(panel('.tools .my-team'));
   assert.match(await back.innerText(), /^←\s*My team$/);
   await page.screenshot({ path: `${OUT}team-someone-else.png` });
-  // Arrow keys go through the other teams, A to Z, skipping yours, round and round.
-  const others = await page.evaluate((me) => {
+  // Arrow keys go through every team, A to Z, yours too, and stop at the first and the last.
+  const teams = await page.evaluate(() => {
     const root = document.querySelector('#sleeper-nba-panel').shadowRoot;
-    return [...root.querySelectorAll('.tp-menu [data-pick-roster]')].filter((b) => b.dataset.pickRoster !== me).map((b) => b.querySelector('b').textContent.trim());
-  }, String(mine.roster_id));
+    return [...root.querySelectorAll('.tp-menu [data-pick-roster]')].map((b) => b.querySelector('b').textContent.trim());
+  });
   const shown = async () => (await page.locator(panel('.team-card .team-name')).textContent()).trim();
-  const at = others.indexOf(await shown());
+  const showing = (name) => page.locator(panel('.team-card .team-name')).filter({ hasText: name }).waitFor();
+  const at = teams.indexOf(await shown());
+  for (let i = at; i < teams.length - 1; i++) {
+    await page.keyboard.press('ArrowDown');
+    await showing(teams[i + 1]);
+  }
   await page.keyboard.press('ArrowDown');
-  await page.locator(panel('.team-card .team-name')).filter({ hasText: others[(at + 1) % others.length] }).waitFor();
+  await page.waitForTimeout(300);
+  assert.equal(await shown(), teams.at(-1), 'the last team stays');
+  for (let i = teams.length - 1; i > 0; i--) {
+    await page.keyboard.press('ArrowUp');
+    await showing(teams[i - 1]);
+  }
   await page.keyboard.press('ArrowUp');
-  await page.keyboard.press('ArrowUp');
-  await page.locator(panel('.team-card .team-name')).filter({ hasText: others[(at - 1 + others.length) % others.length] }).waitFor();
+  await page.waitForTimeout(300);
+  assert.equal(await shown(), teams[0], 'the first team stays');
+  // Yours is on the way; from someone else's team, "My team" goes back.
+  const myName = await page.evaluate((id) => document.querySelector('#sleeper-nba-panel').shadowRoot.querySelector(`.tp-menu [data-pick-roster="${id}"] b`).textContent.trim(), String(mine.roster_id));
+  assert.ok(teams.includes(myName));
+  if (teams[0] === myName) {
+    await page.keyboard.press('ArrowDown');
+    await showing(teams[1]);
+  }
   await back.click();
   await page.locator(panel('.tools .my-team')).waitFor({ state: 'detached' });
   assert.equal(await page.locator(panel('.team-pick .tp-button')).getAttribute('data-roster'), String(mine.roster_id), 'your own team again');
@@ -2149,12 +2166,18 @@ test('players tab: a team picker beside the search, and rostered players show th
   assert.equal(await picker.locator('.snp-team-button .snp-team-name').textContent(), 'Cling Kong');
   assert.equal(await picker.locator('.snp-team-menu').isVisible(), false, 'the menu closes');
   assert.deepEqual(await page.evaluate(() => [panel.state.filterByUser, panel.state.hideOwned]), [true, false]);
-  // Arrow keys go through the teams, A to Z, round and round; not while typing in Find player.
+  // Arrow keys go through the teams, A to Z, and stop at the last and the first; not while typing in Find player.
   await page.keyboard.press('ArrowDown');
   await page.waitForFunction(() => document.querySelector('.snp-team-button .snp-team-name')?.textContent === 'Cookie Monster');
   assert.deepEqual(await rows(), ['mine']);
   await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(300);
+  assert.equal(await picker.locator('.snp-team-button .snp-team-name').textContent(), 'Cookie Monster', 'the last team stays');
+  await page.keyboard.press('ArrowUp');
   await page.waitForFunction(() => document.querySelector('.snp-team-button .snp-team-name')?.textContent === 'Cling Kong');
+  await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(300);
+  assert.equal(await picker.locator('.snp-team-button .snp-team-name').textContent(), 'Cling Kong', 'the first team stays');
   await page.locator('.player-search input').focus();
   await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(300);

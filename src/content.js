@@ -1427,18 +1427,17 @@
         state.rosterMenu = false;
         return schedule();
       }
-      // Looking at someone else's team: arrow up and down go through the other
-      // teams, in the picker's order (A to Z), round and round.
+      // Arrow up and down go through every team, yours too, in the picker's
+      // order (A to Z), stopping at the first and the last.
       if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
         const typing = e.composedPath().some((el) => el instanceof Element && el.matches('input, select, textarea, [contenteditable]'));
-        const mine = state.rosters?.find((r) => ui.owns(state, r));
-        if (typing || state.modal || !state.onPanel || state.page !== 'team' || state.tab !== 'page' || !mine || state.rosterId === mine.roster_id) return;
-        const others = state.rosters.filter((r) => r.roster_id !== mine.roster_id)
-          .sort((a, b) => ui.teamName(state, a).localeCompare(ui.teamName(state, b)));
-        const at = others.findIndex((r) => r.roster_id === state.rosterId);
-        if (at < 0) return;
+        if (typing || state.modal || !state.onPanel || state.page !== 'team' || state.tab !== 'page' || !state.rosters?.length) return;
+        const teams = [...state.rosters].sort((a, b) => ui.teamName(state, a).localeCompare(ui.teamName(state, b)));
+        const at = teams.findIndex((r) => r.roster_id === state.rosterId);
+        const next = teams[at + (e.key === 'ArrowDown' ? 1 : -1)];
+        if (at < 0 || !next) return;
         e.preventDefault();
-        return setRoster(others[(at + (e.key === 'ArrowDown' ? 1 : -1) + others.length) % others.length].roster_id);
+        return setRoster(next.roster_id);
       }
       if (e.key === 'Escape' && (state.swap || state.lockConfirm)) {
         state.swap = null;

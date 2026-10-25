@@ -126,7 +126,8 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 ### Team picker
 
 - The toolbar's team picker shows every team with its avatar, name and owner, A to Z (yours marked "you"); the pick is kept for next time.
-- While you're looking at someone else's team, a "My team" button beside it goes back to yours in one click, and the arrow up and down keys go through the other teams in the picker's order, round and round (not while typing).
+- While you're looking at someone else's team, a "My team" button beside it goes back to yours in one click.
+- The arrow up and down keys go through every team in the picker's order, yours included, and stop at the first and the last (not while typing).
 - On the Matchup tab, and on the League tab's matchups, a team's avatar, owner or name opens it on the Team tab (just for now: the picker's choice stays).
 
 ### League
@@ -153,7 +154,7 @@ Sleeper's own NBA Players table, with these additions:
   A game played wears its score's color (see [Score colors](#score-colors); dim gray when they didn't play); in the game log's muted tones; bright red is a game on now, light gray one still to play, faint no game.
   Hovering a mark shows a card: the game, its score (or tip-off time), and how many games are left; sorting by the column sorts by games left.
   The schedule is the week's GraphQL `scores` (already loaded for the Team tab's week, else one query per week); the scores come from the week's stat rows, which Best and Worst already load.
-- Team picker: beside Find player, every league team with its avatar and name (All teams first); picking one narrows the list to that team's players through Sleeper's own owner filter (the one in its filter section), so the Week strip scans a whole roster. With a team picked, arrow up and down go through the teams, round and round (not while typing in Find player). Ticking Free agents lets the pick go. It's remembered with the rest of the view.
+- Team picker: beside Find player, every league team with its avatar and name (All teams first); picking one narrows the list to that team's players through Sleeper's own owner filter (the one in its filter section), so the Week strip scans a whole roster. With a team picked, arrow up and down go through the teams, stopping at the first and the last (not while typing in Find player). Ticking Free agents lets the pick go. It's remembered with the rest of the view.
 - With more columns than Sleeper's 9 they narrow to fit, the labels center, and each value sits right under its label (Sleeper's own rows only line up at its 60px width); the name area gets 12px more.
 - Rostered players' owner line shows the team's avatar (or initial) and team name, in place of Sleeper's arrow and username.
 - Shooting: a small + at the end of the column header (−, filled, while on), in Stats only, off until pressed: FGM, FGA, 3PA, FTM and FTA at the end of the table. It stays out of Sleeper's filter row, which has no room to spare.
@@ -229,7 +230,7 @@ Sleeper's own NFL Players table, with these additions (the same hooks as the NBA
   Hovering a mark shows the week, the opponent (from Sleeper's own schedule) and the score, with points per game over those weeks; sorting by the column sorts by that.
   The scores come from `/stats/nfl/<season>/<week>` (finished weeks once per page load, the week on now every two minutes at most) and, for the week on now, GraphQL `scores` for where each game stands.
 - Sleeper's group headers (Fantasy, Rushing, Receiving, Passing) move with the columns, centered over their own.
-- The team picker and team lines of the NBA Players tab: every league team with its avatar, narrowing the list to one team through Sleeper's owner filter, arrow keys through the teams, and each rostered player's team avatar and name.
+- The team picker and team lines of the NBA Players tab: every league team with its avatar, narrowing the list to one team through Sleeper's owner filter, arrow keys through the teams (stopping at the ends), and each rostered player's team avatar and name.
 - The view you last had on comes back, as on the NBA Players tab.
 
 ### NFL: Optimize lineup

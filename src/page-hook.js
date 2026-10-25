@@ -539,7 +539,7 @@
   }
   document.addEventListener('click', () => document.querySelector(`${PLAYERS_PANEL} .snp-team-pick.open`)?.classList.remove('open'));
   // With a team picked, arrow up and down go through the league's teams (A to
-  // Z, as the picker lists them), round and round. Not while typing (Find player).
+  // Z, as the picker lists them), stopping at the first and the last. Not while typing (Find player).
   document.addEventListener('keydown', (e) => {
     if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
     if (e.target instanceof Element && e.target.matches('input, select, textarea, [contenteditable]')) return;
@@ -548,10 +548,11 @@
     if (!picked) return;
     const teams = leagueTeams(panel);
     const at = teams.findIndex((t) => t.id === picked);
-    if (at < 0) return;
+    const next = teams[at + (e.key === 'ArrowDown' ? 1 : -1)];
+    if (at < 0 || !next) return;
     e.preventDefault();
     panel.snpTeamPicked = true;
-    pickTeam(panel, teams[(at + (e.key === 'ArrowDown' ? 1 : -1) + teams.length) % teams.length].id);
+    pickTeam(panel, next.id);
   });
 
   // A rostered player's owner line: the team's avatar and name, in place of Sleeper's arrow and username.
