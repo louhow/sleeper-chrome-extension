@@ -223,10 +223,13 @@
         const m = mark(d);
         return dayCell(d, s, m, (m === 'lockable' || m === 'maybe') && lockRoster != null ? `${lockRoster}:${id}` : null);
       }).join('')}</div>
-      <div class="week-pts${lockedDay ? ' locked' : ''}">
-        <b>${lockedDay ? lockIcon() : ''}${f2(points ? points[id] : st.points)}</b>
-        <span>${lockedDay ? `lock ${f2(lockedDay.actual ?? lockedDay.proj)}` : `proj ${f2(lockInDefault(days))}`}</span>
-      </div>
+      ${lockedDay
+        // Locked: the score that counts, boxed like its day cell (its score's color in a gold frame).
+        ? `<div class="week-pts locked"><b class="tier-${scoreTier(lockedDay.actual ?? lockedDay.proj ?? 0)}">${lockIcon()}${f2(lockedDay.actual ?? lockedDay.proj ?? 0)}</b></div>`
+        : `<div class="week-pts">
+        <b>${f2(points ? points[id] : st.points)}</b>
+        <span>proj ${f2(lockInDefault(days))}</span>
+      </div>`}
     </article>`;
   }
 

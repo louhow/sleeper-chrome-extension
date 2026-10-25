@@ -22,9 +22,9 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
   | Later in the week | Quiet outline, projection muted |
 
 - A game played is tinted, muted, by its score's color (green 24+, yellow 15+, red below, as in the game log); a locked one is filled bright in that color inside its gold frame.
-- The points column marks a locked-in score with a padlock, in yellow, so it reads apart from a score still in play.
+- The points column shows a locked-in score once, boxed like its day cell (its score's color in a gold frame), with a padlock, in yellow, so it reads apart from a score still in play.
 - Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
-- Lock-In needs the player starting when the game tipped off: a game played on the bench can't be locked after moving them in.
+- Lock-In needs the player starting when the game tipped off and never benched since. Sleeper's own wording (in its app's strings): "Player was not in starting lineup OR was moved to bench since game began". A game played on the bench can't be locked after moving them in, nor one whose player was benched and started again.
   Sleeper keeps no lineup history, so the extension remembers your lineups as it reads them, in the browser's extension storage: the current week only (earlier weeks are deleted), at most 100 lineup changes.
   It reads your leg on each load and after each save, plus once 5 minutes after each tip-off time of your players' games (games tipping off together share the read), only while the tab is visible; a read missed while it was hidden happens when it comes back, if the game is still on. Reads are never closer than a minute apart.
   Sleeper won't move a player whose game is on, so a lineup seen in the two hours after tip-off settles it; so does the same lineup seen before and after.
@@ -57,7 +57,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
     The player going out says where and why ("To bench · no game Sat · 31.91/g") and, when they have a finished game that could still be locked, the score they drop ("Drops lock-in 16.50 Wed vs GSW").
     The one coming in says where from and their next game ("From bench · Sat @ CHI 7:00pm").
     Their headshots carry substitution marks, as soccer apps show them: a green arrow up coming in, a red arrow down going out (the NFL dialog too).
-    When the one going out has a finished game that could still be locked, "Lock 21.50 instead" under Apply keeps them in the lineup and locks it ("(if started)" when the extension didn't see them start it); the dialog stays open on the plan around the lock.
+    Its two options are spelled out: "Apply change", and, when the one going out has a finished game that could still be locked, "Lock current", which keeps them in the lineup and locks it (its tooltip names the score, and says when it depends on them having started); the dialog stays open on the plan around the lock.
   - A finished game worth locking shows its score, the open value and when the window closes, with a Lock button.
   - A slot that stays is dimmed and says why: "No change", "Locked" (with the locked score), "Playing" or "Empty".
 - Applying one row saves just that slot and keeps the dialog open on the plan from the new lineup, with a note saying what saved.

@@ -281,14 +281,17 @@
   // seen in this long after tip-off (a game runs longer) is the one they tipped off in.
   const FROZEN_MS = 2 * 3600e3;
 
-  // Whether a player was in the starting lineup when a game tipped off at
-  // `time`, from lineups the extension saw: [{ from, to, starters }], each
-  // lineup seen unchanged from `from` to `to`. A lineup seen while the game
-  // was on settles it; so do lineups seen before and after that agree.
-  // Otherwise null: Sleeper keeps no lineup history.
+  // Whether a game that tipped off at `time` can still be locked for a player,
+  // by Sleeper's rule ("Player was not in starting lineup OR was moved to bench
+  // since game began" makes it ineligible), from lineups the extension saw:
+  // [{ from, to, starters }], each seen unchanged from `from` to `to`. Seen on
+  // the bench at any point since tip-off: no. Otherwise a lineup seen while the
+  // game was on settles it, and so do lineups seen before and after that agree.
+  // Else null: Sleeper's API keeps no lineup history.
   function startedAt(history, id, time) {
     if (!history?.length || time == null) return null;
     const has = (h) => h.starters.includes(id);
+    if (history.some((h) => h.to >= time && !has(h))) return false;
     const during = history.find((h) => h.from <= time + FROZEN_MS && h.to >= time);
     if (during) return has(during);
     const before = history.filter((h) => h.to < time).at(-1);

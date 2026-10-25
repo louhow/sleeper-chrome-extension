@@ -127,7 +127,9 @@ test('logged-in leg data wins: starters, projection and locked games', () => {
   assert.match(out, /4\.00 proj 157\.23/);
   assert.match(out, /PG Jeremiah Fears .* G Luka Doncic/);
   assert.match(html, /class="day game locked"/);
-  assert.match(out, /lock 30\.79/);
+  // The PTS column boxes the locked score like its day cell, with no second line.
+  assert.match(html, /<div class="week-pts locked"><b class="tier-green"><svg class="lock-icon"[^>]*>.*?<\/svg>30\.79<\/b><\/div>/);
+  assert.doesNotMatch(out, /lock 30\.79/);
 });
 
 test('game cells: locked, still lockable, past locking, live, today and later read apart', () => {
@@ -195,7 +197,7 @@ test('game cells: locked, still lockable, past locking, live, today and later re
   s.weeks[1].legs = [{ roster_id: 1, starters: ['a', 'b', '0'], points: 20, starters_games: { a: 'w2' } }];
   const locked = render(s, []);
   assert.deepEqual(cells(locked, 'Luka Doncic').map(([kind]) => kind), ['past', 'locked', 'today', 'future']);
-  assert.match(locked, /<div class="week-pts locked">\s*<b><svg class="lock-icon"/);
+  assert.match(locked, /<div class="week-pts locked"><b class="tier-\w+"><svg class="lock-icon"/);
 });
 
 const taxiState = (overrides = {}) => {

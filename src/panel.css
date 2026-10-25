@@ -735,18 +735,26 @@ button.cell:disabled {
   height: 8px;
 }
 /* A locked-in score reads as banked. */
+/* A locked score: boxed like its locked day cell, its score's color in a gold frame. */
 .week-pts.locked b {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  color: var(--warn);
+  gap: 4px;
+  padding: 3px 7px;
+  border: 2px solid #ffcf3a;
+  border-radius: 7px;
+  background: #2a3142;
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px rgba(13, 20, 33, 0.55);
+  color: var(--text);
 }
+.week-pts.locked b.tier-green { background-color: #2f8f58; }
+.week-pts.locked b.tier-yellow { background-color: #977a17; }
+.week-pts.locked b.tier-red { background-color: #b03f59; }
 .week-pts.locked b .lock-icon {
   width: 11px;
   height: 11px;
-}
-.week-pts.locked span {
-  color: var(--warn);
+  color: #ffe07a;
 }
 
 /* Narrow panels: the week drops under the player. */
@@ -1977,7 +1985,7 @@ button.optimize:hover:not(:disabled) {
 .os-head,
 .os-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 44px 40px 72px;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 44px 40px 100px;
   align-items: center;
   column-gap: 10px;
 }
@@ -1996,7 +2004,7 @@ button.optimize:hover:not(:disabled) {
 /* NFL: one number (this week's projection). */
 .os-head.nfl,
 .os-row.nfl {
-  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px 72px;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px 100px;
 }
 .os-row.nfl .slot {
   width: 44px;
@@ -2068,22 +2076,25 @@ button.optimize:hover:not(:disabled) {
 .os-p.out .os-arrow {
   opacity: 1;
 }
-/* A swap's secondary option, under its Apply: two short lines in the action column. */
-.os-act .os-lock-instead {
-  display: block;
-  width: 100%;
-  color: var(--warn);
-  font-size: 10px;
-  line-height: 12px;
-  text-align: center;
-  white-space: normal;
+/* A swap's other option, under Apply change: keep the starter, lock their score. */
+.os-act .os-lock-current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 0;
+  border: 1px solid rgba(255, 207, 58, 0.6);
+  border-radius: 8px;
+  background: none;
+  color: #ffcf3a;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.os-act .os-lock-instead .lock-icon {
-  vertical-align: -1px;
-  margin-right: 2px;
-}
-.os-act .os-lock-instead:hover:not(:disabled) {
-  color: #ffe07a;
+.os-act .os-lock-current:hover:not(:disabled) {
+  border-color: #ffcf3a;
+  background: rgba(255, 207, 58, 0.1);
 }
 /* A change: who comes in first, then who they replace (faded, past a divider). */
 .os-p.in .dp-name button.name,
@@ -2179,7 +2190,7 @@ button.optimize:hover:not(:disabled) {
   padding: 7px 0;
   background: #5ac8b4;
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;

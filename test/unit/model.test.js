@@ -433,16 +433,24 @@ test('lineup history: who was starting at a time, from the lineups seen', () => 
   for (let i = 0; i < 150; i++) many = model.seeLineup(many, [String(i)], i);
   assert.equal(many.length, 100, 'capped');
   assert.deepEqual(plain(many.at(-1).starters), ['149'], 'keeping the latest');
-  assert.equal(model.startedAt(h, 'a', t(150)), true, 'inside a span');
+  assert.equal(model.startedAt(h, 'b', t(150)), true, 'inside a span');
   assert.equal(model.startedAt(h, 'c', t(150)), false);
+  assert.equal(model.startedAt(h, 'a', t(150)), false, 'started it, but benched since (Sleeper: ineligible)');
   assert.equal(model.startedAt(h, 'b', t(250)), true, 'between spans that agree');
-  assert.equal(model.startedAt(h, 'a', t(250)), null, 'between spans that disagree: a change happened, but when?');
-  assert.equal(model.startedAt(h, 'a', t(50)), null, 'before anything was seen');
+  const later = [{ from: t(100), to: t(200), starters: ['c'] }, { from: t(300), to: t(400), starters: ['a'] }];
+  assert.equal(model.startedAt(later, 'a', t(250)), null, 'between spans that disagree: a change happened, but when?');
+  assert.equal(model.startedAt(h, 'b', t(50)), null, 'before anything was seen');
   assert.equal(model.startedAt([], 'a', t(150)), null);
   // Seen while the game was on, the lineup can't have changed for it since tip-off.
   const live = [{ from: t(100), to: t(100), starters: ['x'] }, { from: t(260) + 5 * 60e3, to: t(260) + 5 * 60e3, starters: ['a'] }];
   assert.equal(model.startedAt(live, 'a', t(260)), true, 'read 5 minutes after tip-off');
   assert.equal(model.startedAt(live, 'a', t(260) - model.FROZEN_MS - 1), null, 'read after that game ended: unknown');
+  // Sleeper's rule: moved to the bench since the game began, even if back now, makes it ineligible.
+  const benched = [{ from: t(100), to: t(270), starters: ['a'] }, { from: t(280), to: t(280), starters: ['x'] }, { from: t(290), to: t(300), starters: ['a'] }];
+  assert.equal(model.startedAt(benched, 'a', t(260)), false, 'benched after tip-off, then started again');
+  assert.equal(model.startedAt(benched, 'a', t(285)), true, 'benched before this tip-off, starting while it was on: eligible');
+  assert.equal(model.startedAt([{ from: t(100), to: t(100), starters: ['x'] }, { from: t(300), to: t(300), starters: ['x'] }], 'a', t(200)), false,
+    'benched before and after: not starting');
 });
 
 test('lineup reads follow tip-offs: one per tip-off time, never on a timer', () => {

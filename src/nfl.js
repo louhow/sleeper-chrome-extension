@@ -105,7 +105,7 @@
         ${player(lineup, cur, 'out', outSub)}
         <span class="dp-pts">${f2(m.proj[next] ?? 0)}</span>
         <span class="os-act">
-          <button class="os-apply" data-op-row="${i}" ${m.saving ? 'disabled' : ''} ${others.length ? `title="Also changes ${esc(others.join(', '))}"` : ''}>${m.busy === `row:${i}` ? 'Saving…' : 'Apply'}</button>
+          <button class="os-apply" data-op-row="${i}" ${m.saving ? 'disabled' : ''} ${others.length ? `title="Also changes ${esc(others.join(', '))}"` : ''}>${m.busy === `row:${i}` ? 'Saving…' : 'Apply change'}</button>
           ${others.length ? `<span class="os-with">with ${esc(others.join(', '))}</span>` : ''}
         </span>
       </div>`;

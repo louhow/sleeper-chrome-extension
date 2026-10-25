@@ -124,7 +124,8 @@ test('team tab: league scoring shows Sleeper\'s totals; what-if adds them up and
   assert.match(wi.html, /<div class="app whatif">/);
   assert.match(wi.out, /What-if scoring Points Scored 1 → 2\. Fantasy points here aren't your league's; Lock-In and Optimize are off\. Use league scoring/);
   assert.match(wi.out, /louhow .* 80\.00 proj 80\.00/, 'the locked game, rescored');
-  assert.match(wi.out, /Luka Doncic .* 80\.00 lock 80\.00/);
+  assert.match(wi.out, /Luka Doncic .* 80\.00/);
+  assert.doesNotMatch(wi.out, /lock 80\.00/, 'the locked score shows once, boxed');
   assert.doesNotMatch(wi.out, /99\.00|111\.00/);
   assert.match(wi.html, /<button class="optimize" disabled/);
 });

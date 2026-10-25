@@ -112,11 +112,11 @@
         ${numbers(plan, next)}
         <span class="os-act">
           <button class="os-apply" data-op-row="${i}" ${m.saving || risky ? 'disabled' : ''}
-            ${risky ? 'title="Tick the box above to confirm giving up that score"' : others.length ? `title="Also changes ${esc(others.join(', '))}"` : ''}>${busy ? 'Saving…' : 'Apply'}</button>
+            ${risky ? 'title="Tick the box above to confirm giving up that score"' : others.length ? `title="Also changes ${esc(others.join(', '))}"` : ''}>${busy ? 'Saving…' : 'Apply change'}</button>
           ${others.length ? `<span class="os-with">with ${esc(others.join(', '))}</span>` : ''}
-          ${drops && plan.lockable ? `<button class="os-link os-lock-instead" data-op-lock-out="${esc(cur)}" ${m.saving ? 'disabled' : ''}
-            title="${esc(`Keep ${s.players[cur]?.name || 'them'} in the lineup and lock ${f2(drops.actual)} (${gameText(drops)}); locking is final${change.dropsUnsure ? '. Only if they were starting at tip-off' : ''}`)}">${m.busy === `lockout:${cur}` ? 'Locking…'
-              : `${lockIcon()}Lock ${f2(drops.actual)} instead${change.dropsUnsure ? ' (if started)' : ''}`}</button>` : ''}
+          ${drops && plan.lockable ? `<button class="os-lock-current" data-op-lock-out="${esc(cur)}" ${m.saving ? 'disabled' : ''}
+            title="${esc(`Or keep ${s.players[cur]?.name || 'them'} and lock ${f2(drops.actual)} (${gameText(drops)}) instead. Locking is final${change.dropsUnsure ? '; Sleeper only allows it if they were starting at tip-off and haven\'t been benched since' : ''}.`)}">${m.busy === `lockout:${cur}` ? 'Locking…'
+              : `${lockIcon()}Lock current`}</button>` : ''}
         </span>
       </div>`;
     }
