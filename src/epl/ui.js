@@ -91,8 +91,11 @@
     </div>`;
   }
 
-  // One team's side of a matchup: avatar, name, points and the win bar. `link` makes it open that team.
-  function teamSide(s, l, totals, prob, cls, { link = false } = {}) {
+  // One lineup's side of a matchup, drawn from EPL state: its roster's avatar,
+  // name, points (`totals`: teamTotals), the win bar (`prob`) and yet to play.
+  // `link` makes it open that team. EPL lays it out its own way, so it isn't
+  // SNP.ui.teamSide, which draws ready-made numbers for NBA and NFL.
+  function lineupSide(s, l, totals, prob, cls, { link = false } = {}) {
     const { roster } = l;
     const pctValue = prob == null ? null : Math.round(prob * 100);
     const trend = pctValue == null ? '' : pctValue >= 50 ? 'up' : 'down';
@@ -211,7 +214,7 @@
 
   return {
     esc, f2, f1, CDN, headshot, teamLogo, teamName, ownerName, avatar, avatarImg, record, shortName, playerOf, injuryTag, positions,
-    gameTime, weekday, shortDate, slotBadge, versus, nextMatch, nextGameText, gameChips, teamSide, dialog, dialogErrors, weekNav, notice, loading, errorMsg,
+    gameTime, weekday, shortDate, slotBadge, versus, nextMatch, nextGameText, gameChips, lineupSide, dialog, dialogErrors, weekNav, notice, loading, errorMsg,
     owns, myRoster, real, ownerOf, lineup, teamTotals, reserveRule, pct, playerLine, positionRank, roleName,
   };
 })();

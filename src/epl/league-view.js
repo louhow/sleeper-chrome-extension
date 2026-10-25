@@ -2,7 +2,7 @@
 // transactions, as the mobile app's League tab shows them. Pure: state -> HTML.
 (globalThis.SEP ||= {}).leagueView = (() => {
   const { winProbability, standings, pointsFor, pointsAgainst, streak, faabLeft, FAAB } = globalThis.SEP.model;
-  const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, teamSide, weekNav, headshot, positions, owns, playerOf, loading, errorMsg } = globalThis.SEP.ui;
+  const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, lineupSide, weekNav, headshot, positions, owns, playerOf, loading, errorMsg } = globalThis.SEP.ui;
 
   function render(s) {
     if (s.error) return errorMsg(s.error);
@@ -39,9 +39,9 @@
     const tb = lb && teamTotals(s, lb);
     const [p1, p2] = tb ? winProbability(ta.points, ta.proj, tb.points, tb.proj) : [null, null];
     return `<section class="mu-head">
-      ${teamSide(s, la, ta, p1, 'mine', { link: true })}
+      ${lineupSide(s, la, ta, p1, 'mine', { link: true })}
       <div class="vs">VS</div>
-      ${lb ? teamSide(s, lb, tb, p2, 'theirs', { link: true }) : '<div class="mu-team theirs bye"><span class="sub">Bye</span></div>'}
+      ${lb ? lineupSide(s, lb, tb, p2, 'theirs', { link: true }) : '<div class="mu-team theirs bye"><span class="sub">Bye</span></div>'}
     </section>`;
   }
 

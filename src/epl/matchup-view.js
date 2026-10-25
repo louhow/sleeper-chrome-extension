@@ -3,7 +3,7 @@
 (globalThis.SEP ||= {}).matchupView = (() => {
   const { playerGames, weekTotals, winProbability } = globalThis.SEP.model;
   const { breakdown } = globalThis.SEP.scoring;
-  const { esc, f2, shortName, playerOf, injuryTag, positions, headshot, slotBadge, weekNav, lineup, teamTotals, gameChips, versus, nextMatch, teamSide, real, loading, errorMsg } = globalThis.SEP.ui;
+  const { esc, f2, shortName, playerOf, injuryTag, positions, headshot, slotBadge, weekNav, lineup, teamTotals, gameChips, versus, nextMatch, lineupSide, real, loading, errorMsg } = globalThis.SEP.ui;
 
   function render(s) {
     if (s.error) return errorMsg(s.error);
@@ -24,9 +24,9 @@
     const noLegs = s.loggedIn && mine.week.legs == null && s.week <= s.currentWeek;
     return `
       <section class="mu-head">
-        ${teamSide(s, left.l, left, p1, 'mine')}
+        ${lineupSide(s, left.l, left, p1, 'mine')}
         <div class="vs">VS</div>
-        ${right ? teamSide(s, right.l, right, p2, 'theirs') : `<div class="mu-team theirs bye"><span class="sub">${s.loggedIn ? 'No opponent this week' : 'Log in to Sleeper to see this week\'s matchup'}</span></div>`}
+        ${right ? lineupSide(s, right.l, right, p2, 'theirs') : `<div class="mu-team theirs bye"><span class="sub">${s.loggedIn ? 'No opponent this week' : 'Log in to Sleeper to see this week\'s matchup'}</span></div>`}
       </section>
       ${noLegs ? '<p class="hint center">Matchup pairings come from Sleeper\'s logged-in API, which didn\'t answer; showing the roster\'s saved lineup.</p>' : ''}
       <div class="mu-starters">
