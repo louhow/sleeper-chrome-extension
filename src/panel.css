@@ -2445,8 +2445,8 @@ button.danger.solid:hover:not(:disabled) {
   font-size: 10px;
   text-overflow: ellipsis;
 }
-.nfl-game.pre b,
-.mp-game.pre b {
+.nfl-game.left b,
+.mp-game.left b {
   color: var(--muted);
 }
 .nfl-game.live b,

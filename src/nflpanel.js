@@ -43,8 +43,6 @@
     return { ...g, state, team, homeSide: home, opponent: home ? g.away : g.home, mine: home ? g.homeScore : g.awayScore, theirs: home ? g.awayScore : g.homeScore };
   }
   const kickedOff = (g) => g.state === 'live' || g.state === 'done';
-  // The game's class: panel.css still calls a game to come `.pre`.
-  const gameClass = (g) => (g.state === 'left' ? 'pre' : g.state);
 
   // Points so far (Sleeper's stats, scored with the league's settings), and the
   // projection: the game's, until it's on; then what's scored plus the
@@ -180,7 +178,7 @@
         <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${teamTag(p)}${nfl.injury(p)}</div>
         ${researchLine(week.research[id])}
       </div>
-      <div class="nfl-game ${gameClass(n.g)}">
+      <div class="nfl-game ${n.g.state}">
         <b>${esc(gameText(n.g))}</b>
         <span>${esc(statLine(week.stats[id], p.position))}</span>
       </div>
@@ -226,7 +224,7 @@
         <div class="name"><button data-player="${esc(id)}">${esc(shortName(p))}</button>${nfl.injury(p)}</div>
         <div class="sub">${teamTag(p, { sep: '•' })}</div>
       </div>
-      <div class="mp-game ${gameClass(g)}"><b>${esc(at)}</b><span class="sub">${esc(when)}</span></div>
+      <div class="mp-game ${g.state}"><b>${esc(at)}</b><span class="sub">${esc(when)}</span></div>
       <div class="mp-pts">${points(s, p, n)}<span>proj ${f2(n.proj)}</span></div>
     </div>`;
   }
