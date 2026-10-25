@@ -75,6 +75,7 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "src/base.css",
         "src/panel.css",
         "src/epl/panel.css"
       ],

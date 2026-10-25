@@ -5,9 +5,17 @@
 (globalThis.SNP ||= {}).shared = (() => {
   const NOTICE_MS = 3000;
 
-  // The stylesheet is inlined into each shadow root, so nothing ever paints unstyled.
-  let css = null;
-  const stylesheet = () => (css ||= fetch(chrome.runtime.getURL('src/panel.css')).then((r) => r.text()));
+  // The stylesheet is inlined into each shadow root, so nothing ever paints unstyled:
+  // base.css (what the NBA/NFL and Premier League panels share) first, then the
+  // panel's own. One fetch per panel; the EPL entry calls this too.
+  const sheets = new Map();
+  function stylesheet(path = 'src/panel.css') {
+    if (!sheets.has(path)) {
+      sheets.set(path, Promise.all(['src/base.css', path].map((p) => fetch(chrome.runtime.getURL(p)).then((r) => r.text())))
+        .then((texts) => texts.join('\n')));
+    }
+    return sheets.get(path);
+  }
 
   // An element with an open shadow root holding the stylesheet and a `.root`
   // to render into: { host, shadow, root, styled }. `onStyled` runs once the
@@ -167,5 +175,5 @@
     tabs.find((t) => new RegExp(`^${page}$`, 'i').test(t.textContent.trim()))?.click();
   }
 
-  return { shadowHost, hideSleeper, flasher, activateOnKey, markMissingImages, safeStore, arrowStep, teamOrder, movedText, listen, openSleeperTab, nflPlayerCard };
+  return { stylesheet, shadowHost, hideSleeper, flasher, activateOnKey, markMissingImages, safeStore, arrowStep, teamOrder, movedText, listen, openSleeperTab, nflPlayerCard };
 })();
