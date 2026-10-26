@@ -2740,9 +2740,9 @@ test('the Premier League panel never mounts on an NBA league page', async () => 
 // Sleeper's league chat, reduced to a message's emoji reactions (inspected
 // 2026-10-25): its markup and its own rules for them, a component that acts
 // as Sleeper's does (every option in the row, the unused ones hidden until
-// hovered; the names popup 300ms after hovering an emoji, when every option
-// shows, gone 100ms after leaving), and a chat that keeps itself pinned to the
-// bottom whenever the component re-renders.
+// hovered; 300ms after hovering any emoji every option shows, with who picked
+// it if anyone did, until 100ms after leaving it), and a chat that keeps
+// itself pinned to the bottom whenever the component re-renders.
 const chatPage = () => {
   const options = ['thumbs', 'laugh', 'fist', 'cry', 'shock', 'think', 'heart', 'fire', 'poop', 'eyes', 'angry', 'cap', 'clown', 'goat'];
   const emoji = (i) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="9" fill="hsl(${i * 25},80%,60%)"/></svg>`)}`;
@@ -2778,7 +2778,7 @@ const chatPage = () => {
 <div class="chat">
   ${message('badonkeyds', 'The fantasy bball gods prevail.', { laugh: 2 })}
   ${message('PavScore', 'Kate and I have been texting about it', { laugh: 3 })}
-  ${message('OuiThePeople', 'Anyone wanna trade for Jalen Williams', null)}
+  ${message('OuiThePeople', 'Anyone wanna trade for Jalen Williams', { fire: 1 })}
 </div>
 <script>
   const chat = document.querySelector('.chat');
@@ -2793,7 +2793,7 @@ const chatPage = () => {
       for (const r of menu.children) {
         r.classList.toggle('hide', !r.classList.contains('reacted') && !open);
         r.querySelector('.reaction-members-container')?.remove();
-        if (r.dataset.o === open) r.insertAdjacentHTML('afterbegin', '<div class="reaction-members-container"><div class="reaction-members"><div class="members">'
+        if (r.dataset.o === open && r.classList.contains('reacted')) r.insertAdjacentHTML('afterbegin', '<div class="reaction-members-container"><div class="reaction-members"><div class="members">'
           + ['badonkeyds', 'louhow', 'dmacncheese'].map((n) => '<div class="user"><span class="avatar"></span>' + n + '</div>').join('') + '</div><div class="arrow"></div></div></div>');
       }
       // Sleeper's chat stays pinned to its bottom as it re-renders.
@@ -2804,7 +2804,7 @@ const chatPage = () => {
       r.addEventListener('mouseover', () => {
         clearTimeout(show);
         clearTimeout(close);
-        show = setTimeout(() => { open = r.classList.contains('reacted') ? r.dataset.o : null; render(); }, 300);
+        show = setTimeout(() => { open = r.dataset.o; render(); }, 300);
       });
       r.addEventListener('mouseout', () => {
         clearTimeout(show);
@@ -2816,7 +2816,7 @@ const chatPage = () => {
 </script>`;
 };
 
-test('chat: hovering an emoji reaction opens one row in place, moves nothing, and the names popup shows whole', async () => {
+test('chat: hovering an emoji reaction opens its rows below, in place, moves nothing, never flickers, and the names popup shows whole', async () => {
   documentBody = chatPage();
   // A reacted emoji's place, the chat's scroll, and the names popup, as seen.
   const look = () => page.evaluate(() => {
@@ -2864,26 +2864,70 @@ test('chat: hovering an emoji reaction opens one row in place, moves nothing, an
   assert.deepEqual(fixed.named.emoji, fixed.before.emoji);
   assert.equal(fixed.named.scroll, fixed.before.scroll, 'the chat never scrolls');
   assert.deepEqual(fixed.named.popup, { whole: true, cut: false }, 'every name shows, whole');
-  // Every option to pick from, in one row level with the picked emoji, inside the message and clear of its text.
-  const row = await page.evaluate(() => {
-    const group = document.querySelectorAll('.comment-group')[1];
+  // Every option to pick from: the picked emoji's row where it was, the rest in rows below, clear of the message's text.
+  const rows = () => page.evaluate((i) => {
+    const group = document.querySelectorAll('.comment-group')[i];
     const menu = group.querySelector('.reaction-menu').getBoundingClientRect();
     const options = [...group.querySelectorAll('.reaction')].map((el) => el.getBoundingClientRect());
     const picked = group.querySelector('.reaction.reacted').getBoundingClientRect();
+    const chat = document.querySelector('.chat').getBoundingClientRect();
     return {
-      options: options.length,
-      level: options.every((o) => Math.round(o.top) === Math.round(picked.top)),
-      inside: Math.round(menu.right) <= Math.round(group.querySelector('.text-container').getBoundingClientRect().right),
+      options: options.filter((o) => o.width === 40).length,
+      tops: [...new Set(options.map((o) => Math.round(o.top - picked.top)))].sort((x, y) => x - y),
       clear: Math.round(menu.top) >= Math.round(group.querySelector('pre').getBoundingClientRect().bottom),
-      widths: [...new Set(options.map((o) => Math.round(o.width)))],
+      inChat: menu.top >= chat.top && menu.bottom <= chat.bottom,
     };
-  });
-  assert.deepEqual({ ...row, widths: row.widths.length }, { options: 14, level: true, inside: true, clear: true, widths: 2 }, JSON.stringify(row));
+  }, 1);
+  assert.deepEqual(await rows(), { options: 14, tops: [0, 25, 50], clear: true, inChat: true });
   await page.screenshot({ path: `${OUT}chat-reactions.png`, clip: { x: 380, y: 40, width: 560, height: 400 } });
   // Leaving closes it, back to how it was.
   await page.mouse.move(10, 10);
   await page.waitForTimeout(400);
   assert.deepEqual((await look()).emoji, fixed.before.emoji);
   assert.equal(await page.locator('.reaction-members-container').count(), 0);
+
+  // Resting on an emoji nobody picked (Sleeper shows every option, with no names),
+  // then just below the open rows: it closes once and stays closed, never flickering.
+  await page.mouse.move(fixed.before.emoji[0] + 10, fixed.before.emoji[1] + 12);
+  await page.waitForTimeout(300);
+  const unused = await page.locator('.comment-group').nth(1).locator('.reaction').nth(4).boundingBox();
+  await page.mouse.move(unused.x + 20, unused.y + 12);
+  await page.waitForTimeout(1000);
+  const open = await page.locator('.comment-group').nth(1).locator('.reaction-menu').boundingBox();
+  // Every frame: the message's height and the chat's scroll.
+  await page.evaluate(() => {
+    const group = document.querySelectorAll('.comment-group')[1];
+    window.__frames = new Set();
+    const tick = () => {
+      window.__frames.add(`${Math.round(group.getBoundingClientRect().height)}/${document.querySelector('.chat').scrollTop}`);
+      if (!window.__stop) requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  await page.mouse.move(unused.x + 20, open.y + open.height + 2);
+  await page.waitForTimeout(1500);
+  const frames = await page.evaluate(() => { window.__stop = true; return [...window.__frames]; });
+  assert.deepEqual(frames, [`${fixed.before.group}/${fixed.before.scroll}`], 'the message never grows and the chat never scrolls');
+  assert.deepEqual((await look()).emoji, fixed.before.emoji, 'and where it was');
+  assert.equal((await look()).scroll, fixed.before.scroll);
+
+  // The chat's last message has no room below it: its rows still go below, out over what's under the chat.
+  await page.mouse.move(10, 10);
+  await page.waitForTimeout(400);
+  const last = await page.locator('.reaction.reacted').nth(2).boundingBox();
+  await page.mouse.move(last.x + 10, last.y + 12);
+  await page.waitForTimeout(450);
+  const out = await page.evaluate(() => {
+    const group = document.querySelectorAll('.comment-group')[2];
+    const menu = group.querySelector('.reaction-menu').getBoundingClientRect();
+    const chat = document.querySelector('.chat').getBoundingClientRect();
+    const picked = group.querySelector('.reaction.reacted').getBoundingClientRect();
+    // What's drawn at the last row's middle, past the chat's bottom: the row itself, not clipped.
+    const lastRow = document.elementFromPoint(menu.left + 30, menu.bottom - 14);
+    return { below: Math.round(menu.top) === Math.round(picked.top) - 3, pastChat: menu.bottom > chat.bottom, shown: Boolean(lastRow?.closest('.reaction-menu')), rows: Math.round(menu.height) };
+  });
+  assert.deepEqual(out, { below: true, pastChat: true, shown: true, rows: 81 }, 'all three rows, below, shown past the chat');
+  assert.deepEqual(await page.locator('.reaction.reacted').nth(2).boundingBox(), last, 'the picked emoji stays under the cursor');
+  await page.screenshot({ path: `${OUT}chat-reactions-last.png`, clip: { x: 380, y: 40, width: 560, height: 400 } });
   documentBody = LOGGED_OUT;
 });

@@ -5,22 +5,24 @@
 // line or two; the chat, pinned to its bottom, then scrolls by that much as
 // soon as the names popup re-renders it, moving everything again. That popup
 // sits in its message, which clips it (overflow: hidden), and cuts names at 64px.
-// Here an open row is an overlay instead: one line from where it sits, the
-// emoji already picked first and where they were, the options after them
-// narrowed to fit the message's width, so nothing goes over the message's text
-// and the message keeps its height: nothing on the page moves. The names popup
-// comes out of the message, as wide as the names. A row is open while hovered,
-// and while Sleeper shows its names popup (it lingers a moment after the cursor leaves).
+// Here an open row is an overlay instead: from where it sits, the emoji already
+// picked first and where they were, the rest in rows below, over whatever is
+// under the message, which keeps its height, so nothing on the page moves.
+// Without room below in the chat (its last message), the rows are pinned to
+// the screen there instead and go on below, over the box you type in; only
+// without room in the window either do they go above. The names popup comes
+// out of the message, as wide as the names.
+// A row is open while hovered, and while Sleeper itself shows every option:
+// for a moment after the cursor leaves, as its names popup lingers (with or
+// without names, which only a picked emoji has). Let go then, Sleeper's own
+// wide row would come back in place, under the cursor, and open it again, and so on.
 //   chat() -> { destroy }
 (globalThis.SNP ||= {}).chat = () => {
   const ROW = '.comment-reactions-container';
-  const OPEN = `${ROW}:is([data-snp-open], :has(.reaction-members-container))`;
   // An option nobody picked: its count is empty (Sleeper's `hide` class comes
-  // off every option while the names popup shows, so it can't tell them apart).
+  // off every option while it shows them all, so it can't tell them apart).
   const UNUSED = '.reaction:has(.reaction-count:empty)';
-  // An option's width (Sleeper's), and the narrowest one opening up may get.
-  const OPTION_W = 40;
-  const MIN_W = 24;
+  const OPEN = `${ROW}:is([data-snp-open], :has(.reaction:not(.hide) > .reaction-count:empty), :has(.reaction-members-container))`;
   // The open row's padding either side, and how far left of the row it starts so its emoji stay put.
   const PAD = 6;
   // Only while the extension runs (data-snp-chat on <html>).
@@ -37,18 +39,19 @@
     ${on} ${OPEN} .reaction-menu {
       position: absolute;
       z-index: 3;
+      top: 0;
       left: -${PAD}px;
-      bottom: 0;
       box-sizing: content-box;
       width: max-content;
-      max-width: none;
-      flex-wrap: nowrap;
       padding: 3px ${PAD}px !important;
       border-radius: 10px;
       background: rgb(52, 62, 82);
       box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 18px rgba(0, 0, 0, 0.45);
     }
-    ${on} ${OPEN} .reaction-menu ${UNUSED} { width: var(--snp-option-w, ${OPTION_W}px) !important; }
+    /* No room below in the chat: pinned to the screen where it sits, so it can go on below the chat. */
+    ${on} ${OPEN}[data-snp-out] .reaction-menu { position: fixed; top: var(--snp-y); left: var(--snp-x); }
+    /* Nor in the window: the rows go above, the picked emoji's row staying put at the bottom. */
+    ${on} ${OPEN}[data-snp-up] .reaction-menu { top: auto; bottom: 0; flex-wrap: wrap-reverse; }
     /* Who picked it: centred over the emoji, as wide as their names. */
     ${on} ${ROW} .reaction-members-container { z-index: 4; left: 50%; transform: translateX(-50%); }
     ${on} ${ROW} .reaction-members { box-sizing: border-box; width: max-content; min-width: 80px; max-width: 220px; border-radius: 8px; }
@@ -59,25 +62,50 @@
   (document.head || document.documentElement).append(style);
   document.documentElement.toggleAttribute('data-snp-chat', true);
 
+  // The chat's scrolled box around a message: its first ancestor that clips.
+  function scroller(el) {
+    for (let e = el?.parentElement; e && e !== document.body; e = e.parentElement) {
+      if (getComputedStyle(e).overflowY !== 'visible') return e;
+    }
+    return document.documentElement;
+  }
+
+  // Pins an open row's rows to the screen where the row is.
+  function pin(row) {
+    const box = row.getBoundingClientRect();
+    row.style.setProperty('--snp-x', `${box.left - PAD}px`);
+    row.style.setProperty('--snp-y', `${box.top}px`);
+  }
+
   // Opens a row from where it sits: its height as it is closed, held while
-  // it's open, and the width the unused options get to fit the message's.
+  // it's open, and its rows below it (pinned to the screen when the chat has no
+  // room below), or above when the window has none either.
   function enter(e) {
     const row = e.target instanceof Element && e.target.closest(ROW);
     if (!row || row.hasAttribute('data-snp-open')) return;
-    if (!row.matches(OPEN)) {
+    const opening = !row.matches(OPEN);
+    if (opening) {
       row.toggleAttribute('data-snp-measure', true);
-      const box = row.getBoundingClientRect();
+      row.style.setProperty('--snp-reactions-h', `${row.getBoundingClientRect().height}px`);
       row.removeAttribute('data-snp-measure');
-      const menu = row.querySelector('.reaction-menu');
-      const unused = menu?.querySelectorAll(UNUSED).length || 0;
-      const picked = (menu?.children.length || 0) - unused;
-      // Within the message's text column, so it ends where the text does.
-      const room = (row.closest('.text-container') ?? row.parentElement).getBoundingClientRect().right - box.left - PAD;
-      const width = Math.max(MIN_W, Math.min(OPTION_W, Math.floor((room - picked * OPTION_W) / Math.max(1, unused))));
-      row.style.setProperty('--snp-reactions-h', `${box.height}px`);
-      row.style.setProperty('--snp-option-w', `${width}px`);
+      row.removeAttribute('data-snp-out');
+      row.removeAttribute('data-snp-up');
     }
     row.toggleAttribute('data-snp-open', true);
+    if (!opening) return;
+    // Laid out below first, then moved as needed (no paint in between).
+    const menu = row.querySelector('.reaction-menu');
+    if (!menu || menu.getBoundingClientRect().bottom <= scroller(row.closest('.comment-group') ?? row).getBoundingClientRect().bottom) return;
+    pin(row);
+    row.toggleAttribute('data-snp-out', true);
+    if (menu.getBoundingClientRect().bottom <= innerHeight) return;
+    row.removeAttribute('data-snp-out');
+    row.toggleAttribute('data-snp-up', true);
+  }
+
+  // A pinned row's rows follow it if the page scrolls while it's open.
+  function follow() {
+    for (const row of document.querySelectorAll(`${ROW}[data-snp-out]`)) pin(row);
   }
 
   function leave(e) {
@@ -89,10 +117,12 @@
   // Capture, so the row is held before the hover paints.
   document.addEventListener('mouseover', enter, true);
   document.addEventListener('mouseout', leave, true);
+  document.addEventListener('scroll', follow, true);
 
   function destroy() {
     document.removeEventListener('mouseover', enter, true);
     document.removeEventListener('mouseout', leave, true);
+    document.removeEventListener('scroll', follow, true);
     document.documentElement.removeAttribute('data-snp-chat');
     style.remove();
   }

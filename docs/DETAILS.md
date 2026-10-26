@@ -306,7 +306,9 @@ Sleeper's chat (any page) keeps every emoji option in a message's reaction row, 
 That moves the emoji under the cursor (an option before it opens up) and makes the message a line or two taller; the chat, pinned to its bottom, then scrolls by that much once the names popup re-renders it.
 The popup itself sits inside its message, which clips it, and cuts names at 64px.
 
-- An open row is an overlay instead, one line from where it sits: the emoji already picked first and where they were, then every other option, narrowed to fit the message's text column (24 to 40px each). Nothing goes over the message's text, and the message keeps its height, so nothing on the page moves and the chat never scrolls.
+- An open row is an overlay instead: from where it sits, the emoji already picked first and where they were, the rest in rows below, over whatever is under the message (the next message), which keeps its height. Nothing on the page moves and the chat never scrolls.
+- The chat's last message has no room below in the chat, so its rows are pinned to the screen there and go on below, over the box you type in; only without room in the window either do they go above.
+- It stays open while Sleeper itself shows every option (for a moment after the cursor leaves an emoji, with or without names). Let go then, Sleeper's own wide row would come back in place under the cursor and open it again, over and over.
 - Widths change at once and only the pop-in animates, so closing doesn't reflow either.
 - Who reacted shows above the emoji, outside the message, as wide as the names.
 - It's all one stylesheet switched on by `data-snp-chat` on `<html>`, plus a hover handler that holds the row's height while it's open (`src/chat.js`).
