@@ -285,7 +285,8 @@ button.optimize:hover:not(:disabled) { background: color-mix(in srgb, var(--acce
 .mu-forms .theirs { text-align: right; }
 .mu-forms .sub { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; text-align: center; line-height: 1.1; }
 @container (max-width: 640px) { .mu-forms { grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); } }
-.slot.pair { display: grid; grid-template-columns: 1fr 1fr; padding: 0; overflow: hidden; background: transparent; }
+/* Both roles side by side, each half filled with its color (.slot centers its contents, which would shrink the halves to their letters). */
+.slot.pair { display: grid; grid-template-columns: 1fr 1fr; place-items: stretch; padding: 0; overflow: hidden; background: transparent; }
 .slot.pair b { display: grid; place-items: center; height: 100%; font-size: 11px; }
 .slot.pair .f { background: var(--f); }
 .slot.pair .m { background: var(--m); }
