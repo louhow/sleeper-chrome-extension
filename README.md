@@ -56,6 +56,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Match, Team, Players and League tabs in place of Sleeper's "not supported on web yet" page.
 - Lineup swaps with formations, IR moves, Optimize lineup.
 - Free-agent adds, waiver bids and drops.
+- Players tab: a Last 5 column (the last five gameweeks, a mark each in its score's color, opponent and points on hover; sorts by points per match).
 - Player card with next match, projections, game log, career and history.
 
 **All sports**

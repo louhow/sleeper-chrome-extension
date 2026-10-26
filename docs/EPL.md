@@ -12,6 +12,10 @@ The extension fills that page with the mobile app's tabs.
   An Optimize button proposes the best projected lineup and saves it once you confirm.
 - **Players**: available players, trending adds and drops, season leaders, your team, and search, filtered by position.
   Add free agents, place waiver bids (with FAAB) and drop players, with the same roster and budget checks Sleeper's own dialog makes.
+  A Last 5 column shows each player's last five gameweeks, a mark each: colored by the gameweek's points (both matches of a double gameweek add up), gray when the player didn't play, faint when the club had no match.
+  Hovering a mark shows the gameweek, the opponent and the points, and the player's points per match over those gameweeks; tapping the column's header sorts by that.
+  The gameweeks run through the one on now once a match in it has kicked off.
+  Score colors are the thirds of the rostered players' gameweeks over the same five, per position (Sleeper's public matchups, which NBA and NFL take them from, answer 404 for EPL).
 - **League**: every matchup this week, the standings table and the week's transactions.
 - **Player card**: bio, next match, projections for the coming gameweeks, news, a per-match game log with heat-shaded stats, career totals and the player's transaction history in your league.
 - **API**: a log of every call the extension makes, with timing, size and a JSON preview.
@@ -41,7 +45,7 @@ The panel waits for that attribute to name the league as `clubsoccer:epl` before
   Soccer scoring is keyed by position and stat (`pos_m_g` is a midfielder's goals) and Sleeper's stat rows carry the same keys, so points are a weighted sum.
   Checked against Sleeper's own `pts_std` for standard-scoring leagues.
 - `src/epl/model.js`: pure rules.
-  Matches per gameweek (a club can play twice), weekly totals, which positions each slot accepts (`FM_FLEX` takes F or M, and so on), lineup and IR moves, formations, the lineup optimizer, standings, club form and a best guess at waiver status.
+  Matches per gameweek (a club can play twice), weekly totals, the Players tab's Last 5 (`recentWeeks`, `recentForm`, `recentMarks`; score colors by `SNP.model.scoreTiers` and `scoreTier`), which positions each slot accepts (`FM_FLEX` takes F or M, and so on), lineup and IR moves, formations, the lineup optimizer, standings, club form and a best guess at waiver status.
   The optimizer is `SNP.model.solveLineup` given soccer's slot rules; like NBA and NFL it never leaves a slot empty to dodge a negative projection.
   Sleeper's win-probability formula and the FAAB and roster-room checks for claims come from `SNP.model` too.
 - `src/epl/ui.js`: shared render helpers and the resolved lineup for a roster and week.
@@ -65,7 +69,7 @@ Any player a flex slot accepts can be moved into it; the formation changes with 
 | `GET /v1/state/clubsoccer:epl` | Current gameweek |
 | `GET /v1/players/clubsoccer:epl` | Names, clubs, positions, injuries (~2.3 MB, cached 12h) |
 | `GET /schedule/clubsoccer:epl/regular/<season>` | Every gameweek's fixtures (last week of the season, fallback for kickoff data) |
-| `GET /projections/clubsoccer:epl/<season>/<week>`, `/stats/...` | Per-match projected and actual stats, scored with the league's settings |
+| `GET /projections/clubsoccer:epl/<season>/<week>`, `/stats/...` | Per-match projected and actual stats, scored with the league's settings; the Players tab's Last 5 reads `/stats/...` for its five gameweeks, once each |
 | `GET /players/clubsoccer:epl/research/regular/<season>/<week>` | Rostered and start percentages |
 | `GET /v1/players/clubsoccer:epl/trending/add`, `/drop` | Trending players |
 | `GET /stats/clubsoccer:epl/<season>` | Season totals for Leaders and the FPTS column |
@@ -88,7 +92,7 @@ Logged out, the Match and League tabs show lineups but no pairings.
 
 ## Development
 
-Unit tests: `test/unit/epl-model.test.js` and `test/unit/epl-ui.test.js` (run with `npm test`), loaded by `loadSep` in `test/unit/load.js`.
+Unit tests: `test/unit/epl-model.test.js`, `test/unit/epl-ui.test.js` and `test/unit/epl-players-view.test.js` (run with `npm test`), loaded by `loadSep` in `test/unit/load.js`.
 The end-to-end suite checks that the panel never mounts on an NBA league page; there is no end-to-end test of the panel itself yet.
 
 `test/epl/harness.html` is a stand-in for Sleeper's EPL league page.

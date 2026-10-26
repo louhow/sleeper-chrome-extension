@@ -361,8 +361,74 @@
     return out;
   }
 
+
+  // The Players tab's Last 5. The gameweeks it covers: the five through the one
+  // on now once a match in it has kicked off, else through the one before.
+  function recentWeeks(current, start, games, now = Date.now()) {
+    const end = games.some((g) => started(g, now)) ? current : current - 1;
+    const weeks = [];
+    for (let w = Math.max(start, end - 4); w <= end; w++) weeks.push(w);
+    return weeks;
+  }
+
+  // A stat line from a match the player played in (an unused substitute's has no minutes).
+  const playedIn = (stats) => stats?.min > 0 || stats?.gp > 0;
+
+  // Each player's gameweeks (both matches of a double gameweek add up), points
+  // per match over the matches played, and score tiers from the rostered
+  // players' gameweeks, by position (core model's scoreTiers).
+  //   weeks: gameweeks, oldest first; actual: each one's pointsByGame;
+  //   games: each one's games; rostered: player ids; positionOf(id).
+  function recentForm({ weeks, actual, games, rostered, positionOf }) {
+    const points = {};
+    const total = {};
+    const matches = {};
+    weeks.forEach((w, i) => {
+      for (const [id, byGame] of Object.entries(actual[i] || {})) {
+        const played = Object.entries(byGame).filter(([, x]) => playedIn(x.stats));
+        if (!played.length) continue;
+        const fpts = played.reduce((sum, [, x]) => sum + x.points, 0);
+        (points[id] ||= {})[w] = { fpts, games: played.map(([gameId, x]) => ({ id: gameId, opponent: x.opponent })) };
+        total[id] = (total[id] || 0) + fpts;
+        matches[id] = (matches[id] || 0) + played.length;
+      }
+    });
+    const avg = Object.fromEntries(Object.keys(total).map((id) => [id, total[id] / matches[id]]));
+    const samples = [];
+    for (const id of rostered || []) {
+      for (const x of Object.values(points[id] || {})) samples.push({ position: positionOf(id), points: x.fpts });
+    }
+    const tiers = core.scoreTiers(samples, { byPosition: true });
+    return { weeks, points, avg, matches, tiers, games: games.map((list) => list || []) };
+  }
+
+  // One mark per gameweek for a player whose club is `team`: 'none' (no match
+  // that gameweek), 'left' (a match still to play), 'live', 'done' (with its points and
+  // score tier) or 'dnp' (the club played, the player didn't), and the matches:
+  // [{ opponent (abbreviation), home, start, date }].
+  function recentMarks(form, id, team, position, now = Date.now()) {
+    return form.weeks.map((week, i) => {
+      const score = form.points[id]?.[week];
+      const list = form.games[i];
+      const fixtures = score
+        ? score.games.map((x) => {
+          const g = list.find((game) => game.id === x.id);
+          return g && { g, home: x.opponent ? g.away === x.opponent : g.home === team };
+        }).filter(Boolean)
+        : list.filter((g) => g.home === team || g.away === team).map((g) => ({ g, home: g.home === team }));
+      const matches = fixtures.map(({ g, home }) => ({ opponent: home ? g.awayAbbr : g.homeAbbr, home, start: g.start, date: g.date }));
+      const live = fixtures.some(({ g }) => started(g, now) && !finished(g));
+      const kind = !fixtures.length && !score ? 'none'
+        : live ? 'live'
+        : score ? 'done'
+        : fixtures.some(({ g }) => !started(g, now)) ? 'left'
+        : 'dnp';
+      return { week, kind, matches, fpts: score?.fpts ?? null, tier: score ? core.scoreTier(score.fpts, form.tiers, position) : '' };
+    });
+  }
+
   return {
-    clubForms,
+    clubForms, recentWeeks, recentForm, recentMarks,
     gamesFromScores, gamesByTeam, pointsByGame, playerGames, weekTotals, started, finished,
     slotAccepts, fits, reserveEligible, spotOf, spotRefs, swapTargets, applyMove, describeMove,
     parseFormation, savedFormation, slotLabels, formationOf, FORMATION_ORDER,

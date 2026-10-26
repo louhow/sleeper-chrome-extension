@@ -1,8 +1,8 @@
 // Players tab: available players, trending adds and drops, season leaders and
 // search, each with an add (or drop) button. Pure: state -> HTML.
 (globalThis.SEP ||= {}).playersView = (() => {
-  const { playerGames, weekTotals } = globalThis.SEP.model;
-  const { esc, f2, f1, pct, teamName, ownerOf, owns, playerLine, loading, errorMsg } = globalThis.SEP.ui;
+  const { playerGames, weekTotals, recentMarks } = globalThis.SEP.model;
+  const { esc, f2, f1, pct, teamName, ownerOf, owns, playerLine, loading, errorMsg, weekday, gameTime } = globalThis.SEP.ui;
   const TABS = [['available', 'Available'], ['trending', 'Trending'], ['leaders', 'Leaders'], ['mine', 'My Team'], ['all', 'All']];
   const POSITIONS = ['ALL', 'F', 'M', 'D', 'GK'];
   const PAGE = 50;
@@ -28,7 +28,7 @@
         ${trendToggle}${faLabel}
       </div>
       ${s.season == null && (t.mode === 'leaders' || t.mode === 'all') ? loading('Loading season stats…') : ''}
-      <div class="plist-head"><span>Player</span><span class="col">Owner</span><span class="col num">Proj</span><span class="col num" title="Fantasy points this season">FPTS</span><span class="col num">Own%</span><span class="col act"></span></div>
+      <div class="plist-head"><span>Player</span><span class="col">Owner</span>${sortHead(t, 'last5', 'Last 5', 'Points per match over the last five gameweeks')}<span class="col num">Proj</span><span class="col num" title="Fantasy points this season">FPTS</span><span class="col num">Own%</span><span class="col act"></span></div>
       ${shown.length ? shown.map((row) => playerRow(s, row)).join('') : '<p class="msg">No players match.</p>'}
       ${list.length > shown.length ? `<button class="more" data-more>Show more (${list.length - shown.length} left)</button>` : ''}`;
   }
@@ -68,7 +68,7 @@
       ids = trend.map((x) => x.player_id).filter((id) => s.players[id] && s.players[id].position !== 'DEF');
       const counts = Object.fromEntries(trend.map((x) => [x.player_id, x.count]));
       order = (a, b) => (counts[b] || 0) - (counts[a] || 0);
-      return ids.filter(byPos).filter(byQuery).sort(order).map((id) => ({ id, count: counts[id] }));
+      return bySort(s, ids.filter(byPos).filter(byQuery).sort(order)).map((id) => ({ id, count: counts[id] }));
     }
     ids = pool(s);
     if (t.mode === 'available') ids = ids.filter((id) => !owned.has(id));
@@ -82,7 +82,46 @@
       if (query && t.mode !== 'leaders') order = (a, b) => (s.players[a].rank ?? 1e9) - (s.players[b].rank ?? 1e9);
       ids = [...ids].sort(order);
     }
-    return ids.map((id) => ({ id }));
+    return bySort(s, ids).map((id) => ({ id }));
+  }
+
+  // A column header that sorts the list (best first); tapped again, the list goes back to its own order.
+  function sortHead(t, key, label, title) {
+    const on = t.sort === key;
+    return `<button class="col sort${on ? ' active' : ''}" data-psort="${key}" title="${esc(title)}" aria-pressed="${on}">${label}${on ? ' ▾' : ''}</button>`;
+  }
+
+  // The list by the column picked; players with nothing in it last, in the list's own order.
+  function bySort(s, ids) {
+    if (s.playersTab.sort !== 'last5' || !s.recent) return ids;
+    const key = (id) => s.recent.avg[id] ?? -Infinity;
+    return [...ids].sort((a, b) => key(b) - key(a));
+  }
+
+  // A player's last five gameweeks: a mark each, colored by score, with what
+  // the hover card shows (recentTip) in its data attributes.
+  function recentStrip(s, id) {
+    if (!s.recent) return '<span class="last5 empty">–</span>';
+    const p = s.players[id] || {};
+    const matches = s.recent.matches[id] || 0;
+    const count = matches ? `${f1(s.recent.avg[id])} a game over ${matches} match${matches === 1 ? '' : 'es'}` : 'No matches in these gameweeks';
+    const marks = recentMarks(s.recent, id, p.team, p.position, s.now).map((m) => {
+      const versus = m.matches.map((x) => `${x.home ? 'vs' : '@'} ${x.opponent}`).join(', ');
+      const kickoff = m.matches.find((x) => x.start || x.date);
+      const note = m.kind === 'none' ? 'No match'
+        : m.kind === 'left' ? (kickoff ? `${weekday(kickoff.date || kickoff.start)}${kickoff.start ? ` ${gameTime(kickoff.start)}` : ''}` : 'Still to play')
+        : m.kind === 'live' ? (m.fpts != null ? `${f1(m.fpts)} so far` : 'On now')
+        : m.kind === 'done' ? f1(m.fpts)
+        : 'Didn\'t play';
+      const tier = m.tier && m.kind !== 'left' ? ` data-tier="${m.tier}"` : '';
+      return `<i class="${m.kind}${m.kind === 'done' && m.tier ? ` ${m.tier}` : ''}" data-tip="${esc(`GW ${m.week}${versus ? ` ${versus}` : ''}`)}" data-note="${esc(note)}"${tier} data-count="${esc(count)}"></i>`;
+    }).join('');
+    return `<span class="last5" role="img" aria-label="${esc(`Last 5: ${count}`)}">${marks}</span>`;
+  }
+
+  // The hover card for a Last 5 mark, from its data attributes.
+  function recentTip({ tip, note, tier, count }) {
+    return `<div class="tip-head"><b>${esc(tip)}</b><span class="${tier ? `tip-score ${esc(tier)}` : ''}">${esc(note)}</span></div><div class="tip-foot">${esc(count)}</div>`;
   }
 
   function waiverStatus(s, id) {
@@ -103,6 +142,7 @@
     return `<article class="prow">
       ${playerLine(s, id, { sub })}
       <span class="col">${ownerText}</span>
+      <span class="col">${recentStrip(s, id)}</span>
       <span class="col num">${f2(projOf(s, id))}</span>
       <span class="col num">${f1(seasonPts(s, id))}</span>
       <span class="col num">${pct(research?.owned)}</span>
@@ -110,5 +150,5 @@
     </article>`;
   }
 
-  return { render, PAGE };
+  return { render, recentTip, PAGE };
 })();

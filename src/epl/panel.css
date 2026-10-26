@@ -346,7 +346,7 @@ th.num, td.num { text-align: right; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .plist-head, .prow {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 120px 56px 56px 52px 40px;
+  grid-template-columns: 32px minmax(0, 1fr) 120px 38px 56px 56px 52px 40px;
   align-items: center;
   column-gap: 10px;
 }
@@ -365,10 +365,36 @@ th.num, td.num { text-align: right; }
 .act.drop:hover { background: color-mix(in srgb, var(--danger) 35%, transparent) !important; }
 .act.trade { background: rgba(255, 255, 255, 0.06); color: var(--muted); font-size: 14px; }
 .more { display: block; margin: 12px auto; }
+.plist-head .sort { padding: 0; border-radius: 0; background: none !important; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; white-space: nowrap; }
+.plist-head .sort:hover, .plist-head .sort.active { color: var(--text); }
+/* Last 5: a mark per gameweek, colored by its score's tier. */
+.last5 { display: flex; gap: 2px; height: 14px; align-items: stretch; }
+.last5.empty { color: var(--muted); align-items: center; }
+.last5 i { flex: 0 0 6px; border-radius: 1.5px; background: rgba(185, 196, 212, 0.6); cursor: default; }
+.last5 i.none { background: rgba(255, 255, 255, 0.04); }
+.last5 i.dnp { background: rgba(185, 196, 212, 0.22); }
+.last5 i.left { background: rgba(225, 232, 242, 0.85); }
+.last5 i.live { background: #ff5b6e; }
+.last5 i.done.green { background: rgb(84, 132, 100); }
+.last5 i.done.yellow { background: rgb(128, 122, 78); }
+.last5 i.done.red { background: rgb(150, 72, 96); }
+.last5 i:hover { outline: 1px solid rgba(255, 255, 255, 0.8); outline-offset: 1px; }
+.week-tip {
+  display: none; position: fixed; z-index: 10; padding: 7px 10px; border-radius: 8px; pointer-events: none; white-space: nowrap;
+  background: #0f1420; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); font-size: 13px; color: var(--text);
+}
+.week-tip .tip-head { display: flex; align-items: center; gap: 8px; }
+.week-tip .tip-head span { color: rgb(185, 196, 212); }
+.week-tip .tip-score { padding: 0 5px; border-radius: 4px; color: #fff !important; font-weight: 800; font-variant-numeric: tabular-nums; }
+.week-tip .tip-score.green { background: rgba(84, 132, 100, 0.95); }
+.week-tip .tip-score.yellow { background: rgba(128, 122, 78, 0.95); }
+.week-tip .tip-score.red { background: rgba(150, 72, 96, 0.95); }
+.week-tip .tip-foot { margin-top: 3px; font-size: 11px; color: var(--muted); }
 @container (max-width: 640px) {
-  .plist-head, .prow { grid-template-columns: 32px minmax(0, 1fr) 56px 40px; }
+  .plist-head, .prow { grid-template-columns: 32px minmax(0, 1fr) 38px 56px 40px; }
   .plist-head .col:not(.act), .prow .col:not(.act) { display: none; }
-  .plist-head .col.num:nth-child(3), .prow .col.num:nth-child(5) { display: block; }
+  /* Last 5 and FPTS stay. */
+  .plist-head .col:nth-child(3), .prow .col:nth-child(4), .plist-head .col.num:nth-child(5), .prow .col.num:nth-child(6) { display: block; }
 }
 
 /* Dialogs in their own host over the whole page. */

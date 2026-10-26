@@ -105,14 +105,16 @@
       claims: null,
       trending: null,
       season: null,
+      recent: null, // the Players tab's Last 5 (model.recentForm)
       cards: {},
       modal: null,
-      playersTab: { mode: 'available', position: 'ALL', query: '', trend: 'add', shown: 0, freeAgentsOnly: false },
+      playersTab: { mode: 'available', position: 'ALL', query: '', trend: 'add', shown: 0, freeAgentsOnly: false, sort: null },
       waiverStatus: (id) => waiverStatus(id),
     };
     let destroyed = false;
     let frame = 0;
     let seasonLoading = false;
+    let recentLoading = null; // the league whose Last 5 is loading
     const api = createApi(schedule);
     const leagueData = loaders.leagueData(api, leagueId, 'sleeper-epl');
 
@@ -325,6 +327,7 @@
         schedule: scheduleRows || [],
         clubs: model.clubForms(scheduleRows || []),
         weeks: {},
+        recent: null,
         cards: {},
       });
       const current = Number(sportState.display_week || sportState.week || state.minWeek);
@@ -337,7 +340,10 @@
       if (state.currentWeek > state.minWeek) loadWeek(state.currentWeek - 1).catch(() => {});
       loadClaims();
       loadTrending();
-      if (state.page === 'players') loadSeason();
+      if (state.page === 'players') {
+        loadSeason();
+        loadRecent();
+      }
     }
 
     async function loadWeek(week) {
@@ -423,6 +429,37 @@
         state.season = { stats: {} };
       } finally {
         seasonLoading = false;
+        schedule();
+      }
+    }
+
+    // The Players tab's Last 5: the stat rows of the five gameweeks through the
+    // latest one under way (a gameweek already loaded is read from there),
+    // loaded once, on demand.
+    async function loadRecent() {
+      const { league } = state;
+      if (state.recent || !league || recentLoading === league) return;
+      recentLoading = league;
+      try {
+        const seasonType = league.season_type || 'regular';
+        const gamesOf = (w) => state.weeks[w]?.games || model.gamesFromScores(state.schedule.filter((g) => g.week === w));
+        const weeks = model.recentWeeks(state.currentWeek, state.minWeek, gamesOf(state.currentWeek), Date.now());
+        const settings = league.scoring_settings || {};
+        const actual = await Promise.all(weeks.map((w) => state.weeks[w]?.actual
+          || api.get(`/stats/${SPORT}/${league.season}/${w}?season_type=${seasonType}`).catch(() => [])
+            .then((rows) => model.pointsByGame(rows || [], settings, scoring.scoreStats))));
+        if (league !== state.league) return;
+        state.recent = model.recentForm({
+          weeks,
+          actual,
+          games: weeks.map(gamesOf),
+          rostered: state.rosters.flatMap((r) => r.players || []),
+          positionOf: (id) => state.players[id]?.position,
+        });
+      } catch (err) {
+        console.warn('[sleeper-epl] last five gameweeks unavailable', err);
+      } finally {
+        if (recentLoading === league) recentLoading = null;
         schedule();
       }
     }
@@ -767,7 +804,10 @@
       state.tab = 'page';
       state.swap = null;
       state.notice = null;
-      if (page === 'players') loadSeason();
+      if (page === 'players') {
+        loadSeason();
+        loadRecent();
+      }
       schedule();
     }
 
@@ -797,6 +837,12 @@
       const pos = e.target.closest('[data-pos]');
       if (pos) {
         state.playersTab.position = pos.dataset.pos;
+        state.playersTab.shown = 0;
+        return schedule();
+      }
+      const sort = e.target.closest('[data-psort]');
+      if (sort) {
+        state.playersTab.sort = state.playersTab.sort === sort.dataset.psort ? null : sort.dataset.psort;
         state.playersTab.shown = 0;
         return schedule();
       }
@@ -854,6 +900,24 @@
     root.addEventListener('error', (e) => {
       if (e.target.tagName === 'IMG') e.target.classList.add('missing');
     }, true);
+    // The Last 5 strip's hover card, beside the panel's root so a render doesn't
+    // take it down and a row doesn't clip it.
+    const tip = document.createElement('div');
+    tip.className = 'week-tip';
+    shadow.append(tip);
+    root.addEventListener('mouseover', (e) => {
+      const mark = e.target.closest('.last5 i[data-tip]');
+      if (!mark) {
+        tip.style.display = 'none';
+        return;
+      }
+      tip.innerHTML = playersView.recentTip(mark.dataset);
+      tip.style.display = 'block';
+      const box = mark.getBoundingClientRect();
+      tip.style.left = `${Math.round(Math.max(4, box.left + box.width / 2 - tip.offsetWidth / 2))}px`;
+      tip.style.top = `${Math.round(box.top - tip.offsetHeight - 8)}px`;
+    });
+    root.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
 
     layerRoot.addEventListener('click', (e) => {
       const m = state.modal;

@@ -267,3 +267,61 @@ test('the rules that are the same as NBA and NFL come from the core model', () =
     assert.equal(sep.model[name], SNP.model[name], name);
   }
 });
+
+// Last 5: club 1 plays gameweek 1 at home, has no match in gameweek 2, and plays
+// twice in gameweek 3 (away, finished; at home, still to come).
+const recent = (() => {
+  const gw = [
+    model.gamesFromScores([score('a', '2026-08-16', '1', '2', { status: 'complete', start_time: NOW - 30 * 864e5 })]),
+    model.gamesFromScores([score('b', '2026-08-23', '3', '4', { status: 'complete', start_time: NOW - 20 * 864e5 })]),
+    model.gamesFromScores([score('c', '2026-10-24', '3', '1', { status: 'complete', start_time: NOW - 3 * HOUR }), score('d', '2026-10-27', '1', '4')]),
+  ];
+  const row = (player_id, game_id, opponent, stats) => ({ player_id, game_id, opponent, stats });
+  const actual = [
+    [row('f1', 'a', '2', { min: 90, pos_f_g: 1 }), row('bench', 'a', '2', {}), row('m1', 'a', '2', { min: 20, pos_m_g: 1 })],
+    [row('x', 'b', '4', { min: 90, pos_f_g: 3 })],
+    [row('f1', 'c', '3', { min: 90, pos_f_g: 2 }), row('m1', 'c', '3', { min: 0 })],
+  ].map((rows) => model.pointsByGame(rows, settings, scoring.scoreStats));
+  const positions = { f1: 'F', m1: 'M', x: 'F', bench: 'F' };
+  return model.recentForm({ weeks: [1, 2, 3], actual, games: gw, rostered: ['f1', 'm1'], positionOf: (id) => positions[id] });
+})();
+
+test('last 5: the five gameweeks through the one under way, else through the one before', () => {
+  const upcoming = model.gamesFromScores([score('z', '2026-10-31', '1', '2')]);
+  assert.deepEqual(plain(model.recentWeeks(9, 1, upcoming, NOW)), [4, 5, 6, 7, 8]);
+  assert.deepEqual(plain(model.recentWeeks(9, 1, games, NOW)), [5, 6, 7, 8, 9], 'a match this gameweek has kicked off');
+  assert.deepEqual(plain(model.recentWeeks(3, 1, upcoming, NOW)), [1, 2], 'never before the league starts');
+  assert.deepEqual(plain(model.recentWeeks(9, 7, upcoming, NOW)), [7, 8]);
+});
+
+test('last 5: points per gameweek and per match, only for matches played', () => {
+  assert.deepEqual(plain(recent.points.f1), {
+    1: { fpts: 10, games: [{ id: 'a', opponent: '2' }] },
+    3: { fpts: 20, games: [{ id: 'c', opponent: '3' }] },
+  });
+  assert.equal(recent.avg.f1, 15);
+  assert.equal(recent.matches.f1, 2);
+  assert.equal(recent.points.bench, undefined, 'an unused substitute played no match');
+  assert.deepEqual(Object.keys(recent.points.m1), ['1'], 'no minutes in gameweek 3');
+  assert.equal(recent.avg.m1, 5);
+});
+
+test('last 5: score tiers from the rostered players\' gameweeks, by the core model\'s rules', () => {
+  const samples = [{ position: 'F', points: 10 }, { position: 'M', points: 5 }, { position: 'F', points: 20 }];
+  assert.deepEqual(plain(recent.tiers), plain(loadSep().SNP.model.scoreTiers(samples, { byPosition: true })));
+  assert.equal(recent.tiers.games, 3, 'the unrostered player is left out');
+});
+
+test('last 5: a mark per gameweek, with its matches', () => {
+  const marks = model.recentMarks(recent, 'f1', '1', 'F', NOW);
+  assert.deepEqual(plain(marks.map((m) => [m.week, m.kind, m.fpts, m.tier])), [[1, 'done', 10, 'yellow'], [2, 'none', null, ''], [3, 'done', 20, 'green']]);
+  assert.deepEqual(plain(marks[0].matches), [{ opponent: 'T2', home: true, start: NOW - 30 * 864e5, date: '2026-08-16' }]);
+  assert.deepEqual(plain(marks[2].matches.map((m) => [m.opponent, m.home])), [['T3', false]], 'only the match played');
+  const m1 = model.recentMarks(recent, 'm1', '1', 'M', NOW);
+  assert.deepEqual(plain(m1.map((m) => m.kind)), ['done', 'none', 'left'], 'a match still to come in a double gameweek');
+  assert.deepEqual(plain(m1[2].matches.map((m) => [m.opponent, m.home])), [['T3', false], ['T4', true]]);
+  const later = model.recentMarks(recent, 'm1', '1', 'M', Date.parse('2026-10-28T12:00:00Z'));
+  assert.equal(later[2].kind, 'live', 'past kickoff and not complete');
+  const done = model.recentForm({ ...recent, actual: [{}, {}, {}], games: recent.games.map((list) => list.map((g) => ({ ...g, status: 'complete' }))), rostered: [], positionOf: () => 'M' });
+  assert.equal(model.recentMarks(done, 'm1', '1', 'M', Date.parse('2026-10-28T12:00:00Z'))[2].kind, 'dnp');
+});
