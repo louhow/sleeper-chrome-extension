@@ -58,7 +58,8 @@ const state = (overrides = {}) => ({
 test('header pairs both teams with win %, record, rank and projection', () => {
   const out = text(matchup.render(state()));
   // Sleeper's running total counts each starter's latest finished game (the leg's points are empty).
-  assert.match(out, /@louhow COOKIE MONSTER 41\.50 36% WIN 0-0 \(#3\) Yet to play \(1\) 157\.23 VS @badonkeyds Cling Kong – 64% WIN 0-0 \(#7\) Yet to play \(1\) 181\.21/);
+  // The projections are added up: Luka's last game of the week (39.83), Mitchell's (25.75), never the legs' frozen ones.
+  assert.match(out, /@louhow COOKIE MONSTER 41\.50 96% WIN 0-0 \(#3\) Yet to play \(1\) 39\.83 VS @badonkeyds Cling Kong – 4% WIN 0-0 \(#7\) Yet to play \(1\) 25\.75/);
 });
 
 test('starter rows mirror the slot with the lockable game and logos', () => {
@@ -100,17 +101,21 @@ test('lock controls only for rosters the logged-in user owns', () => {
   assert.doesNotMatch(loggedOut, /data-lock=/);
 });
 
-test('league median: the shown team against it on the Matchup tab, yours first on the League tab, only when the league plays one', () => {
+test('league median: the League tab leads with it, and every team over it now wears a medallion, only when the league plays one', () => {
   const league = { ...state().league, settings: { reserve_slots: 1, league_average_match: 1, playoff_week_start: 19 } };
-  // Points so far 41.50 and none (0), projections 157.23 and 181.21.
-  const median = /VS M Beat it for an extra win League Median 20\.75 Top 1 of 2 win 169\.22/;
-  const out = text(matchup.render(state({ league })));
-  assert.match(out, new RegExp(`181\\.21 @louhow COOKIE MONSTER 41\\.50 \\d+% WIN 0-0 \\(#3\\) Yet to play \\(1\\) 157\\.23 ${median.source} Starters`));
-  // Picked the other team: the median is against theirs.
-  assert.match(text(matchup.render(state({ league, rosterId: 5 }))), new RegExp(`@badonkeyds Cling Kong – \\d+% WIN 0-0 \\(#7\\) Yet to play \\(1\\) 181\\.21 ${median.source}`));
-  const lg = text(matchup.league(state({ league, page: 'league', rosterId: 5 })));
-  assert.match(lg, new RegExp(`^ Matchups .*?@louhow COOKIE MONSTER 41\\.50 \\d+% WIN .*?${median.source} @louhow COOKIE MONSTER`));
+  // Points so far 41.50 and none (0): median 20.75; projections 39.83 and 25.75: median 32.79.
+  const lg = matchup.league(state({ league, page: 'league' }));
+  assert.match(text(lg), /^ Matchups ‹ Week 1 OCT 19-25 › M League Median: 20\.75 Proj 32\.79 Win an extra matchup by scoring higher than the league median\. Top 1 of 2 win M @louhow/);
+  assert.match(lg, /<section class="median-bar" aria-label="League median">/);
+  // Over it now and likely to stay over: a solid medallion on the avatar; under it, none.
+  const medals = [...lg.matchAll(/<span class="medal (\w+)" title="([^"]+)"/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(medals, [['likely', 'Over the league median now, 88% to finish over it']]);
+  assert.match(lg, /<span class="mu-av"><(?:img|div) class="avatar team-link"[^>]*>(?:<\/div>)?<span class="medal likely"/);
+  // The Matchup tab: medallions on the matchup's teams, no banner.
+  const mu = matchup.render(state({ league }));
+  assert.equal([...mu.matchAll(/class="medal likely"/g)].length, 1);
+  assert.doesNotMatch(mu, /median-bar/);
   for (const s of [state(), state({ league: { ...league, settings: { ...league.settings, playoff_week_start: 1 } } })]) {
-    assert.doesNotMatch(matchup.render(s) + matchup.league({ ...s, page: 'league' }), /League Median/);
+    assert.doesNotMatch(matchup.render(s) + matchup.league({ ...s, page: 'league' }), /medal|median-bar/);
   }
 });

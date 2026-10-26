@@ -85,26 +85,17 @@
     return kind === 'b' || kind === 't' ? key : null;
   }
 
-  // The team card: points so far and the projection, and the Waivers button on your own team.
+  // The team card: points so far and the projection, the Matchup tab's totals
+  // (nbaWeek.side), and the Waivers button on your own team.
   function summary(s, l) {
-    const { roster, week, matchup, leg, starters } = l;
-    // The public matchup is cached for minutes, so with the (fresh) leg, or under what-if
-    // scoring (Sleeper's totals use the league's), the total is added up here as Sleeper
-    // does: each starter's locked game, else their latest finished one. Sleeper's own
-    // leg points (and a commissioner's custom points) still win.
-    const states = (whatIfOn(s) || leg) && week ? starters.filter(real)
-      .map((id) => lockState(playerDays(week, s.players[id]?.team, id), l.locks[id], s.now)) : null;
-    const proj = whatIfOn(s) && states ? states.reduce((sum, st) => sum + (st.counted ? st.points : lockInDefault(st.games) ?? 0), 0)
-      : leg?.proj_points ?? (week && starters.reduce((sum, id) => sum + (lockInDefault(playerDays(week, s.players[id]?.team, id)) ?? 0), 0));
-    const live = states?.reduce((sum, st) => sum + st.livePoints, 0);
-    const points = whatIfOn(s) ? live
-      : leg ? leg.custom_points ?? leg.points ?? live : matchup?.custom_points ?? matchup?.points;
+    const { roster, week, matchup } = l;
+    const sd = week ? globalThis.SNP.nbaWeek.side(s, l) : null;
     const opp = matchup?.matchup_id != null &&
       week.matchups.find((m) => m.matchup_id === matchup.matchup_id && m.roster_id !== roster.roster_id);
     const claims = s.claims?.length || 0;
     return teamCard(s, roster, {
-      points: points || null,
-      proj,
+      points: sd?.anyPoints ? sd.points : null,
+      proj: sd?.proj ?? null,
       opponent: opp && s.rosters.find((r) => r.roster_id === opp.roster_id),
       week,
       extra: l.mine ? `<button class="waivers" data-action="claims">Waivers${claims ? ` <span class="count">${claims}</span>` : ''}</button>` : '',

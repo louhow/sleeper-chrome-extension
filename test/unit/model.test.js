@@ -845,3 +845,25 @@ test('league median: played only in regular-season weeks of leagues that have it
     { points: 15, proj: 25, winners: 2, teams: 4 }, 'a team without points yet counts as 0');
   assert.equal(model.leagueMedian([{ points: null, proj: 20 }, { points: null, proj: 10 }]).points, null, 'no team has points yet');
 });
+
+test('median standing: a medallion only while over the median now, by how sure it is', () => {
+  const m = { points: 100, proj: 150 };
+  assert.equal(model.medianStanding({ points: 90, proj: 200 }, m), null, 'under it now, however good the projection');
+  assert.equal(model.medianStanding({ points: null, proj: 200 }, m), null, 'no points yet');
+  assert.equal(model.medianStanding({ points: 120, proj: 160 }, { points: null, proj: 150 }), null, 'no median score yet');
+  assert.equal(model.medianStanding({ points: 120, proj: 160 }, null), null, 'no median that week');
+  assert.equal(model.medianStanding({ points: 110, proj: 140 }, m).tier, 'over', 'over now, but projected under');
+  assert.equal(model.medianStanding({ points: 140, proj: 220 }, m).tier, 'likely');
+  assert.deepEqual(plain(model.medianStanding({ points: 140, proj: 140 }, { points: 100, proj: 100 })), { chance: 1, tier: 'won' }, 'everything settled');
+  assert.equal(model.medianStanding({ points: 100, proj: 100 }, { points: 100, proj: 100 }), null, 'level is not over');
+});
+
+test('live reads: every so often while a game is on, else a minute after the next start, else never', () => {
+  const now = Date.parse('2026-10-25T20:00:00Z');
+  const at = (min, status) => ({ start: now + min * 60e3, status });
+  assert.equal(model.nextLiveRead([at(-30, 'in_game'), at(60, 'pre_game')], now, 90e3), now + 90e3);
+  assert.equal(model.nextLiveRead([at(-5, 'pre_game')], now, 90e3), now + 90e3, 'past its start: on, whatever the status says');
+  assert.equal(model.nextLiveRead([at(-200, 'complete'), at(60, 'pre_game'), at(30, 'pre_game')], now, 90e3), now + 31 * 60e3);
+  assert.equal(model.nextLiveRead([at(-200, 'complete')], now, 90e3), null);
+  assert.equal(model.nextLiveRead([], now, 90e3), null);
+});

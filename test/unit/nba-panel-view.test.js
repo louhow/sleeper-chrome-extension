@@ -121,12 +121,16 @@ test('picking a spot highlights who it can swap with and dims the rest', () => {
   assert.match(text(html), /Pick a player to swap with Luka Doncic/);
 });
 
-test('logged-in leg data wins: starters, projection and locked games', () => {
+test('logged-in leg data wins: starters, points and locked games; the projection is added up, not Sleeper\'s', () => {
   const s = state({ me: 'u1', currentWeek: 1 });
-  s.weeks = { 1: { ...week, legs: [{ roster_id: 1, starters: ['b', 'a', '0'], proj_points: 157.23, points: 4, starters_games: { a: 'g1' } }] } };
+  // Luka locked his first game (30.79); Sleeper's leg projection is from before the week and never moves.
+  const actual = model.pointsByGame([{ player_id: 'a', game_id: 'g1', stats: { pts: 30.79 } }, { player_id: 'a', game_id: 'g2', stats: { pts: 12.5 } }], { pts: 1 }, scoring.scoreStats);
+  s.weeks = { 1: { ...week, actual, legs: [{ roster_id: 1, starters: ['b', 'a', '0'], proj_points: 157.23, points: 4, starters_games: { a: 'g1' } }] } };
   const html = render(s, []);
   const out = text(html);
-  assert.match(out, /4\.00 proj 157\.23/);
+  // Sleeper's leg points win, and with every starter's game counted (Luka's lock) the projection is the same.
+  assert.match(out, /4\.00 proj 4\.00/);
+  assert.doesNotMatch(out, /157\.23/);
   assert.match(out, /PG Jeremiah Fears .* G Luka Doncic/);
   assert.match(html, /class="day game locked"/);
   // The PTS column boxes the locked score like its day cell, with no second line.

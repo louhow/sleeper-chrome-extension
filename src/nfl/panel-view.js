@@ -3,8 +3,8 @@
 // player, any team or matchup from the picker. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflPanelView = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
-    shell, pageTitle, teamCard, teamSideOf, matchupPair, medianPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
-  const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian } = globalThis.SNP.model;
+    shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
+  const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian, medianStanding } = globalThis.SNP.model;
   const { slotBadge, headshot, injury } = globalThis.SNP.nflUi;
   // Sleeper's apps list bench players by position in this order.
   const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
@@ -206,13 +206,12 @@
     const a = totals(s, mine);
     const b = theirs && totals(s, theirs);
     const [p1, p2] = b ? winProbability(a.points ?? 0, a.proj, b.points ?? 0, b.proj) : [null, null];
-    const team = (l, t, p) => teamSideOf(s, l.roster, { points: t.points, win: p, proj: t.proj });
+    const med = median(s);
+    const team = (l, t, p) => teamSideOf(s, l.roster, { points: t.points, win: p, proj: t.proj, median: medianStanding(t, med) });
     const settings = s.league.settings || {};
     const row = (slot, idA, idB) => muRow(side(s, idA, 'mine'), slotBadge(slot), theirs ? side(s, idB, 'theirs') : null);
     const section = (title, slot, x, y, count) => muSection(title, x, y || [], count, (idA, idB) => row(slot, idA, idB));
-    const med = median(s);
     return `${matchupPair(team(mine, a, p1), theirs && team(theirs, b, p2), { cls: 'lg-match nfl-mu-head', failed: s.failedAvatars })}
-      ${med ? medianPair(team(mine, a, null), med, { failed: s.failedAvatars }) : ''}
       ${muStarters(`${a.toPlay} yet to play${b ? ` · ${b.toPlay} for them` : ''}`, weekNav(s, mine.week))}
       ${mine.slots.map((slot, i) => row(slot, mine.starters[i], theirs?.starters[i])).join('')}
       ${section('Bench', 'BN', mine.bench, theirs?.bench)}

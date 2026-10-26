@@ -116,7 +116,8 @@ function panelState(whatIf) {
 
 test('team tab: league scoring shows Sleeper\'s totals; what-if adds them up and says so', () => {
   const league = render(panelState(false));
-  assert.match(league.out, /louhow .* 99\.00 proj 111\.00/);
+  // Sleeper's points; the projection is added up (the locked game, so the same), never Sleeper's frozen leg projection.
+  assert.match(league.out, /louhow .* 99\.00 proj 99\.00/);
   assert.doesNotMatch(league.html, /whatif/);
   assert.match(league.html, /data-action="optimize"/);
 
@@ -140,7 +141,8 @@ test('matchup tab: what-if replaces Sleeper\'s totals and turns off locking', ()
   assert.doesNotMatch(matchup.render(s), /data-lock=/, 'a lock is real points');
   const league = { ...panelState(false), page: 'matchup' };
   league.weeks[1].legs[0].starters_games = {};
-  assert.match(text(matchup.render(league)), /111\.00/);
+  // Sleeper's points (59 more than the 40 seen); unlocked, the projection is his last game's (25), plus those 59.
+  assert.match(text(matchup.render(league)), /louhow 99\.00 .* 84\.00 VS/);
   assert.match(matchup.render(league), /data-lock="1:luka"/);
 });
 

@@ -16,8 +16,9 @@
   --locked-green: #2f8f58;
   --locked-yellow: #977a17;
   --locked-red: #b03f59;
-  /* The league median's mark. */
+  /* The league median's medallion: orange, gold once won. */
   --median: #f2741f;
+  --median-gold: #ffc23a;
   /* What-if scoring: everything scored with it wears this color. */
   --whatif: #b69cff;
   --whatif-bg: color-mix(in srgb, var(--whatif) 14%, transparent);
@@ -673,7 +674,6 @@ ul.picks {
   text-align: right;
 }
 .mu-team .avatar {
-  grid-area: av;
   width: 36px;
   height: 36px;
 }
@@ -948,30 +948,95 @@ span.team-link:hover {
 .lg-match.own .mu-team {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
-/* The league median as an extra matchup: an orange M in place of an avatar,
-   its side set apart and without a win bar (the chance is the team's). */
-.mu-team .avatar.mark {
+/* The league median (ui.medal, ui.medianBanner): a team over it wears a
+   medallion on its avatar, outlined while it's over, solid once it's likely to
+   stay over, gold and lit once it has won. */
+.mu-av {
+  grid-area: av;
+  position: relative;
+  display: block;
+  line-height: 0;
+}
+.medal {
   display: grid;
   place-items: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffb35c, var(--median) 70%);
-  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
   color: #fff;
+  background: radial-gradient(circle at 35% 30%, #ffb35c, var(--median) 70%);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.medal.over {
+  border: 1.5px solid var(--median);
+  background: var(--ink);
+  color: var(--median);
+}
+.medal.won {
+  background: radial-gradient(circle at 35% 30%, #ffe08a, var(--median-gold) 45%, var(--median) 90%);
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 3.5px var(--median-gold), 0 0 12px 3px color-mix(in srgb, var(--median-gold) 70%, transparent);
+}
+/* On the avatar's outer corner, clear of the team's name. */
+.mu-av .medal {
+  position: absolute;
+  left: -5px;
+  bottom: -4px;
+}
+.mu-team.theirs .mu-av .medal {
+  left: auto;
+  right: -5px;
+}
+.lg-match .mu-av .medal {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+}
+.median-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--median) 35%, transparent);
+  border-radius: 10px;
+  background: var(--card);
+}
+.median-bar .medal {
+  flex: none;
+  width: 30px;
+  height: 30px;
   font-size: 15px;
+}
+.mb-who {
+  flex: 1;
+  min-width: 0;
+}
+.mb-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.mb-line b {
+  font-size: 14px;
   font-weight: 900;
 }
-.lg-match .mu-team .avatar.mark {
-  font-size: 13px;
+.mb-line span {
+  color: var(--muted);
+  font-size: 12px;
 }
-.median .mu-team.theirs {
-  border-color: color-mix(in srgb, var(--median) 40%, transparent);
+.median-bar .sub {
+  font-size: 11px;
+  line-height: 14px;
 }
-.median .mu-team.theirs .mu-bar {
-  visibility: hidden;
-}
-/* Under a Matchup tab's own matchup, as close as the League tab's cards. */
-.mu-head + .median {
-  margin-top: 5px;
+.mb-top {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
 }
 .mu-starters {
   display: flex;

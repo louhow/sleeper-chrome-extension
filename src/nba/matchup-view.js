@@ -1,10 +1,10 @@
 // Matchup view: the selected team (left) against its opponent (right), slot by
 // slot, with Lock-In status and the lock control for the logged-in owner.
 (globalThis.SNP ||= {}).nbaMatchupView = (() => {
-  const { playerDays, lockState, winProbability } = globalThis.SNP.model;
+  const { playerDays, lockState, winProbability, medianStanding } = globalThis.SNP.model;
   const { side, median } = globalThis.SNP.nbaWeek;
   const { esc, f2, headshot, teamLogo, teamName, shortName, injuryTag, teamTag, gameTime, weekday, gameLabel, slotBadge, weekNav, lineup, real, playerOf,
-    loading, errorMsg, opponentOf, teamSideOf, matchupPair, medianPair, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
+    loading, errorMsg, opponentOf, teamSideOf, matchupPair, medianBanner, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
 
   function render(s) {
     if (s.error) return errorMsg(s.error);
@@ -24,8 +24,7 @@
     const med = median(s);
 
     return `
-      ${matchupPair(teamOf(s, left, p1), right && teamOf(s, right, p2), { tag: 'section', failed: s.failedAvatars })}
-      ${med ? medianPair(teamOf(s, left, null), med, { failed: s.failedAvatars }) : ''}
+      ${matchupPair(teamOf(s, left, p1, med), right && teamOf(s, right, p2, med), { tag: 'section', failed: s.failedAvatars })}
       ${muStarters(mine.lockable ? (s.saving ? 'Saving…' : 'Lock in a finished game before the player\'s next game starts') : '', weekNav(s, mine.week))}
       ${mine.slots.map((slot, i) => row(slot, mine.starters[i], theirs?.starters[i], true)).join('')}
       ${section('Bench', 'BN', mine.bench, theirs?.bench || [])}
@@ -34,10 +33,13 @@
   }
 
   // A team's card over the matchup (ui.teamSide): `prob`, its chance to win.
-  function teamOf(s, sd, prob) {
+  // `med`: the week's league median, for the team's medallion (null: none that week).
+  function teamOf(s, sd, prob, med) {
     const { roster, week } = sd.l;
+    const points = sd.anyPoints ? sd.points : null;
     return teamSideOf(s, roster, {
-      points: sd.anyPoints ? sd.points : null,
+      points,
+      median: medianStanding({ points, proj: sd.proj }, med),
       win: prob,
       rank: week.ranks?.[roster.roster_id],
       yetToPlay: sd.yetToPlay,
@@ -112,8 +114,8 @@
 
   // League tab: every matchup of the week, each as the Matchup tab's header
   // (score, win chance, record and rank, yet to play, projection), yours
-  // first, after yours against the league median when the league plays one.
-  // Clicking one opens it on the Matchup tab.
+  // first. When the league plays the median, the week's median comes first and
+  // every team over it wears a medallion. Clicking one opens it on the Matchup tab.
   function league(s) {
     const week = s.weeks?.[s.week];
     const head = `<div class="lg-head"><h3>Matchups</h3>${weekNav(s, week)}</div>`;
@@ -130,16 +132,14 @@
     const pairs = [...groups.entries()].sort(([a, x], [b, y]) => (y.some(mine) - x.some(mine)) || a - b)
       .map(([, list]) => list.sort((a, b) => mine(b) - mine(a)));
     if (!pairs.length) return `${head}<p class="msg">No matchups this week.</p>`;
-    // The median against your team (else the team picked).
     const med = median(s);
-    const you = med && (pairs.flat().find((l) => l.mine) ?? lineup(s));
-    return `${head}<div class="lg-list">${you ? medianPair(teamOf(s, side(s, you), null), med, { failed: s.failedAvatars }) : ''}${pairs.map(([a, b]) => {
+    return `${head}${med ? medianBanner(med) : ''}<div class="lg-list">${pairs.map(([a, b]) => {
       const left = side(s, a);
       const right = b && side(s, b);
       const [p1, p2] = right ? winProbability(left.points, left.proj, right.points, right.proj) : [null, null];
       const label = `Open ${teamName(s, a.roster)}${b ? ` vs ${teamName(s, b.roster)}` : ''} on the Matchup tab`;
       // A box that opens the matchup, holding team links (so not a <button>).
-      return matchupPair(teamOf(s, left, p1), right && teamOf(s, right, p2), {
+      return matchupPair(teamOf(s, left, p1, med), right && teamOf(s, right, p2, med), {
         cls: `lg-match${a.mine ? ' own' : ''}`,
         attrs: `role="button" tabindex="0" data-open-matchup="${a.roster.roster_id}" aria-label="${esc(label)}"`,
         failed: s.failedAvatars,

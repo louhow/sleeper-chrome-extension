@@ -121,6 +121,8 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 - Per player: the game that matters for Lock-In (the locked game, the one that can be locked, or the next one), its points or projection, and team logos for the week's games.
 - Lock-In for your own starters: once a game ends, `LOCK-IN` stays open until that player's next game starts, if they were starting when it tipped off (see the Team tab). Locking is final, so it asks to confirm.
 - Team totals are Sleeper's running total, added up from the leg's lineup as on the Team tab.
+- The projection is added up the same way: each starter's locked game, else the final game of their week, played or projected. Sleeper's own leg projection (`proj_points`) is set before the week and never moves, so it isn't used. Where Sleeper's total counts what the extension can't see (logged out, locks are unknown), the projection moves by the same amount.
+- While a game of the current week is on, its stats, projections and games are read again every 90 seconds (only while the tab is visible and on the Team, Matchup or League tab), as on NFL; otherwise a minute after the next tip-off.
 - Switching leagues in the sidebar (any sport) opens each league on the tab you were last on in it, where Sleeper would open its League tab; the last tab per league is kept in the page's storage. A league you haven't been on yet opens where Sleeper sends it, except an NBA league from a Matchup tab, which opens on its Matchup tab.
 
 ### Team picker
@@ -139,11 +141,12 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 
 ### League median
 
-In a league that plays the median (`settings.league_average_match`), every regular-season week each team has one more matchup, against the league's median score: the top half of the league wins it.
-Sleeper's website doesn't show it; the extension does, wherever it shows the week's matchups (NBA and NFL).
+In a league that plays the median (`settings.league_average_match`), every regular-season week each team also plays the league's median score: the top half of the league wins it, an extra win.
+Sleeper's website doesn't show it; the extension does, on NBA and NFL alike.
 
-- On the Matchup tab, under the matchup: the team shown against the median. On the League tab, before the matchups: yours (else the team picked).
-- It's drawn as one more matchup, so it reads like the others: the team's points, projection and chance of finishing above the median (the same win formula, with the bar); the median's side, marked M, has the median score so far (– before any team has points), the median projection, and how many teams win it ("Top 7 of 14 win").
+- At the top of the League tab, as in Sleeper's app: "League Median" with its score so far (– before any team has points), its projection, and how many teams win it ("Top 7 of 14 win").
+- Every team over the median now wears an M medallion on its avatar, on the League tab's matchups and the Matchup tab's, so you can see at a glance who is winning it.
+  It's outlined while the team is over, solid once it's likely to stay over (a 75% or better chance of finishing over, by the same win formula as the matchups, against the median's score and projection), and gold and lit once it's won (every game of the week settled). Hovering it gives the chance.
 - The median is the middle of every team's score that week (the mean of the middle two for an even count); a team without points yet counts as 0. The projection is the middle of every team's projection.
 - Not in the playoffs (from `playoff_week_start`), and not at all in a league without the median.
 - On NFL's League tab the numbers are Sleeper's own, read off its cards, and the week is the one Sleeper's week picker shows.
@@ -265,7 +268,7 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
 - The week's matchups drawn as the NBA League tab draws them (yours first and framed; avatars, owners, team names, scores, win chance and bar, record, projection), in place of Sleeper's own cards.
 - The numbers are Sleeper's own: its cards stay on the page, hidden, and the extension reads them as they update during games, so they always match the rest of Sleeper.
 - Clicking a matchup opens it the way Sleeper's own card does. Sleeper's week picker and the rest of the tab (standings, activity) stay as they are.
-- In a league that plays the median, yours against it comes first (see League median).
+- In a league that plays the median, its banner comes first and every team over it wears a medallion (see League median).
 
 ### NFL: Players tab
 
@@ -336,7 +339,7 @@ It enables:
 
 - `league_rosters(league_id)`: rosters straight from Sleeper. The public `/rosters` endpoint is cached at the CDN for up to ~10 minutes, so after a save it can show (and a follow-up move could build on) the old roster.
 - `me`: which roster is yours (swaps are only offered there, for the current and future weeks).
-- `matchup_legs(league_id, round)`: the week's saved lineup, Sleeper's own projection (`proj_points`) and Lock-In picks (`starters_games`, shown with a lock).
+- `matchup_legs(league_id, round)`: the week's saved lineup, Sleeper's own points and Lock-In picks (`starters_games`, shown with a lock).
 - `update_matchup_leg(...)` during the season, `roster_update_starters(...)` outside it: saving a swap.
 - `update_matchup_leg(..., starters_games: $starters_games)`: Lock-In. The variable is the week's full player -> game map as JSON, with the new lock added.
 - `roster_update_taxi(league_id, roster_id, taxi)`: taxi moves. Saved before any starter change, like Sleeper's web app.

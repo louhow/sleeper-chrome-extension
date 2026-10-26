@@ -888,9 +888,9 @@
     return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
   }
 
-  // The week's median as an opponent, from every team's { points, proj }
-  // (points null until the team has any): its points (null until some team has
-  // any), its projection, and how many teams beat it (the top half).
+  // The week's median from every team's { points, proj } (points null until
+  // the team has any): its points so far (null until some team has any), its
+  // projection, and how many teams win it (the top half).
   function leagueMedian(teams) {
     return {
       points: teams.some((t) => t.points != null) ? median(teams.map((t) => t.points ?? 0)) : null,
@@ -898,6 +898,26 @@
       winners: Math.floor(teams.length / 2),
       teams: teams.length,
     };
+  }
+
+  // A team's place against the median `m` (leagueMedian), for its medallion:
+  // null unless it's over the median now; else its chance of finishing over
+  // (winProbability against the median's points and projection) and a tier:
+  // 'won' once both are settled, 'likely' from MEDIAN_LIKELY, else 'over'.
+  const MEDIAN_LIKELY = 0.75;
+  function medianStanding(team, m) {
+    if (!m || m.points == null || team.points == null || !(team.points > m.points)) return null;
+    const [chance] = winProbability(team.points, team.proj, m.points, m.proj);
+    return { chance, tier: chance === 1 ? 'won' : chance >= MEDIAN_LIKELY ? 'likely' : 'over' };
+  }
+
+  // When to read a week's stats and games again: while a game is on, `every`
+  // ms from now; otherwise a minute after the next tip-off or kickoff; null
+  // once nothing is left to play. `games`: [{ start, status }].
+  function nextLiveRead(games, now, every) {
+    if (games.some((g) => gameState(g, now) === 'live')) return now + every;
+    const next = Math.min(...games.filter((g) => g.status === 'pre_game' && g.start > now).map((g) => g.start));
+    return Number.isFinite(next) ? next + 60e3 : null;
   }
 
   // roster_id -> rank. Uses Sleeper's roster_standings when it has rows; before
@@ -1050,7 +1070,7 @@
     taxiEligible, taxiOpen, reserveEligible,
     lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
-    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks, medianOn, median, leagueMedian,
+    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
   };
 })();

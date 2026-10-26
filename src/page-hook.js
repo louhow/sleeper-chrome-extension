@@ -1279,8 +1279,7 @@
           bar: parseFloat(user.querySelector('.win-bar > div')?.style.width) || 0,
         };
       });
-      const side = mine == null ? -1 : [ids.rosterId1, ids.rosterId2].indexOf(mine);
-      return { own: side >= 0, mine: side >= 0 && sides[side] ? side : null, sides };
+      return { own: mine != null && (ids.rosterId1 === mine || ids.rosterId2 === mine), sides };
     });
     // The week shown (Sleeper's week picker), for whether it plays the league median.
     return { cards, round: league?.round ?? null };

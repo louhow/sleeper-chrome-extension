@@ -22,6 +22,9 @@
   const AFTER_TIP_MS = 5 * 60e3;
   // Never read the legs more often than this, whatever asks.
   const LEG_READ_GAP_MS = 60e3;
+  // While a game of the current week is on, its stats, projections and games
+  // are read again this often (tab visible, on a panel tab), as on NFL.
+  const LIVE_READ_MS = 90e3;
 
   const panel = shared.shadowHost('sleeper-nba-panel', schedule);
   const { host, root } = panel;
@@ -359,7 +362,10 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
       ranks: model.standingsRanks(state.rosters, standings),
     };
     seeLineups(week, legs);
-    if (week === state.currentWeek) planTipReads();
+    if (week === state.currentWeek) {
+      planTipReads();
+      planLiveRead();
+    }
     schedule();
   }
 
@@ -418,9 +424,40 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
     }, next.at - now);
   }
   function onVisible() {
-    if (document.visibilityState !== 'visible' || missedTip == null) return;
+    if (document.visibilityState !== 'visible') return;
+    // A game on (or over) since the last read while the tab was hidden.
+    const games = state.weeks[state.currentWeek]?.games || [];
+    if (Date.now() - lastLiveRead > LIVE_READ_MS && games.some((g) => model.gameState(g, Date.now()) === 'live')) liveRead();
+    if (missedTip == null) return;
     if (Date.now() < missedTip + model.FROZEN_MS) readLegs().catch(() => {});
     missedTip = null;
+  }
+
+  // The current week's points as games go: read again while one is on
+  // (model.nextLiveRead), else a minute after the next tip-off.
+  let liveTimer = null;
+  let lastLiveRead = Date.now();
+  function planLiveRead() {
+    clearTimeout(liveTimer);
+    const week = state.weeks[state.currentWeek];
+    if (!week || destroyed || disabled) return;
+    const now = Date.now();
+    const at = model.nextLiveRead(week.games, now, LIVE_READ_MS);
+    if (at != null) liveTimer = setTimeout(liveRead, Math.max(LIVE_READ_MS / 3, at - now));
+  }
+  async function liveRead() {
+    if (destroyed || disabled) return;
+    if (document.visibilityState !== 'visible' || !state.onPanel) return planLiveRead();
+    lastLiveRead = Date.now();
+    const week = state.currentWeek;
+    try {
+      const core = await nbaWeek.load(api, state.league, week, ui.scoringOf(state));
+      if (state.weeks[week]) Object.assign(state.weeks[week], core);
+    } catch (err) {
+      console.warn('[sleeper-nba-panel] live read failed', err);
+    }
+    planLiveRead();
+    schedule();
   }
 
   // Writes the week's matchup leg, as Sleeper's apps do in season. Lock-In
@@ -791,6 +828,7 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
   function teardown() {
     clearInterval(clock);
     clearTimeout(tipTimer);
+    clearTimeout(liveTimer);
     stops.forEach((stop) => stop());
     if (document.documentElement.dataset.snpNbaLeague === leagueId) delete document.documentElement.dataset.snpNbaLeague;
     if (document.documentElement.dataset.snpPlayersLeague === leagueId) delete document.documentElement.dataset.snpPlayersLeague;

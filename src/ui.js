@@ -372,8 +372,7 @@
   // record, rank, yetToPlay, proj, rosterId }; numbers print as points, text
   // (Sleeper's own, read off its page) as it is, and nothing as –. With
   // `rosterId`, the avatar, owner and team name open that team on the Team tab.
-  // Not a team (the league median): `mark`, a letter in place of the avatar,
-  // and `note` in place of the owner.
+  // `median`: its model.medianStanding, a medallion on the avatar when it's over the league median.
   function teamSide(t, cls, failed = NO_FAILED) {
     const shown = (v) => (typeof v === 'number' ? f2(v) : esc(v || '–'));
     const pct = t.win == null ? null : Math.round(t.win * 100);
@@ -381,9 +380,9 @@
     const link = t.rosterId != null ? `data-open-team="${esc(t.rosterId)}" role="link" tabindex="0" title="${esc(`${t.team}'s team`)}"` : '';
     const linked = (html) => (link ? `<span class="team-link" ${link}>${html}</span>` : html);
     return `<div class="mu-team ${cls}">
-      ${t.mark ? `<span class="avatar mark">${esc(t.mark)}</span>` : avatarImg(t.avatar, link ? 'avatar team-link' : 'avatar', failed, { attrs: link })}
+      <span class="mu-av">${avatarImg(t.avatar, link ? 'avatar team-link' : 'avatar', failed, { attrs: link })}${medal(t.median)}</span>
       <div class="mu-who">
-        <div class="sub">${t.note != null ? esc(t.note) : linked(`@${esc(t.owner || 'unknown')}`)}</div>
+        <div class="sub">${linked(`@${esc(t.owner || 'unknown')}`)}</div>
         <div class="team-name">${linked(esc(t.team))}</div>
       </div>
       <div class="mu-pts">${shown(t.points)}</div>
@@ -408,15 +407,28 @@
       </${tag}>`;
   }
 
-  // The league median as a team's extra matchup (see model.medianOn): `t` the
-  // team (teamSide data with numeric points, null before it has any), `m` the
-  // week's median (model.leagueMedian). The team's side carries its chance of
-  // finishing above the median; the median's, its score now, its projection and
-  // how many teams win it.
-  function medianPair(t, m, { failed = NO_FAILED } = {}) {
-    const [win] = globalThis.SNP.model.winProbability(t.points ?? 0, t.proj, m.points ?? 0, m.proj);
-    const median = { mark: 'M', note: 'Beat it for an extra win', team: 'League Median', points: m.points, proj: m.proj, record: `Top ${m.winners} of ${m.teams} win` };
-    return matchupPair({ ...t, win }, median, { tag: 'section', cls: 'lg-match median', attrs: 'aria-label="Against the league median"', failed });
+  // ---- League median (see model.medianOn) ----
+
+  // A team's medallion for being over the league median now (model.medianStanding):
+  // outlined while it's over, solid once it's likely to stay over, lit once it's won.
+  const MEDAL_TITLES = { over: 'Over the league median now', likely: 'Over the league median now', won: 'Won the league median: an extra win' };
+  function medal(standing) {
+    if (!standing) return '';
+    const title = standing.tier === 'won' ? MEDAL_TITLES.won : `${MEDAL_TITLES[standing.tier]}, ${Math.round(standing.chance * 100)}% to finish over it`;
+    return `<span class="medal ${standing.tier}" title="${esc(title)}" aria-label="${esc(title)}">M</span>`;
+  }
+
+  // The League tab's line about the week's median (model.leagueMedian): its
+  // score so far (– before any) and projection, and how many teams win it.
+  function medianBanner(m) {
+    return `<section class="median-bar" aria-label="League median">
+      <span class="medal won" aria-hidden="true">M</span>
+      <div class="mb-who">
+        <div class="mb-line"><b>League Median: ${m.points == null ? '–' : f2(m.points)}</b><span>Proj ${f2(m.proj)}</span></div>
+        <div class="sub">Win an extra matchup by scoring higher than the league median.</div>
+      </div>
+      <div class="mb-top">Top ${m.winners} of ${m.teams} win</div>
+    </section>`;
   }
 
   // ---- Team tab rows ----
@@ -715,7 +727,7 @@
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
     lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, researchLine,
     dash, num, height, ago, newsSource, heat, scaler, tierClass,
-    avatarImg, teamCard, teamSideOf, teamSide, matchupPair, medianPair, rowHead, swapHint, swapClass, emptyCard,
+    avatarImg, teamCard, teamSideOf, teamSide, matchupPair, medal, medianBanner, rowHead, swapHint, swapClass, emptyCard,
     muRow, muEmpty, muStarters, muSection,
     PAGES, pageTitle, toolbar, shell, apiView, sessionExpired, teamPicker, matchupPicker, matchupPairs,
     howTip, planSummary, optimizeDialog, applyAll, applyChange, slotPlayer, subArrow,

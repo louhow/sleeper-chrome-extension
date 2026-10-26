@@ -168,10 +168,7 @@
     const week = state.weeks[state.week];
     if (!week || state.week !== info.currentWeek || destroyed) return;
     const now = Date.now();
-    const list = Object.values(week.games);
-    const live = list.some((g) => model.gameState(g, now) === 'live');
-    const next = Math.min(...list.filter((g) => g.status === 'pre_game' && g.start > now).map((g) => g.start));
-    const at = live ? now + LIVE_READ_MS : Number.isFinite(next) ? next + 60e3 : null;
+    const at = model.nextLiveRead(Object.values(week.games), now, LIVE_READ_MS);
     if (at == null) return;
     liveTimer = setTimeout(liveRead, Math.max(LIVE_READ_MS / 3, at - now));
   }

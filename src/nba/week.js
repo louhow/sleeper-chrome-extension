@@ -4,8 +4,8 @@
 (globalThis.SNP ||= {}).nbaWeek = (() => {
   const { model, scoring, ui, loaders } = globalThis.SNP;
   const PLAYERS_KEY = 'players:nba:v4';
-  // A matchup leg's fields: the lineup, Lock-In picks (starters_games) and Sleeper's points and projections.
-  const LEG_FIELDS = 'leg matchup_id roster_id round starters points proj_points max_points custom_points starters_games subs';
+  // A matchup leg's fields: the lineup, Lock-In picks (starters_games) and Sleeper's points.
+  const LEG_FIELDS = 'leg matchup_id roster_id round starters points max_points custom_points starters_games subs';
 
   // The fields the extension keeps of each NBA player.
   const toPlayer = (p) => ({
@@ -51,9 +51,12 @@
     };
   }
 
-  // A lineup's (ui.lineup) totals for its week, with each starter's lockState.
-  // Sleeper's own leg numbers win when logged in; otherwise they're rebuilt
-  // from Lock-In rules (locked game, else the final game of the week).
+  // A lineup's (ui.lineup) totals for its week, with each starter's lockState,
+  // added up from Lock-In rules: points are each starter's locked game, else
+  // their latest finished one (Sleeper's own leg or matchup points win when it
+  // has them); the projection counts each starter's locked game, else the
+  // final game of the week, played or projected. Sleeper's leg projection
+  // (proj_points) is set before the week and never moves, so it isn't used.
   function side(s, l) {
     const states = {};
     for (const id of l.starters) {
@@ -77,7 +80,9 @@
       states,
       points: points ?? 0,
       anyPoints: all.some((st) => st.locked || st.games.some((d) => d.game.status === 'complete')) || Boolean(server && (l.leg ? l.leg.points : l.matchup?.points)),
-      proj: (server && l.leg?.proj_points) ?? projected,
+      // Sleeper's total can count what this can't see (logged out, locks are
+      // unknown; a commissioner's custom points), so the projection moves with it.
+      proj: projected + ((points ?? 0) - live),
       yetToPlay: all.filter((st) => st.yetToPlay).length,
     };
   }
