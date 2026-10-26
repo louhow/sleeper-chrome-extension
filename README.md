@@ -41,6 +41,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 **All sports**
 - Score colors (green, yellow, red) from the league's own games: the thirds of its starters' recent scores, per position in NFL.
 - Each league opens on the tab you were last on in it when you switch leagues in the sidebar.
+- Chat: hovering a message's emoji reactions no longer shifts the chat around, and who reacted shows in full.
 - API tab: a log of every call the extension makes, with status, timing, size and a JSON preview.
 
 Details: [docs/DETAILS.md](docs/DETAILS.md) (NBA and NFL) and [docs/EPL.md](docs/EPL.md) (Premier League).

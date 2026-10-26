@@ -2736,3 +2736,140 @@ test('the Premier League panel never mounts on an NBA league page', async () => 
   assert.equal(await page.evaluate(() => document.documentElement.dataset.snpLeagueSport), `${LEAGUE}:nba`);
   assert.equal(await page.evaluate(() => window.__eplMounted), false);
 });
+
+// Sleeper's league chat, reduced to a message's emoji reactions (inspected
+// 2026-10-25): its markup and its own rules for them, a component that acts
+// as Sleeper's does (every option in the row, the unused ones hidden until
+// hovered; the names popup 300ms after hovering an emoji, when every option
+// shows, gone 100ms after leaving), and a chat that keeps itself pinned to the
+// bottom whenever the component re-renders.
+const chatPage = () => {
+  const options = ['thumbs', 'laugh', 'fist', 'cry', 'shock', 'think', 'heart', 'fire', 'poop', 'eyes', 'angry', 'cap', 'clown', 'goat'];
+  const emoji = (i) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="9" fill="hsl(${i * 25},80%,60%)"/></svg>`)}`;
+  const message = (who, text, reacted) => `<div class="comment-group"><div class="avatar"></div><div class="text-container"><div class="author">${who}</div><pre>${text}</pre>${reacted ? `<div class="comment-reactions-container"><div class="reaction-menu">${options.map((o, i) => `<div class="reaction ${reacted[o] ? 'reacted' : 'hide'}" data-o="${o}"><img src="${emoji(i)}"><div class="reaction-count">${reacted[o] || ''}</div></div>`).join('')}</div></div>` : ''}</div></div>`;
+  return `<!doctype html><title>Sleeper</title>
+<style>
+  body { margin: 0; background: rgb(24, 28, 40); color: #fff; font-family: Lato, Arial, sans-serif; }
+  .chat { position: absolute; left: 400px; top: 60px; width: 520px; height: 240px; overflow: hidden; background: rgba(58, 70, 91, 0.5); }
+  .comment-group { display: flex; min-width: 0; overflow: hidden; padding: 12px 16px; }
+  .comment-group > .avatar { flex: none; width: 40px; height: 40px; margin-right: 12px; border-radius: 50%; background: #456; }
+  .text-container { flex: 1; }
+  pre { margin: 6px 0 0; font: inherit; }
+  /* Sleeper's own rules for the reaction row and its names popup. */
+  .comment-group .text-container .comment-reactions-container { display: inline-block; }
+  .comment-group .text-container .comment-reactions-container .reaction-menu { padding: 3px 0 !important; }
+  .comment-group .text-container .comment-reactions-container .reaction-menu .reaction { height: 25px; position: relative; justify-content: flex-start; }
+  .comment-group .text-container .comment-reactions-container .reaction-menu .reaction img { max-height: 20px; }
+  .comment-group .text-container .comment-reactions-container .reaction-menu .reaction.reacted { background: none; }
+  .comment-group .text-container .comment-reactions-container .reaction-menu .reaction .reaction-count { font-size: 10px; color: #aaa; padding-left: 2px; font-weight: bold; position: absolute; left: 18px; }
+  .reaction-members { background: #333; width: 80px; padding: 0px 8px; color: #fff; font-size: 12px; position: relative; }
+  .reaction-members .members { padding: 5px 0; max-height: 150px; overflow-y: auto; }
+  .reaction-members .user { white-space: nowrap; text-overflow: ellipsis; max-width: 64px; padding: 3px 0; font-weight: bold; display: flex; }
+  .reaction-members .user .avatar { flex: 0 0 15px; width: 15px; height: 15px; margin-right: 7px !important; border-radius: 50%; background: #789; }
+  .reaction-members .arrow { position: absolute; left: 50%; transform: translateX(-50%) rotate(45deg); width: 6px; height: 6px; background: #333; bottom: -3px; }
+  .reaction-menu { display: flex; flex-direction: row; flex-wrap: wrap; padding: 8px; max-width: 240px; }
+  .reaction-menu .reaction { width: 40px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 5px; cursor: pointer; transition: all 0.3s ease; }
+  .reaction-menu .reaction img { max-height: 24px; transition: all 0.2s ease; }
+  .reaction-menu .reaction:hover img { transform: scale(1.5); }
+  .reaction-menu .reaction.hide { transform: scale(0); width: 0px !important; }
+  .reaction-menu:hover .reaction.hide { transform: scale(1); width: 40px !important; }
+  .reaction-menu .reaction-members-container { position: absolute; bottom: 30px; left: -38px; }
+</style>
+<div class="chat">
+  ${message('badonkeyds', 'The fantasy bball gods prevail.', { laugh: 2 })}
+  ${message('PavScore', 'Kate and I have been texting about it', { laugh: 3 })}
+  ${message('OuiThePeople', 'Anyone wanna trade for Jalen Williams', null)}
+</div>
+<script>
+  const chat = document.querySelector('.chat');
+  const pin = () => { chat.scrollTop = chat.scrollHeight; };
+  pin();
+  window.__pins = 0;
+  for (const menu of document.querySelectorAll('.reaction-menu')) {
+    let open = null;
+    let show = null;
+    let close = null;
+    const render = () => {
+      for (const r of menu.children) {
+        r.classList.toggle('hide', !r.classList.contains('reacted') && !open);
+        r.querySelector('.reaction-members-container')?.remove();
+        if (r.dataset.o === open) r.insertAdjacentHTML('afterbegin', '<div class="reaction-members-container"><div class="reaction-members"><div class="members">'
+          + ['badonkeyds', 'louhow', 'dmacncheese'].map((n) => '<div class="user"><span class="avatar"></span>' + n + '</div>').join('') + '</div><div class="arrow"></div></div></div>');
+      }
+      // Sleeper's chat stays pinned to its bottom as it re-renders.
+      window.__pins++;
+      pin();
+    };
+    for (const r of menu.children) {
+      r.addEventListener('mouseover', () => {
+        clearTimeout(show);
+        clearTimeout(close);
+        show = setTimeout(() => { open = r.classList.contains('reacted') ? r.dataset.o : null; render(); }, 300);
+      });
+      r.addEventListener('mouseout', () => {
+        clearTimeout(show);
+        clearTimeout(close);
+        close = setTimeout(() => { open = null; render(); }, 100);
+      });
+    }
+  }
+</script>`;
+};
+
+test('chat: hovering an emoji reaction moves nothing, and the names popup shows whole', async () => {
+  documentBody = chatPage();
+  // A reacted emoji's place, the chat's scroll, and the names popup, as seen.
+  const look = () => page.evaluate(() => {
+    const emoji = document.querySelectorAll('.reaction.reacted')[1].getBoundingClientRect();
+    const box = document.querySelector('.reaction-members-container .reaction-members')?.getBoundingClientRect();
+    const users = [...document.querySelectorAll('.reaction-members .user')];
+    const group = document.querySelectorAll('.comment-group')[1].getBoundingClientRect();
+    // The popup's top edge is what the message clipped.
+    const top = box && document.elementFromPoint(box.x + box.width / 2, box.y + 4);
+    return {
+      emoji: [Math.round(emoji.x), Math.round(emoji.y)],
+      scroll: document.querySelector('.chat').scrollTop,
+      group: Math.round(group.height),
+      popup: box ? { whole: Boolean(top?.closest('.reaction-members')), cut: users.some((u) => u.scrollWidth > u.clientWidth + 1 || u.getBoundingClientRect().right > box.right) } : null,
+    };
+  });
+  // Hovers the emoji, then hovers it again where it is now, as you would.
+  const hoverTwice = async () => {
+    await page.goto(`https://sleeper.com/leagues/${LEAGUE}/league`);
+    await page.locator('.reaction.reacted').nth(1).waitFor();
+    const before = await look();
+    await page.mouse.move(before.emoji[0] + 10, before.emoji[1] + 12);
+    await page.waitForTimeout(450);
+    const hovered = await look();
+    await page.mouse.move(hovered.emoji[0] + 10, hovered.emoji[1] + 12);
+    await page.waitForTimeout(700);
+    return { before, hovered, named: await look() };
+  };
+
+  // Sleeper's own behavior, the extension's fix switched off (its <html> switch kept off on this page): both shifts, and the names cut off.
+  await page.addInitScript(() => new MutationObserver(() => document.documentElement?.removeAttribute('data-snp-chat')).observe(document, { attributes: true, subtree: true, attributeFilter: ['data-snp-chat'] }));
+  const sleeper = await hoverTwice();
+  assert.notDeepEqual(sleeper.hovered.emoji, sleeper.before.emoji, 'Sleeper: the emoji moves away as the row opens');
+  assert.ok(sleeper.hovered.group > sleeper.before.group, 'Sleeper: the message grows');
+  assert.notEqual(sleeper.named.scroll, sleeper.before.scroll, 'Sleeper: the chat scrolls, pinned to its bottom as the row re-renders');
+  assert.ok(!sleeper.named.popup.whole || sleeper.named.popup.cut, 'Sleeper: the names are cut off');
+
+  // With the extension: nothing moves, and the names show whole.
+  await page.close();
+  page = await context.newPage();
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+  const fixed = await hoverTwice();
+  assert.deepEqual(fixed.hovered.emoji, fixed.before.emoji, 'the emoji stays under the cursor');
+  assert.equal(fixed.hovered.group, fixed.before.group, 'the message keeps its height');
+  assert.deepEqual(fixed.named.emoji, fixed.before.emoji);
+  assert.equal(fixed.named.scroll, fixed.before.scroll, 'the chat never scrolls');
+  assert.deepEqual(fixed.named.popup, { whole: true, cut: false }, 'every name shows, whole');
+  assert.equal(await page.locator('.reaction-menu').nth(1).locator('.reaction').evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().width === 40).length), 14, 'every option to pick from');
+  await page.screenshot({ path: `${OUT}chat-reactions.png`, clip: { x: 380, y: 40, width: 560, height: 400 } });
+  // Leaving closes it, back to how it was.
+  await page.mouse.move(10, 10);
+  await page.waitForTimeout(400);
+  assert.deepEqual((await look()).emoji, fixed.before.emoji);
+  assert.equal(await page.locator('.reaction-members-container').count(), 0);
+  documentBody = LOGGED_OUT;
+});

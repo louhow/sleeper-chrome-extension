@@ -300,6 +300,17 @@ It opens the same dialog as the NBA version, with no warnings to tick through: o
 
 How it hooks in: `src/page-hook.js` reads the lineup from Sleeper's Team component props (slots and starters as shown, roster, players, `hasTeamPlayedMap`) and each row's projection (`proj` stats and `scoringSettings`), and answers the extension's `snp:nfl-lineup` ask synchronously.
 
+### Chat reactions
+
+Sleeper's chat (any page) keeps every emoji option in a message's reaction row, the unused ones at width 0, and widens them all while the row is hovered.
+That moves the emoji under the cursor (an option before it opens up) and makes the message a line or two taller; the chat, pinned to its bottom, then scrolls by that much once the names popup re-renders it.
+The popup itself sits inside its message, which clips it, and cuts names at 64px.
+
+- An open row is an overlay instead: it opens upward over its own message from where it sits, emoji already picked first, and the message keeps its height, so nothing on the page moves and the chat never scrolls.
+- Widths change at once and only the pop-in animates, so closing doesn't reflow either.
+- Who reacted shows above the emoji, outside the message, as wide as the names.
+- It's all one stylesheet switched on by `data-snp-chat` on `<html>`, plus a hover handler that holds the row's height while it's open (`src/chat.js`).
+
 ### How the extension and page-hook talk
 
 `src/page-hook.js` runs in the page's own world (only there can it read React props); the rest runs in the extension's.

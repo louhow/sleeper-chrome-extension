@@ -1,14 +1,15 @@
 // The content scripts' entry: follows Sleeper's in-page navigation and keeps
 // one session per league, an NBA one to start with (nba/session.js), which
 // hands an NFL league over to nfl/session.js once its sport is known; the
-// sidebar's lines for NBA leagues (nba/nav.js), on every page. Also the admin
-// switch (?snp-admin), saved for the whole browser.
+// sidebar's lines for NBA leagues (nba/nav.js) and the chat's emoji reactions
+// (chat.js), on every page. Also the admin switch (?snp-admin), saved for the whole browser.
 (() => {
-  const { nbaSession, nbaNav } = globalThis.SNP;
+  const { nbaSession, nbaNav, chat } = globalThis.SNP;
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
 
   let active = null;
   const nav = nbaNav();
+  chat();
 
   // Admin tools (what-if scoring: the Scoring control and the Players tab's
   // adminFPTS and adminDelta columns) are hidden unless turned on with
