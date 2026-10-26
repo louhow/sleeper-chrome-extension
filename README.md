@@ -13,8 +13,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 Everything runs locally in your browser.
 There is no server: the extension only talks to Sleeper, the same way Sleeper's own site does.
 It calls `api.sleeper.app` and `sleeper.com` for league data, and loads player headshots, team logos and avatars from Sleeper's image CDN (`sleepercdn.com`).
-No data is sent to the author or any third party, and we never see your data or your Sleeper login.
-The only things it stores are cached copies of Sleeper's public player lists, which team you picked per league, and your own lineups as it reads them (to know who started which game for Lock-In), all in your browser's extension storage.
+No data is sent to the author or any third party, we never see your data.
 
 ## Install
 
@@ -23,8 +22,6 @@ The only things it stores are cached copies of Sleeper's public player lists, wh
 3. Click "Load unpacked" and pick the cloned directory.
 4. Visit your league on `https://sleeper.com` while logged in (for NBA, the `/team` or `/matchup` tab).
 
-Pick your team in the dropdown once; the choice is remembered per league.
-If the page has no empty tab to fill, the panel shows as a floating panel instead.
 To update, `git pull`, hit the reload icon on the extension card, and refresh the Sleeper tab.
 
 ## Features
