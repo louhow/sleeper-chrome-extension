@@ -283,7 +283,8 @@ Sleeper's web app has no Matchup tab for one and its standings are all 0-0, so t
   A halo goes to a chopped team that scored better a week than the league did (every team's points over every week it played), horns to the rest. Sleeper doesn't publish its rule; this one gives the same halos as its app on a real league.
 - The week's numbers are the NFL Team tab's (the same loads), read again during games while the League tab is on screen.
 - On the Team tab, the team card shows what Sleeper's app shows in place of the record (always 0-0) and opponent (there is none): points per week played and FAAB left ("110.55 avg fpts · $61 faab"), then, for the week on now, the safe chance and its bar. A chopped team's card says "Chopped · wk 6".
-- On the Players tab, a red axe after a player's name marks each player the latest chop dropped who no one has picked up since, as Sleeper's app marks them (hover: "Chopped in week 6: on waivers"). Who that is comes from Sleeper's own Players panel, the list its Chopped filter shows, so it costs no extra calls.
+- On the Players tab, a red axe after a player's name marks each player the latest chop dropped who no one has picked up since, as Sleeper's app marks them (hover: "Chopped in week 6: on waivers"). Who that is comes from Sleeper's own Players panel, the list its Chopped filter shows, so it costs no extra calls. It sits after Sleeper's rookie badge, never on top of it.
+- Sleeper's web Chopped filter lists every player the latest chop dropped, even those claimed since; its app lists only those still on waivers. The extension takes the claimed ones out of the web filter's list, so it shows what the app does.
 
 ### NFL: Players tab
 

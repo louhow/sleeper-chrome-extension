@@ -376,6 +376,7 @@
     weekSwitch(week);
     shotToggle(statType === 'stat' && !nfl);
     teamPicker(panel);
+    if (nfl) unclaimedChops(panel);
     const fetched = shownWeek && !nfl ? weekSchedule(season, shownWeek) : null;
     // The season shows the weeks through the current one (Sleeper's leg).
     const recent = nfl ? recentWeeks(season, shownWeek ?? panel.props.leg) : null;
@@ -626,6 +627,18 @@
   // dropped and no one has picked up since, as Sleeper's app marks them. Sleeper's
   // own Players panel holds who that is (the Chopped filter's list).
   const AXE = '<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(35 12 12)"><path d="M10.6 2.5h4.2c2.2 0 4.2-.9 5.8-2.3v11.2c-1.6-1.4-3.6-2.3-5.8-2.3h-4.2z" fill="currentColor"/><path d="M12.2 3v20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></g></svg>';
+  // Sleeper's web Chopped filter lists every player the latest chop dropped,
+  // claimed since or not; its app lists only those still on waivers. Taking
+  // the rostered ones out of the panel's list makes the web filter match.
+  function unclaimedChops(panel) {
+    const data = panel.state.choppedData;
+    const map = data?.latestChoppedPlayersMap;
+    const owned = panel.props.ownedPlayers || {};
+    if (!map || !Object.keys(map).some((id) => owned[id])) return;
+    const left = Object.fromEntries(Object.entries(map).filter(([id]) => !owned[id]));
+    panel.setState({ choppedData: { ...data, latestChoppedPlayersMap: left } });
+  }
+
   function chopMark(row, id, panel) {
     const name = row.querySelector('.player-meta-container .name');
     if (!name) return;
@@ -1153,6 +1166,8 @@
     ${PLAYERS_PANEL} .owner[data-snp-owner] > :not(.snp-owner) { display: none !important; }
     ${PLAYERS_PANEL} .snp-chop { display: inline-flex; width: 16px; height: 16px; margin-left: 4px; vertical-align: -3px; color: rgb(255, 77, 125); }
     ${PLAYERS_PANEL} .snp-chop svg { width: 100%; height: 100%; }
+    /* Sleeper floats its rookie badge (absolute) after the name, where the axe goes: in line, they sit side by side. */
+    ${PLAYERS_PANEL} .name:has(> .snp-chop) > .rookie-label { position: static !important; vertical-align: -1px; }
     /* NFL rows have a game line too: the team line takes no more height than Sleeper's own (12px). */
     ${PLAYERS_PANEL} .name-container:has(.game-schedule-live-description) .snp-owner { line-height: 12px; }
     ${PLAYERS_PANEL} .name-container:has(.game-schedule-live-description) .snp-owner-avatar { width: 12px; height: 12px; }

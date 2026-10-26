@@ -156,6 +156,8 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   .player-list-item.nfl .game-schedule-live-description { display: inline-block; overflow: hidden; white-space: nowrap; font-size: 11px; min-height: 11px; opacity: 0.6; }
   .player-list-item.nfl .game-schedule-live-description .rz { display: flex; align-items: center; justify-content: center; padding: 2px; border-radius: 3px; background: #ff2a6d; font-weight: bold; font-size: 8px; margin: 0 3px; position: relative; top: -1px; }
   .player-list-item.nfl .owner { font-size: 9px; line-height: 12px; }
+  /* Sleeper's rookie badge, floated after the name. */
+  .player-list-item .player-meta-container .rookie-label { height: 12px; margin-left: 5px; position: absolute; }
   .section-header { display: flex; height: 16px; font-size: 11px; font-weight: 700; }
 </style>
 <div class="integration-players-panel"><div class="filters"><div class="header-top"><button data-pos="ALL">ALL</button><button data-pos="PG">PG</button>
@@ -237,7 +239,7 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
     grid.__reactInternalInstance$test = fiberOf({ players: view, playerStatsMap: map }, 3);
     const nfl = panel.props.sport === 'nfl';
     const game = (p) => (nfl ? '<div class="position-container">' + p.pos + ' - ' + p.team + '</div><div class="game-schedule-live-description">' + (p.game || 'Sun 1:00 PM') + (p.redZone ? '<span class="rz">RZ</span>' : '') + '</div>' : '');
-    grid.innerHTML = view.map(({ player_id: id }) => '<div class="player-list-item' + (nfl ? ' nfl' : '') + '" data-id="' + id + '"><div class="owner-cell"></div><div class="player-meta-container"><div class="name-container"><div class="name">' + id + '</div>' + game(PLAYERS.find((p) => p.id === id)) +
+    grid.innerHTML = view.map(({ player_id: id }) => '<div class="player-list-item' + (nfl ? ' nfl' : '') + '" data-id="' + id + '"><div class="owner-cell"></div><div class="player-meta-container"><div class="name-container"><div class="name">' + id + (PLAYERS.find((p) => p.id === id).rookie ? '<img alt="rookie-label" class="rookie-label" width="12" height="12" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1 1%22%3E%3Crect width=%221%22 height=%221%22 fill=%22%23a97cff%22/%3E%3C/svg%3E">' : '') + '</div>' + game(PLAYERS.find((p) => p.id === id)) +
       (OWNERS[id] ? '<div class="owner"><i class="fa fa-arrow-right">→</i><div>' + USERS[owned[id].user_id].display_name + '</div></div>' : '') + '</div></div>' +
       statKeys.map((k) => '<div class="cell nba">' + (map[id][k] == null ? '-' : (map[id][k] / (k === 'sp' ? 60 : 1) / (map[id].gp || 1)).toFixed(1)) + '</div>').join('') + '</div>').join('');
     for (const row of grid.children) row.__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: { player: { player_id: row.dataset.id } } } };
@@ -2367,7 +2369,7 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
     // Live, in the red zone, as Sleeper marks it.
     { id: 'qbx', pos: 'QB', team: 'DET', owner: 'Cookie Monster', stats: stats(20), game: '5:28 4th 13-43 vs TB', redZone: true },
     { id: 'tex', pos: 'TE', team: 'KC', owner: 'Cling Kong', stats: stats(12) },
-    { id: 'rbx', pos: 'RB', team: 'SF', stats: stats(8) },
+    { id: 'rbx', pos: 'RB', team: 'SF', stats: stats(8), rookie: true },
   ], {
     statType: 'stat', statInterval: 6, statKeys: NFL_KEYS, sort: 'fpts',
     // As in a chopped league: the latest chop's players (the TE has been picked up since).
@@ -2463,6 +2465,11 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
   await page.locator('.player-list-item[data-id="rbx"] .name .snp-chop').waitFor();
   assert.equal(await page.locator('.player-list-item[data-id="rbx"] .snp-chop').getAttribute('title'), 'Chopped in week 6: on waivers');
   assert.equal(await page.locator('.snp-chop').count(), 1, 'only the chopped player still on waivers');
+  // Sleeper's Chopped filter's list loses the TE, claimed since, as on Sleeper's app.
+  assert.deepEqual(await page.evaluate(() => Object.keys(panel.state.choppedData.latestChoppedPlayersMap)), ['rbx']);
+  // The axe and Sleeper's rookie badge sit side by side.
+  const [axe, rookie] = await Promise.all(['.snp-chop', '.rookie-label'].map((sel) => page.locator(`.player-list-item[data-id="rbx"] ${sel}`).boundingBox()));
+  assert.ok(rookie.x + rookie.width <= axe.x || axe.x + axe.width <= rookie.x, `no overlap (rookie ${rookie.x}-${rookie.x + rookie.width}, axe ${axe.x}-${axe.x + axe.width})`);
   await page.locator('.player-table').screenshot({ path: `${OUT}nfl-players-chopped.png` });
   // The team picker and team lines, as on the NBA Players tab.
   const picker = page.locator('.header-top .snp-team-pick');
