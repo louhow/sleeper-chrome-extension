@@ -962,7 +962,8 @@ span.team-link:hover {
   border-radius: 14px;
   background: var(--card);
 }
-.chop-tab {
+.chop-tab,
+.team-card {
   --chop: var(--danger);
   --danger-zone: var(--warn);
   --safe: var(--accent);
@@ -1020,6 +1021,11 @@ span.team-link:hover {
   gap: 10px;
   font-size: 13px;
   text-transform: uppercase;
+}
+.team-card .chop-me-safe {
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 11px;
 }
 .chop-me-safe .chop-bar {
   flex: 1;

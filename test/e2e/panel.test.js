@@ -347,7 +347,8 @@ const chopLeagueTab = () => `<!doctype html><title>Sleeper</title>
 
 // `wrapped`: inside Sleeper's tab frame (its tab row and scroll container), which
 // the extension's own Team and Matchup tabs take the place of. `token`: logged in.
-const nflTeamTab = ({ wrapped = false, rosterId = 4, round = 7, token = false } = {}) => `<!doctype html><title>Sleeper</title>
+// `league`: another NFL league's id (CHOP_LEAGUE).
+const nflTeamTab = ({ wrapped = false, rosterId = 4, round = 7, token = false, league = NFL_LEAGUE } = {}) => `<!doctype html><title>Sleeper</title>
 ${token ? `<script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>` : "<script>localStorage.removeItem('token')</script>"}
 <style>
   body { margin: 0; background: rgb(16, 33, 49); font-family: Lato, Arial, sans-serif; color: #fff; }
@@ -362,7 +363,7 @@ ${token ? `<script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>` : "<
   .center-tab-selector { display: flex; gap: 8px; padding: 20px 24px; }
   .scrollbar-container { flex: 1; min-height: 0; overflow: auto; }
 </style>
-${wrapped ? `<div class="postdraft-panel"><div class="center-tab-selector"><span class="item-tab" onclick="history.pushState({}, '', '/leagues/${NFL_LEAGUE}/matchup')">MATCHUP</span><span class="item-tab" onclick="history.pushState({}, '', '/leagues/${NFL_LEAGUE}/team')">TEAM</span></div><div class="scrollbar-container"><div class="team-panel">` : ''}
+${wrapped ? `<div class="postdraft-panel"><div class="center-tab-selector"><span class="item-tab" onclick="history.pushState({}, '', '/leagues/${league}/matchup')">MATCHUP</span><span class="item-tab" onclick="history.pushState({}, '', '/leagues/${league}/team')">TEAM</span></div><div class="scrollbar-container"><div class="team-panel">` : ''}
 <div class="user-tab-menu"><div class="row"><b>Lou Point Conversion</b><div class="actions">
   <div class="btn-container space"><div class="btn">W</div><div class="btn-text">WAIVER</div></div>
   <div class="btn-container space"><div class="btn">T</div><div class="btn-text">TRADE</div></div>
@@ -376,7 +377,7 @@ ${wrapped ? '</div></div></div>' : ''}
   const scoring = { rec_yd: 0.1 };
   const team = {
     memoizedProps: {
-      sport: 'nfl', leagueId: '${NFL_LEAGUE}', round: ${round}, rosterId: ${rosterId}, isTeamOwner: true, disableEdit: false,
+      sport: 'nfl', leagueId: '${league}', round: ${round}, rosterId: ${rosterId}, isTeamOwner: true, disableEdit: false,
       league: { status: 'in_season' },
       roster: { roster_id: ${rosterId}, players: Object.keys(players), reserve: [], taxi: [] },
       hasTeamPlayedMap: { DET: 'complete' },
@@ -2689,6 +2690,20 @@ test('chopped league tab: your safe status, the chopping block and the graveyard
   assert.equal(await page.locator('.league-tab-standings').isVisible(), false);
   assert.equal(await page.locator('.league-activity-card').isVisible(), true);
   await page.screenshot({ path: `${OUT}chop-league.png`, fullPage: true });
+  documentBody = LOGGED_OUT;
+});
+
+test('chopped league team tab: points per week, FAAB left and the safe chance in place of the 0-0 record', async () => {
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${CHOP_LEAGUE}/rosters`)).json();
+  sleeper.me = rosters.find((r) => !r.settings?.eliminated).owner_id;
+  documentBody = nflTeamTab({ wrapped: true, token: true, league: CHOP_LEAGUE });
+  await page.goto(`https://sleeper.com/leagues/${CHOP_LEAGUE}/team`);
+  const card = page.locator(nflPanel('.team-card'));
+  await card.waitFor({ timeout: 30000 });
+  await card.locator('.chop-me-safe').waitFor({ timeout: 30000 });
+  assert.match(await card.locator('.who').innerText(), /\n\d+\.\d\d avg fpts · \$\d+ faab\n\d+% safe$/i);
+  assert.doesNotMatch(await card.innerText(), /0-0/);
+  await card.screenshot({ path: `${OUT}chop-team-card.png` });
   documentBody = LOGGED_OUT;
 });
 

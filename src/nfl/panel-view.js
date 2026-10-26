@@ -4,7 +4,7 @@
 (globalThis.SNP ||= {}).nflPanelView = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
     shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
-  const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian, medianStanding } = globalThis.SNP.model;
+  const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian, medianStanding, isChopped, chopBlock, chopTeamStats } = globalThis.SNP.model;
   const { slotBadge, headshot, injury } = globalThis.SNP.nflUi;
   // Sleeper's apps list bench players by position in this order.
   const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
@@ -112,6 +112,33 @@
     return { points: any ? points : null, proj: live.reduce((sum, x) => sum + x.now, 0), toPlay: live.filter((x) => x.g.state === 'left').length };
   }
 
+  // A chopped league's block for the shown week (model.chopBlock): every team
+  // still alive with its totals and starters played.
+  function chopBlockOf(s) {
+    const teams = (s.rosters || []).filter((r) => !r.settings?.eliminated).map((roster) => {
+      const l = lineup(s, roster.roster_id);
+      const t = l ? totals(s, l) : { points: null, proj: 0, toPlay: 0 };
+      const starters = l ? l.starters.filter(real).length : 0;
+      return { rosterId: roster.roster_id, roster, ...t, played: starters - t.toPlay, starters };
+    });
+    return chopBlock(teams);
+  }
+
+  // A chopped league's Team tab card line, as Sleeper's app has it: points per
+  // week and FAAB left, then (the week on now) the safe chance and its bar,
+  // or the week the team was chopped. Null in other leagues.
+  function chopLine(s, roster) {
+    if (!isChopped(s.league)) return null;
+    const { avg, faab } = chopTeamStats(s.league, roster);
+    const stats = `${avg == null ? '–' : f2(avg)} avg fpts · $${faab} faab`;
+    const out = roster.settings?.eliminated;
+    const t = !out && s.week === s.currentWeek ? chopBlockOf(s).find((x) => x.rosterId === roster.roster_id) : null;
+    return `<div class="sub">${out ? `<b class="chop-tag">Chopped</b> · wk ${esc(out)} · ` : ''}${stats}</div>
+      ${t ? `<div class="chop-me-safe"><b class="${t.zone}">${Math.round(t.safe * 100)}% safe</b>${chopBar(t.safe, t.zone)}</div>` : ''}`;
+  }
+  // A share as a bar, in its zone's color.
+  const chopBar = (safe, zone) => `<span class="chop-bar ${zone}"><span style="width:${Math.round(safe * 100)}%"></span></span>`;
+
   // The shown week's league median (model.leagueMedian) over every team with a
   // matchup that week; null when the league plays no median that week.
   function median(s) {
@@ -146,7 +173,7 @@
     const row = (slot, id, spot) => playerRow(ctx, slot, id, spot);
     const head = (title, hint = '') => rowHead(title, { hint, cls: 'nfl', middle: '<div class="nfl-game-h">Game</div>' });
     // IR and taxi keep the league's slots, open ones included, so the page holds its shape.
-    return `${teamCard(s, l.roster, { points: t.points, proj: t.proj, opponent: oppId != null && s.rosters.find((r) => r.roster_id === oppId), week: l.week })}
+    return `${teamCard(s, l.roster, { points: t.points, proj: t.proj, opponent: oppId != null && s.rosters.find((r) => r.roster_id === oppId), week: l.week, sub: chopLine(s, l.roster) })}
       ${head('Starters', swapHint(s, l.editable, real(picked) ? s.players[picked]?.name || 'them' : null))}
       ${l.starters.map((id, i) => row(l.slots[i] ?? 'FLEX', id, `s:${i}`)).join('')}
       ${l.bench.length ? `${head('Bench')}${l.bench.map((id) => row('BN', id, `b:${id}`)).join('')}` : ''}
@@ -237,5 +264,5 @@
     </div>`;
   }
 
-  return { render, lineup, totals, moveLineup, targetsOf };
+  return { render, lineup, totals, chopBlockOf, chopBar, moveLineup, targetsOf };
 })();

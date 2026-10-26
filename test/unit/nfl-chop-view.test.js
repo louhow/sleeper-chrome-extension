@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 import { state } from './nfl-fixture.js';
 
-const { nflChopView } = loadSnp();
+const { nflChopView, nflPanelView } = loadSnp();
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 // The NFL fixture as a chopped league: a third team chopped in week 5.
 function chopped({ me = 'u1' } = {}) {
   const s = state();
   s.me = me;
+  s.currentWeek = 7;
   s.league.settings = { ...s.league.settings, type: 3, start_week: 1, last_scored_leg: 6, last_chopped_leg: 5, waiver_budget: 1000 };
   s.usersById.u3 = { display_name: 'ghost', metadata: { team_name: 'Gone Team' } };
   s.rosters[0].settings = { ...s.rosters[0].settings, fpts: 600, fpts_decimal: 0, waiver_budget_used: 939 };
@@ -44,4 +45,20 @@ test('a chopped team of yours says so instead of a safe chance', () => {
 test('loading until the week is in; ordinals', () => {
   assert.match(nflChopView.render(null), /chop-tab/);
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 112].map(nflChopView.ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '112th']);
+});
+
+test('team tab card: points per week and FAAB left in place of the record, and the safe chance for the week on now', () => {
+  const card = (s) => text(nflPanelView.render(s, [])).split('Starters')[0];
+  assert.match(card(chopped()), /Gridiron &lt;Gang&gt; 100\.00 avg fpts · \$61 faab 90% safe 30\.50 proj 50\.40/);
+  assert.doesNotMatch(card(chopped()), /4-2|vs Blitz/);
+  // Another week: no safe chance, which is for the week on now.
+  assert.doesNotMatch(card({ ...chopped(), currentWeek: 8 }), /% safe/);
+  const gone = chopped();
+  gone.rosterId = 3;
+  gone.weeks[7].matchups.push({ roster_id: 3, matchup_id: null, starters: [], points: 0 });
+  assert.match(card(gone), /Gone Team Chopped · wk 5 · 80\.10 avg fpts · \$688 faab/);
+  // Other leagues keep the record and opponent.
+  const s = chopped();
+  s.league.settings.type = 0;
+  assert.match(card(s), /louhow · 4-2 · vs Blitz/);
 });

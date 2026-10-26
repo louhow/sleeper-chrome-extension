@@ -2,9 +2,9 @@
 // Sleeper's app draws it: your own safe status, the week's chopping block
 // (chop zone, danger, safe) and the graveyard of chopped teams. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflChopView = (() => {
-  const { esc, f2, real, avatar, avatarImg, teamName, ownerName, owns, loading } = globalThis.SNP.ui;
-  const { chopBlock, chopTeamStats, graveyard } = globalThis.SNP.model;
-  const { lineup, totals } = globalThis.SNP.nflPanelView;
+  const { esc, f2, avatar, avatarImg, teamName, ownerName, owns, loading } = globalThis.SNP.ui;
+  const { chopTeamStats, graveyard } = globalThis.SNP.model;
+  const { chopBlockOf, chopBar: bar } = globalThis.SNP.nflPanelView;
   // Sleeper's app's wording.
   const ZONES = { chop: 'Chop zone', danger: 'Danger', safe: 'Safe' };
 
@@ -14,19 +14,11 @@
     return `${n}${(!teen && { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10]) || 'th'}`;
   }
   const safeText = (safe) => `${Math.round(safe * 100)}%`;
-  // A share as a bar, in its zone's color.
-  const bar = (safe, zone) => `<span class="chop-bar ${zone}"><span style="width:${Math.round(safe * 100)}%"></span></span>`;
 
   //   s: the NFL panel's data for the week on now (nflPanel.weekView).
   function render(s) {
     if (!s) return `<div class="app league chop-tab">${loading()}</div>`;
-    const teams = (s.rosters || []).filter((r) => !r.settings?.eliminated).map((roster) => {
-      const l = lineup(s, roster.roster_id);
-      const t = l ? totals(s, l) : { points: null, proj: 0, toPlay: 0 };
-      const starters = l ? l.starters.filter(real).length : 0;
-      return { rosterId: roster.roster_id, roster, ...t, played: starters - t.toPlay, starters };
-    });
-    const block = chopBlock(teams);
+    const block = chopBlockOf(s);
     return `<div class="app league chop-tab">
       ${mine(s, block)}
       ${blockView(s, block)}

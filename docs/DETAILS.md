@@ -280,6 +280,7 @@ Sleeper's web app has no Matchup tab for one and its standings are all 0-0, so t
 - Safe % is the chance of not finishing the week last: each team's final score is a normal distribution around its live projection, as in Sleeper's win chance (tighter as its score nears the projection), and a team's chance of being last is summed over every score it could finish on. Once every game is over, the score decides it.
 - Graveyard: every chopped team, latest first, with the week, FAAB left and points per week played.
 - The week's numbers are the NFL Team tab's (the same loads), read again during games while the League tab is on screen.
+- On the Team tab, the team card shows what Sleeper's app shows in place of the record (always 0-0) and opponent (there is none): points per week played and FAAB left ("110.55 avg fpts · $61 faab"), then, for the week on now, the safe chance and its bar. A chopped team's card says "Chopped · wk 6".
 - On the Players tab, a red axe after a player's name marks each player the latest chop dropped who no one has picked up since, as Sleeper's app marks them (hover: "Chopped in week 6: on waivers"). Who that is comes from Sleeper's own Players panel, the list its Chopped filter shows, so it costs no extra calls.
 
 ### NFL: Players tab
