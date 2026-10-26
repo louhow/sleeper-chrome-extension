@@ -51,6 +51,7 @@ The projection follows Lock-In rules: an unlocked player scores their final game
 
 The Team tab's **Optimize lineup** button (your own team, a week you can still edit) proposes the best starting lineup and the finished games worth locking in, and shows all of it in a dialog before anything saves.
 Nothing is written until you apply a row or press Apply all; Cancel, ✕, the backdrop or Esc leave the rest as it was.
+- Ties: at equal points, a player with a game that day takes the slot of one with none (a 0.00 projection with a game is all upside), even if the idle player is better later in the week; check back the next day to start them again. After that, the better player later, then fewest moves.
 
 - Rows: one per starting slot, in your lineup's order, so changes read against the lineup you know. They're compact so a full lineup fits on screen without scrolling.
   - A change leads with who comes in (name in blue), so the Starting column reads as the new lineup top to bottom; who they replace sits beside them in the Replaces column, faded, with an Apply button.

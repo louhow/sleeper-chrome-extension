@@ -637,11 +637,13 @@
   }
 
   // The starting lineup with the highest total worth: every movable player is
-  // matched to an open slot they fit, or to the bench. Ties go to the higher
+  // matched to an open slot they fit, or to the bench. Ties go to playing
+  // someone with a game over leaving the slot to a player with none, then to the higher
   // total `later`, then to the lineup that moves the fewest players, then to
   // players in their most specific slot. Any sport: NBA, NFL and EPL pass
   // their own slot rules.
-  //   worth(id): points a player is worth starting; later(id): the tie-breaker;
+  //   worth(id): points a player is worth starting; plays(id): whether they
+  //   have a game in the span `worth` covers; later(id): the next tie-breaker;
   //   fixedReason(id): why they can't move, or null;
   //   fits(slot, player), specificity(slot) (a small integer, higher = fewer
   //   positions), openSlot: the slot a starter index past `slots` plays.
@@ -649,7 +651,7 @@
   // projection: that's noise more than a forecast, and an empty slot is the
   // one thing Sleeper's own lineup screens flag as a mistake.
   function solveLineup({
-    slots, starters: current, bench, players, worth, later = () => 0, fixedReason = () => null,
+    slots, starters: current, bench, players, worth, plays = () => false, later = () => 0, fixedReason = () => null,
     fits: fitsSlot = fits, specificity = slotSpecificity, openSlot = 'UTIL',
   }) {
     const real = (id) => id && id !== '0';
@@ -671,7 +673,8 @@
     // numbers, so the totals stay exact integers in a double.
     const cents = (x) => Math.max(0, Math.min(Math.round((x || 0) * 100), 99999));
     const worthOf = Object.fromEntries(pool.map((id) => [id, cents(worth(id))]));
-    const laterOf = Object.fromEntries(pool.map((id) => [id, cents(later(id))]));
+    // A game to play outranks anything `later` adds up to (it is capped at 99999).
+    const laterOf = Object.fromEntries(pool.map((id) => [id, (plays(id) ? 100000 : 0) + cents(later(id))]));
     const n = open.length;
     const spec = Math.max(0, ...open.map((i) => specificity(slotOf(i))));
     const STAY = n * spec + 1;
@@ -726,6 +729,8 @@
     const solve = (locking) => solveLineup({
       slots: l.slots, starters: l.starters, bench: l.bench, players: l.players,
       worth: today,
+      // A zero projection with a game still beats an idle slot: it's all upside.
+      plays: (id) => look[id].left.some((d) => d.date === date),
       later: (id) => look[id].value,
       fixedReason: (id) => look[id].fixed || (locking.has(id) ? 'locking' : null),
     });

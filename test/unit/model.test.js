@@ -918,3 +918,12 @@ test('graveyard: a halo for a chopped team that scored better than the league a 
   assert.deepEqual(plain(model.graveyard(league, rosters).map((d) => [d.roster.roster_id, d.angel])), [[2, true], [3, false]]);
 });
 
+
+test('solveLineup: at equal worth, a player with a game takes the slot of one with none, however good the idle one is later', () => {
+  const players = { luka: { positions: ['PG'] }, tre: { positions: ['PG', 'SG'] }, hen: { positions: ['C', 'PF'] } };
+  const base = { slots: ['PG', 'UTIL'], starters: ['luka', 'tre'], bench: ['hen'], players, worth: (id) => (id === 'tre' ? 20 : 0), later: (id) => (id === 'luka' ? 50 : 0) };
+  assert.deepEqual([...model.solveLineup(base).starters], ['luka', 'tre'], 'without a game to play, nobody moves');
+  const plan = model.solveLineup({ ...base, plays: (id) => id !== 'luka' });
+  assert.deepEqual([...plan.starters], ['tre', 'hen']);
+  assert.deepEqual([...plan.changes.map((c) => `${c.id} ${c.from}->${c.to}`)], ['tre UTIL->PG', 'hen BN->UTIL', 'luka PG->BN']);
+});
