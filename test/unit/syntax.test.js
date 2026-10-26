@@ -15,7 +15,8 @@ test('every extension script compiles', () => {
 test('the manifest\'s icons are square PNGs of their size, and its description fits', () => {
   const manifest = JSON.parse(readFileSync(new URL('../../manifest.json', import.meta.url), 'utf8'));
   assert.ok(manifest.description.length <= 132, `${manifest.description.length} characters`);
-  for (const [size, file] of Object.entries(manifest.icons)) {
+  // The toolbar button's icons too: without an action, Chrome draws the pinned icon gray.
+  for (const [size, file] of [...Object.entries(manifest.icons), ...Object.entries(manifest.action.default_icon)]) {
     const png = readFileSync(new URL(`../../${file}`, import.meta.url));
     assert.equal(png.toString('ascii', 1, 4), 'PNG', file);
     assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [Number(size), Number(size)], file);
