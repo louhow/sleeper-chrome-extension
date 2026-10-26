@@ -2268,8 +2268,18 @@ h2.pc-name {
   align-items: flex-end;
 }
 .pc-item {
+  flex: none;
   padding: 0 14px;
   border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+/* A long college gives way (an ellipsis, the full name on hover) before the row runs off the card. */
+.pc-item.college {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.pc-item.college .pc-item-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pc-item:first-child {
   padding-left: 0;
@@ -2295,14 +2305,15 @@ h2.pc-name {
   opacity: 0.8;
 }
 /* The real-life draft: the year in line with the other values, "Rd 1, Pk 1 (CLE)"
-   on a small line under it, so the item is only as wide as the year. */
+   on a small line under it, ending where the year does (it's the row's last
+   item), so the item is only as wide as the year. */
 .pc-item.draft {
   position: relative;
 }
 .pc-item.draft small {
   position: absolute;
   top: 100%;
-  left: 14px;
+  right: 14px;
   margin: 3px 0 0;
   font-size: 11px;
   font-weight: 700;

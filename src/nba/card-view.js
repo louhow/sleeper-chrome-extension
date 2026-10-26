@@ -112,7 +112,7 @@
                 ${item('Height', height(bio?.height))}
                 ${item('Weight', bio?.weight ? `${esc(bio.weight)}<small>lbs</small>` : '-', true)}
                 ${item('Exp', bio?.years_exp ?? p.years_exp ?? '-')}
-                ${item('College', esc(bio?.college || '-'), true)}
+                ${item('College', `<span title="${esc(bio?.college || '')}">${esc(bio?.college || '-')}</span>`, true, 'college')}
                 ${item('Draft', draftValue(c.draft), true, 'draft')}
               </div>
               <div class="pc-label">Player Rankings</div>
