@@ -42,7 +42,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 
 **NFL**
 - Team tab, compact like the NBA one: a row per player (game, live clock and score, stat line, start and rostered %, points in their score color), any team from the picker, lineup swaps from the slot badges, Optimize lineup in the toolbar. Sleeper's own tab is a click away (⇄). A player's name opens Sleeper's player card.
-- Matchup tab: the League tab's matchup card on top (a team opens on the Team tab), both lineups slot by slot; the picker picks a matchup.
+- Matchup tab: the League tab's matchup card on top (a team opens on the Team tab), both lineups slot by slot with the game and box score under each player, muted as on Sleeper's own tab; the picker picks a matchup.
 - Optimize lineup, slot by slot like the NBA one; apply one row or all of them.
 - League tab matchups drawn like the NBA ones, with Sleeper's own live numbers.
 - League median on the League tab and medallions on the Matchup and League tabs, as on NBA.
@@ -61,6 +61,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 **All sports**
 - Score colors (green, yellow, red) from the league's own games: the thirds of its starters' recent scores, per position in NFL.
 - Each league opens on the tab you were last on in it when you switch leagues in the sidebar.
+- Settings: the gear in Sleeper's sidebar opens the extension's settings (a switch for the NFL pages and tools, so Sleeper's own show instead), with Sleeper's account settings a button away.
 - Chat: hovering a message's emoji reactions no longer shifts the chat around, and who reacted shows in full.
 - API tab: a log of every call the extension makes, with status, timing, size and a JSON preview.
 

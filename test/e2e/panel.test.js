@@ -640,8 +640,7 @@ before(async () => {
     return route.fallback();
   });
   await context.route('https://api.sleeper.app/v1/state/nba', async (route) => {
-    // Both doctored weeks are week 1, whatever week it really is.
-    if (!(sleeper.midWeek || sleeper.beforeTipoff)) return route.continue();
+    // The tests' data is week 1's, whatever week Sleeper is really on.
     const res = await route.fetch();
     return route.fulfill({ response: res, json: { ...(await res.json()), season_type: 'regular', week: 1, display_week: 1 } });
   });
@@ -1636,7 +1635,9 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.equal(await lockRow.locator('.os-p [data-player]').first().getAttribute('data-player'), locker);
   assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
   assert.ok(Number(await lockRow.locator('.score-chip.tier-green').textContent()) >= 70, 'the score, in its tier color');
-  assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < 20, 'keeping it open is worth far less');
+  // The live week's projections set the open value, so it's judged against the score, not a fixed number.
+  const locked = Number(await lockRow.locator('.score-chip.tier-green').textContent());
+  assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < locked / 2, 'keeping it open is worth far less');
   assert.equal(await lockRow.locator('[data-op-lock-row]').textContent(), 'Lock');
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
   assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply all');
@@ -1720,12 +1721,12 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   leg.starters_games = { ...existing };
   const beforeGreen = sleeper.mutations.length;
 
-  // Now the UTIL starter's finished game was green (30, over the league's green line) and every bench player is a must-start,
+  // Now the UTIL starter's finished game was green (45, over the league's green line, which moves with its games) and every bench player is a must-start,
   // the star most of all, so ties among the bench can't leave them out.
   sleeper.projections = (rows) => rows.map((r) => {
     if (r.player_id === star) return { ...r, stats: { pts: statPts(60) } };
     if (bench.includes(r.player_id)) return { ...r, stats: { pts: sleeper.finished.has(r.game_id) ? 0 : statPts(50) } };
-    if (r.player_id === victim) return { ...r, stats: { pts: sleeper.finished.has(r.game_id) ? statPts(30) : 0 } };
+    if (r.player_id === victim) return { ...r, stats: { pts: sleeper.finished.has(r.game_id) ? statPts(45) : 0 } };
     if (r.player_id === locker) return big(r);
     return quiet(r);
   });
@@ -2605,6 +2606,8 @@ test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup
   const slots = league.roster_positions.filter((p) => p !== 'BN');
   assert.ok(await page.locator(nflPanel('.mu-row')).count() >= slots.length);
   assert.equal(await page.locator(nflPanel('.mu-row')).first().locator('.mp.nfl').count(), 2);
+  assert.ok(await page.locator(nflPanel('.mp.nfl .mp-game .stats')).count() > 0, 'a box score under each player who has played');
+  assert.match(await page.locator(nflPanel('.mp.nfl .mp-game .sub')).first().textContent(), /^(Final [WLT] \d+-\d+ (vs|@) \w+|(vs|@) \w+ · .+|Bye)$/);
   await page.screenshot({ path: `${OUT}nfl-matchup.png` });
   // The picker lists matchups, both teams each.
   const pick = page.locator(nflPanel('.pair-pick'));
@@ -2624,6 +2627,49 @@ test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup
   await head.locator('.mu-team.theirs .team-name .team-link').click();
   await page.waitForURL(`**/leagues/${NFL_LEAGUE}/team`);
   await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: b }).waitFor({ timeout: 30000 });
+  documentBody = LOGGED_OUT;
+});
+
+test('settings: the sidebar gear opens the extension\'s dialog, the NFL pages switch off and on, account settings stay a button away', async () => {
+  documentBody = nflTeamTab({ wrapped: true });
+  await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/team`);
+  await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+  // Sleeper's gear, bottom left of its sidebar, with the click handler that goes to its account settings.
+  const addGear = () => page.evaluate(() => {
+    window.__account = 0;
+    document.body.insertAdjacentHTML('beforeend', '<div class="footer small"><div class="profile-wrapper"><div class="nav-profile-item"><div class="settings-icon" style="position:fixed;left:8px;bottom:8px;width:30px;height:30px">G</div></div></div></div>');
+    document.querySelector('.settings-icon').addEventListener('click', () => window.__account++);
+  });
+  await addGear();
+  const dialog = (sel = '') => `#sleeper-settings .dialog ${sel}`;
+  const nflSwitch = page.locator(dialog('[data-setting="nflUi"]'));
+  await page.locator('.settings-icon').click();
+  await nflSwitch.waitFor();
+  assert.equal(await page.evaluate(() => window.__account), 0, 'not Sleeper\'s account settings');
+  assert.equal(await nflSwitch.isChecked(), true);
+  await page.screenshot({ path: `${OUT}settings.png` });
+  // Off: Sleeper's own tab is back, and it stays off after a reload.
+  await nflSwitch.uncheck();
+  await page.locator(nflPanel()).waitFor({ state: 'detached' });
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-snp-hide-nfl-tab'));
+  assert.equal(await page.locator('.postdraft-panel > .scrollbar-container').isVisible(), true, 'Sleeper\'s own Team tab');
+  await page.reload();
+  await page.waitForTimeout(1500);
+  assert.equal(await page.locator('#sleeper-nfl-panel').count(), 0, 'remembered');
+  assert.equal(await page.locator('.postdraft-panel > .scrollbar-container').isVisible(), true);
+  // On again: ours is back without a reload.
+  await addGear();
+  await page.locator('.settings-icon').click();
+  await nflSwitch.check();
+  await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+  assert.equal(await page.locator('.postdraft-panel > .scrollbar-container').isVisible(), false);
+  // Escape closes it; the account button passes the click on to Sleeper.
+  await page.keyboard.press('Escape');
+  await page.locator('#sleeper-settings .dialog').waitFor({ state: 'detached' });
+  await page.locator('.settings-icon').click();
+  await page.locator(dialog('[data-action="account"]')).click();
+  assert.equal(await page.evaluate(() => window.__account), 1, 'Sleeper\'s account settings');
+  assert.equal(await page.locator('#sleeper-settings .dialog').count(), 0);
   documentBody = LOGGED_OUT;
 });
 

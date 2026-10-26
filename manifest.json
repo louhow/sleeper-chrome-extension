@@ -35,6 +35,8 @@
         "src/bridge.js",
         "src/shared.js",
         "src/chat.js",
+        "src/settings-view.js",
+        "src/settings.js",
         "src/loaders.js",
         "src/nba/week.js",
         "src/nba/panel-view.js",

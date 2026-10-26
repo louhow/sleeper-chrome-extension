@@ -250,6 +250,7 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
   Points read – until a starter's game kicks off, as on NBA; IR and taxi keep a row per league slot, open ones included, so the page holds its shape.
   Each row: slot, headshot, name, position and team, injury, start and rostered %; the game (opponent, kickoff, or the clock and score while it's on, or the final), the stat line; points, in their [score color](#score-colors) once the game is over, and the projection.
 - Any team from the picker (A to Z, with avatars), remembered for next time; the arrow keys go through them (just for now, as on NBA) and stop at the ends. The picker's menu closes on a click anywhere else.
+- Matchup: a row is the player and their points (a finished game's in its score color as text, not a chip), with the game under them in muted text as on Sleeper's own tab ("Final L 21-35 vs LAR", the clock and score while it's on, or kickoff) and the box score below it.
 - Sleeper's own tab is hidden as soon as the league is known to be NFL, and ours stays blank until its first load is in, as on the NBA tabs, so nothing shifts.
 - Your own lineup, for the week Sleeper's Team tab shows: tap a slot badge, then one of the highlighted players. Players whose game has kicked off stay put, as Sleeper locks them. Saves go through Sleeper's own Team component (`updateMatchupLeg`), as Optimize's do.
 - Optimize lineup sits in the toolbar, as on the NBA Team tab, and opens the same dialog.
@@ -315,6 +316,13 @@ It opens the same dialog as the NBA version, with no warnings to tick through: o
 - The save notice shows in the compact tab when it's on screen, else under the dialog's layer; never both.
 
 How it hooks in: `src/page-hook.js` reads the lineup from Sleeper's Team component props (slots and starters as shown, roster, players, `hasTeamPlayedMap`) and each row's projection (`proj` stats and `scoringSettings`), and answers the extension's `snp:nfl-lineup` ask synchronously.
+
+### Settings
+
+The gear at the bottom left of Sleeper's sidebar opens the extension's settings instead of Sleeper's account settings (`src/settings.js`, drawn by `settings-view.js`); the dialog's "Sleeper account settings" button passes the click on to Sleeper.
+Settings are saved for the whole browser (`chrome.storage.local`, key `settings`) and followed by every tab.
+
+- **NFL tabs and tools** (on by default): the Team and Matchup tabs, League cards, Optimize lineup and the Players tab's Last 5. Off, an NFL league shows Sleeper's own pages and the extension stays out of them; changing it starts each league's session over, no reload needed.
 
 ### Chat reactions
 

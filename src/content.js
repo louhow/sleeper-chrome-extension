@@ -2,14 +2,21 @@
 // one session per league, an NBA one to start with (nba/session.js), which
 // hands an NFL league over to nfl/session.js once its sport is known; the
 // sidebar's lines for NBA leagues (nba/nav.js) and the chat's emoji reactions
-// (chat.js), on every page. Also the admin switch (?snp-admin), saved for the whole browser.
+// (chat.js), and the settings dialog (settings.js), on every page. Also the admin switch (?snp-admin), saved for the whole browser.
 (() => {
   const { nbaSession, nbaNav, chat } = globalThis.SNP;
+  const settings = globalThis.SNP.settings();
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
 
   let active = null;
   const nav = nbaNav();
   chat();
+  // A setting changed: each league's session starts over with it.
+  settings.onChange(() => {
+    active?.destroy();
+    active = null;
+    sync();
+  });
 
   // Admin tools (what-if scoring: the Scoring control and the Players tab's
   // adminFPTS and adminDelta columns) are hidden unless turned on with
@@ -51,7 +58,7 @@
     // One session per league, kept across its tabs; the panel only shows on Team and Matchup.
     if (leagueId !== (active?.leagueId ?? null)) {
       active?.destroy();
-      active = leagueId ? nbaSession(leagueId, page, { admin, nav }) : null;
+      active = leagueId ? nbaSession(leagueId, page, { admin, nav, settings }) : null;
     }
     active?.show(page);
     active?.attach();

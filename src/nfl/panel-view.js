@@ -251,21 +251,30 @@
       ${section('Taxi Squad', 'TX', mine.taxi, theirs?.taxi, settings.taxi_slots)}`;
   }
 
+  // The game under a matchup row, as Sleeper's Matchup tab words it: "Final L 21-35 vs LAR", "Q2 4:12 7-10 @ SEA", "vs PHI · Mon 7:15pm".
+  function matchupGameText(g) {
+    if (g.state === 'bye') return 'Bye';
+    const at = `${g.homeSide ? 'vs' : '@'} ${g.opponent}`;
+    if (g.state === 'done') {
+      const result = g.mine > g.theirs ? 'W' : g.mine < g.theirs ? 'L' : 'T';
+      return `Final ${result} ${g.mine ?? 0}-${g.theirs ?? 0} ${at}`;
+    }
+    return g.state === 'live' ? `${g.clock} ${g.mine ?? 0}-${g.theirs ?? 0} ${at}${g.redZone === g.team ? ' · RZ' : ''}` : `${at} · ${kickoff(g.start)}`;
+  }
+
   function side(s, id, cls) {
     if (!real(id)) return muEmpty(`nfl ${cls}`);
     const p = playerOf(s.players, id);
     const n = numbers(s, id);
-    const { g } = n;
-    const at = g.state === 'bye' ? 'Bye' : `${g.homeSide ? 'vs' : '@'} ${g.opponent}`;
-    const when = g.state === 'done' ? `Final ${g.mine ?? 0}-${g.theirs ?? 0}` : g.state === 'live' ? liveText(g) : g.state === 'left' ? kickoff(g.start) : '';
+    const stats = statLine(s.weeks[s.week].stats[id], p.position);
     return `<div class="mp nfl ${cls}">
       ${photo(id, p)}
       <div class="mp-id">
         <div class="name"><button data-player="${esc(id)}">${esc(shortName(p))}</button>${injury(p)}</div>
         <div class="sub">${teamTag(p, { sep: '•' })}</div>
       </div>
-      <div class="mp-game ${g.state}"><b>${esc(at)}</b><span class="sub">${esc(when)}</span></div>
       <div class="mp-pts">${points(s, p, n)}<span>proj ${f2(n.proj)}</span></div>
+      <div class="mp-game ${n.g.state}"><span class="sub">${esc(matchupGameText(n.g))}</span>${stats ? `<span class="stats">${esc(stats)}</span>` : ''}</div>
     </div>`;
   }
 

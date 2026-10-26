@@ -58,7 +58,10 @@ test('matchup: both teams, win chance, rows slot by slot and empty sections held
   assert.match(html, /class="mu-head lg-match nfl-mu-head"/);
   assert.match(html, /data-open-team="2"/, 'the opponent opens on the Team tab');
   assert.match(out, /Starters 1 yet to play · 2 for them/);
-  assert.match(out, /P\. Mahomes QB • KC vs BUF Final 27-20 24\.50 proj 21\.20 QB J\. Allen QB • BUF @ KC Final 20-27 12\.00 proj 18\.00/);
+  // A row is the player and points, then the game and box score under them, as on Sleeper's own tab.
+  assert.match(out, /P\. Mahomes QB • KC 24\.50 proj 21\.20 Final W 27-20 vs BUF 21\/30 CMP, 260 YD, 2 TD QB J\. Allen QB • BUF 12\.00 proj 18\.00 Final L 20-27 @ KC/);
+  assert.match(out, /C\. Lamb Q RB • DAL 6\.00 proj 14\.00 Q2 4:12 7-10 vs PHI · RZ 8 CAR, 41 YD/, 'a live game');
+  assert.match(html, /<div class="mp-game done"><span class="sub">Final W 27-20 vs BUF<\/span><span class="stats">21\/30 CMP, 260 YD, 2 TD<\/span>/);
   assert.match(out, /Empty W R T G\. Kittle/, 'an open FLEX');
   assert.match(out, /Injured Reserve H\. Back .* IR Empty Empty IR Empty Taxi Squad Empty TX Empty/);
   assert.match(out, /Buffalo Bills DEF • BUF/, 'a defense goes by its full name');

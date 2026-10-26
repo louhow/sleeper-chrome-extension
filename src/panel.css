@@ -2829,7 +2829,7 @@ button.danger.solid:hover:not(:disabled) {
   font-weight: 400;
 }
 /* A finished game's points in its score color, as in the game log. */
-.nfl-panel :is(.week-pts, .mp-pts) b.tier {
+.nfl-panel .week-pts b.tier {
   padding: 0 4px;
   border-radius: 4px;
 }
@@ -2840,14 +2840,41 @@ button.danger.solid:hover:not(:disabled) {
 .nfl-mu-head {
   margin: 4px 0 0;
 }
+/* A row is the player and their points, with the game and the box score under
+   them, muted as on Sleeper's own tab so who is playing whom stays in the background. */
 .mp.nfl {
-  grid-template-columns: 26px minmax(0, 1fr) 84px 52px;
-  grid-template-areas: "hs id game pts";
+  grid-template-columns: 26px minmax(0, 1fr) 56px;
+  grid-template-areas: "hs id pts" "game game game";
+  height: auto;
+  padding: 6px 8px;
+  row-gap: 4px;
 }
 .mp.nfl.theirs {
-  grid-template-columns: 52px 84px minmax(0, 1fr) 26px;
-  grid-template-areas: "pts game id hs";
+  grid-template-columns: 56px minmax(0, 1fr) 26px;
+  grid-template-areas: "pts id hs" "game game game";
 }
+.mp.nfl .mp-game {
+  gap: 1px;
+  white-space: normal;
+}
+.mp.nfl .mp-game .sub {
+  color: var(--muted);
+}
+.mp.nfl .mp-game .stats {
+  font-size: 11px;
+  line-height: 1.3;
+}
+.mp.nfl.theirs .mp-game {
+  text-align: right;
+}
+/* Points in their score color rather than a filled chip. */
+.mp.nfl .mp-pts b.tier {
+  padding: 0;
+  background: none;
+}
+.mp.nfl .mp-pts b.tier-green { color: var(--accent); }
+.mp.nfl .mp-pts b.tier-yellow { color: var(--warn); }
+.mp.nfl .mp-pts b.tier-red { color: var(--danger); }
 .mp.nfl .mp-id .name {
   display: flex;
   align-items: baseline;
@@ -2855,4 +2882,40 @@ button.danger.solid:hover:not(:disabled) {
 }
 .mp.nfl.theirs .mp-id .name {
   justify-content: flex-end;
+}
+
+/* The settings dialog (settings-view.js): one switch per row. */
+.setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 4px;
+  cursor: pointer;
+}
+.setting input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.setting b {
+  display: block;
+  font-size: 14px;
+}
+.setting .sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.settings-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.settings-foot button.primary {
+  min-width: 0;
 }

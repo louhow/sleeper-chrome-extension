@@ -8,8 +8,8 @@
 // its sport is known only once it loads: an NFL league hands over to
 // nfl/session.js, any other sport stays hidden.
 // It gives the sidebar (nav.js) its numbers for the week on now.
-//   nbaSession(leagueId, page, { admin, nav }) -> { leagueId, attach, show, destroy, setAdmin }
-(globalThis.SNP ||= {}).nbaSession = (leagueId, page, { admin, nav = null }) => {
+//   nbaSession(leagueId, page, { admin, nav, settings }) -> { leagueId, attach, show, destroy, setAdmin }
+(globalThis.SNP ||= {}).nbaSession = (leagueId, page, { admin, nav = null, settings = null }) => {
   const { createApi, model, scoring, ui, bridge, shared, loaders,
     nbaWeek, nbaPanelView, nbaCardView, nbaOptimizeView, nbaWaiversView, nbaWhatIfView, nbaCard, nbaWaivers, nbaOptimize, nbaPlayers } = globalThis.SNP;
   const PANEL_PAGES = new Set(['team', 'matchup', 'league']);
@@ -259,7 +259,9 @@
     if (league.sport !== 'nba') {
       disabled = true;
       teardown();
-      if (league.sport === 'nfl' && !destroyed) nflSession = globalThis.SNP.nflSession(leagueId, lastPage, api, league);
+      await settings?.ready;
+      // The NFL pages are the extension's unless the settings turned them off.
+      if (league.sport === 'nfl' && !destroyed && (settings?.values().nflUi ?? true)) nflSession = globalThis.SNP.nflSession(leagueId, lastPage, api, league);
       else console.info('[sleeper-nba-panel] not an NBA league, staying hidden');
       return;
     }
