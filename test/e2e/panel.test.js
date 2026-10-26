@@ -2816,7 +2816,7 @@ const chatPage = () => {
 </script>`;
 };
 
-test('chat: hovering an emoji reaction moves nothing, and the names popup shows whole', async () => {
+test('chat: hovering an emoji reaction opens one row in place, moves nothing, and the names popup shows whole', async () => {
   documentBody = chatPage();
   // A reacted emoji's place, the chat's scroll, and the names popup, as seen.
   const look = () => page.evaluate(() => {
@@ -2864,7 +2864,21 @@ test('chat: hovering an emoji reaction moves nothing, and the names popup shows 
   assert.deepEqual(fixed.named.emoji, fixed.before.emoji);
   assert.equal(fixed.named.scroll, fixed.before.scroll, 'the chat never scrolls');
   assert.deepEqual(fixed.named.popup, { whole: true, cut: false }, 'every name shows, whole');
-  assert.equal(await page.locator('.reaction-menu').nth(1).locator('.reaction').evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().width === 40).length), 14, 'every option to pick from');
+  // Every option to pick from, in one row level with the picked emoji, inside the message and clear of its text.
+  const row = await page.evaluate(() => {
+    const group = document.querySelectorAll('.comment-group')[1];
+    const menu = group.querySelector('.reaction-menu').getBoundingClientRect();
+    const options = [...group.querySelectorAll('.reaction')].map((el) => el.getBoundingClientRect());
+    const picked = group.querySelector('.reaction.reacted').getBoundingClientRect();
+    return {
+      options: options.length,
+      level: options.every((o) => Math.round(o.top) === Math.round(picked.top)),
+      inside: Math.round(menu.right) <= Math.round(group.querySelector('.text-container').getBoundingClientRect().right),
+      clear: Math.round(menu.top) >= Math.round(group.querySelector('pre').getBoundingClientRect().bottom),
+      widths: [...new Set(options.map((o) => Math.round(o.width)))],
+    };
+  });
+  assert.deepEqual({ ...row, widths: row.widths.length }, { options: 14, level: true, inside: true, clear: true, widths: 2 }, JSON.stringify(row));
   await page.screenshot({ path: `${OUT}chat-reactions.png`, clip: { x: 380, y: 40, width: 560, height: 400 } });
   // Leaving closes it, back to how it was.
   await page.mouse.move(10, 10);

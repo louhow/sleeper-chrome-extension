@@ -5,11 +5,12 @@
 // line or two; the chat, pinned to its bottom, then scrolls by that much as
 // soon as the names popup re-renders it, moving everything again. That popup
 // sits in its message, which clips it (overflow: hidden), and cuts names at 64px.
-// Here an open row is an overlay instead: it opens upward over its own message
-// from where it sits, the emoji already there stay put, and the message keeps
-// its height, so nothing on the page moves. The names popup comes out of the
-// message, as wide as the names. A row is open while hovered, and while Sleeper
-// shows its names popup (it lingers a moment after the cursor leaves).
+// Here an open row is an overlay instead: one line from where it sits, the
+// emoji already picked first and where they were, the options after them
+// narrowed to fit the message's width, so nothing goes over the message's text
+// and the message keeps its height: nothing on the page moves. The names popup
+// comes out of the message, as wide as the names. A row is open while hovered,
+// and while Sleeper shows its names popup (it lingers a moment after the cursor leaves).
 //   chat() -> { destroy }
 (globalThis.SNP ||= {}).chat = () => {
   const ROW = '.comment-reactions-container';
@@ -17,6 +18,11 @@
   // An option nobody picked: its count is empty (Sleeper's `hide` class comes
   // off every option while the names popup shows, so it can't tell them apart).
   const UNUSED = '.reaction:has(.reaction-count:empty)';
+  // An option's width (Sleeper's), and the narrowest one opening up may get.
+  const OPTION_W = 40;
+  const MIN_W = 24;
+  // The open row's padding either side, and how far left of the row it starts so its emoji stay put.
+  const PAD = 6;
   // Only while the extension runs (data-snp-chat on <html>).
   const on = 'html[data-snp-chat]';
   const css = `
@@ -31,17 +37,18 @@
     ${on} ${OPEN} .reaction-menu {
       position: absolute;
       z-index: 3;
-      left: -6px;
+      left: -${PAD}px;
       bottom: 0;
       box-sizing: content-box;
       width: max-content;
-      max-width: 240px;
-      flex-wrap: wrap-reverse;
-      padding: 3px 6px !important;
+      max-width: none;
+      flex-wrap: nowrap;
+      padding: 3px ${PAD}px !important;
       border-radius: 10px;
       background: rgb(52, 62, 82);
       box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 18px rgba(0, 0, 0, 0.45);
     }
+    ${on} ${OPEN} .reaction-menu ${UNUSED} { width: var(--snp-option-w, ${OPTION_W}px) !important; }
     /* Who picked it: centred over the emoji, as wide as their names. */
     ${on} ${ROW} .reaction-members-container { z-index: 4; left: 50%; transform: translateX(-50%); }
     ${on} ${ROW} .reaction-members { box-sizing: border-box; width: max-content; min-width: 80px; max-width: 220px; border-radius: 8px; }
@@ -52,14 +59,23 @@
   (document.head || document.documentElement).append(style);
   document.documentElement.toggleAttribute('data-snp-chat', true);
 
-  // Opens a row from where it sits: its height as it is closed, held while it's open.
+  // Opens a row from where it sits: its height as it is closed, held while
+  // it's open, and the width the unused options get to fit the message's.
   function enter(e) {
     const row = e.target instanceof Element && e.target.closest(ROW);
     if (!row || row.hasAttribute('data-snp-open')) return;
     if (!row.matches(OPEN)) {
       row.toggleAttribute('data-snp-measure', true);
-      row.style.setProperty('--snp-reactions-h', `${row.getBoundingClientRect().height}px`);
+      const box = row.getBoundingClientRect();
       row.removeAttribute('data-snp-measure');
+      const menu = row.querySelector('.reaction-menu');
+      const unused = menu?.querySelectorAll(UNUSED).length || 0;
+      const picked = (menu?.children.length || 0) - unused;
+      // Within the message's text column, so it ends where the text does.
+      const room = (row.closest('.text-container') ?? row.parentElement).getBoundingClientRect().right - box.left - PAD;
+      const width = Math.max(MIN_W, Math.min(OPTION_W, Math.floor((room - picked * OPTION_W) / Math.max(1, unused))));
+      row.style.setProperty('--snp-reactions-h', `${box.height}px`);
+      row.style.setProperty('--snp-option-w', `${width}px`);
     }
     row.toggleAttribute('data-snp-open', true);
   }
