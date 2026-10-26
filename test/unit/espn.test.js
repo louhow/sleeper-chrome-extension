@@ -62,13 +62,13 @@ test('contractSeason: NFL league years from March by the year they start, NBA se
 
 test('contractOf: when he\'s a free agent and seasons left, from ESPN\'s records', () => {
   // Derrick Henry, 2026: under contract this year and next.
-  assert.deepEqual(plain(espn.contractOf('nfl', 2026, { salary: 11000000, bonus: 0, yearsRemaining: 2, signedThrough: 2028 })), { fa: 2028, years: 2, pay: 11000000 });
-  assert.deepEqual(plain(espn.contractOf('nfl', 2025, { salary: 14000000, bonus: 1000000, yearsRemaining: 3, signedThrough: 2028 })), { fa: 2028, years: 3, pay: 15000000 });
+  assert.deepEqual(plain(espn.contractOf('nfl', 2026, { salary: 11000000, bonus: 0, yearsRemaining: 2, signedThrough: 2028, team: { $ref: 'http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2026/teams/33?lang=en' } })), { fa: 2028, years: 2, pay: 11000000, team: '33' });
+  assert.deepEqual(plain(espn.contractOf('nfl', 2025, { salary: 14000000, bonus: 1000000, yearsRemaining: 3, signedThrough: 2028 })), { fa: 2028, years: 3, pay: 15000000, team: null });
   // Ja'Marr Chase, 2024: a rookie deal's last year reads "signed through 2024".
-  assert.deepEqual(plain(espn.contractOf('nfl', 2024, { salary: 4862679, bonus: 3807679, yearsRemaining: 0, signedThrough: 2024 })), { fa: 2025, years: 1, pay: 8670358 });
+  assert.deepEqual(plain(espn.contractOf('nfl', 2024, { salary: 4862679, bonus: 3807679, yearsRemaining: 0, signedThrough: 2024 })), { fa: 2025, years: 1, pay: 8670358, team: null });
   // Donovan Mitchell and Tyrese Maxey, 2026-27 (ESPN's 2027).
-  assert.deepEqual(plain(espn.contractOf('nba', 2027, { salary: 50105628, yearsRemaining: 2 })), { fa: 2028, years: 2, pay: 50105628 });
-  assert.deepEqual(plain(espn.contractOf('nba', 2027, { salary: 40770520, yearsRemaining: 3 })), { fa: 2029, years: 3, pay: 40770520 });
+  assert.deepEqual(plain(espn.contractOf('nba', 2027, { salary: 50105628, yearsRemaining: 2 })), { fa: 2028, years: 2, pay: 50105628, team: null });
+  assert.deepEqual(plain(espn.contractOf('nba', 2027, { salary: 40770520, yearsRemaining: 3 })), { fa: 2029, years: 3, pay: 40770520, team: null });
   // No record (LeBron), or none in force.
   for (const [sport, record] of [['nba', null], ['nba', { yearsRemaining: 0 }], ['nfl', {}]]) assert.equal(espn.contractOf(sport, 2027, record), null);
 });
@@ -80,4 +80,16 @@ test('contractParts: "FA 2028" with years left, pay and since when', () => {
   assert.equal(espn.contractText(found({ fa: 2029, years: 3, pay: null, since: null })), 'FA 2029 · 3 yrs left');
   for (const status of ['none', 'error']) assert.equal(espn.contractParts({ status }), null);
   assert.deepEqual([12000000, 50105628, 950000, 125000000, 0].map(espn.money), ['$12M', '$50.1M', '$950K', '$125M', '']);
+});
+
+test('sameContract: the same end year with the same team; a new team\'s deal ending the same year is a new contract', () => {
+  const team = (id) => ({ $ref: `http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2025/teams/${id}` });
+  // Kirk Cousins: Falcons through 2027, then the Raiders, also through 2027.
+  const falcons = espn.contractOf('nfl', 2025, { salary: 27500000, signedThrough: 2027, team: team(1) });
+  const raiders = espn.contractOf('nfl', 2026, { salary: 1300000, signedThrough: 2027, team: team(13) });
+  assert.equal(espn.sameContract(falcons, raiders), false);
+  assert.equal(espn.sameContract(espn.contractOf('nfl', 2025, { signedThrough: 2028, team: team(33) }), espn.contractOf('nfl', 2026, { signedThrough: 2028, team: team(33) })), true, 'Derrick Henry');
+  assert.equal(espn.sameContract(espn.contractOf('nfl', 2025, { signedThrough: 2027, team: team(33) }), espn.contractOf('nfl', 2026, { signedThrough: 2028, team: team(33) })), false, 'an extension');
+  assert.equal(espn.sameContract(espn.contractOf('nba', 2026, { yearsRemaining: 3 }), espn.contractOf('nba', 2027, { yearsRemaining: 2 })), true, 'no team on record: the end year decides');
+  assert.equal(espn.sameContract(null, raiders), false);
 });

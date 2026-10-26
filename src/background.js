@@ -88,7 +88,7 @@ importScripts('espn.js');
   }
 
   // This season's contract, and the season it started: the earliest one in a
-  // row ending the same year (read again only when that year changes).
+  // row that's the same contract (espn.sameContract; read again only when it changes).
   async function findContract(player, get, saved) {
     const { sport } = player;
     const match = await athlete(player, get);
@@ -97,12 +97,12 @@ importScripts('espn.js');
     const read = (s) => get(`espn contract ${s}`, espn.contractUrl(sport, match.id, s), { missing: null });
     const now = espn.contractOf(sport, season, await read(season));
     if (!now) return { status: 'none' };
-    let start = saved?.contract?.fa === now.fa ? saved.contract.startSeason : null;
+    // A start found before contracts recorded their team is found again.
+    let start = saved?.contract && 'team' in saved.contract && espn.sameContract(saved.contract, now) ? saved.contract.startSeason : null;
     if (start == null) {
       start = season;
       for (let s = season - 1; s >= season - MAX_BACK; s--) {
-        const before = espn.contractOf(sport, s, await read(s).catch(() => null));
-        if (before?.fa !== now.fa) break;
+        if (!espn.sameContract(espn.contractOf(sport, s, await read(s).catch(() => null)), now)) break;
         start = s;
       }
     }

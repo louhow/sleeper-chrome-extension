@@ -74,24 +74,31 @@
   // "2025" for NFL, "2025-26" for NBA's 2026.
   const seasonLabel = (sport, season) => (sport === 'nba' ? `${season - 1}-${String(season).slice(2)}` : String(season));
 
-  // One season's contract record: { fa, years, pay }, or null for none.
+  // One season's contract record: { fa, years, pay, team }, or null for none.
   //   fa: the year he's a free agent (NFL's signedThrough, at least next year;
   //     NBA: the summer after the last season, the year that season ends).
   //   years: seasons left counting this one. pay: salary plus bonus this season.
+  //   team: ESPN's id for the team it's with (null if ESPN doesn't say).
   function contractOf(sport, season, record) {
     if (!record) return null;
     const pay = (Number(record.salary) || 0) + (Number(record.bonus) || 0) || null;
+    const team = String(record.team?.$ref || '').match(/\/teams\/(\d+)/)?.[1] ?? null;
     if (sport === 'nfl') {
       const through = Number(record.signedThrough);
       if (!through) return null;
       // A rookie deal's last year reads "signed through" that same year.
       const fa = Math.max(through, season + 1);
-      return { fa, years: fa - season, pay };
+      return { fa, years: fa - season, pay, team };
     }
     const years = Number(record.yearsRemaining);
     if (!(years >= 1)) return null;
-    return { fa: season + years - 1, years, pay };
+    return { fa: season + years - 1, years, pay, team };
   }
+
+  // Whether an earlier season's record is the same contract: it ends the same
+  // year, with the same team (a new team's deal can end the same year as the
+  // old one's, as Kirk Cousins's Raiders deal does his Falcons one).
+  const sameContract = (a, b) => Boolean(a && b) && a.fa === b.fa && (a.team == null || b.team == null || a.team === b.team);
 
   // "$11M", "$50.1M", "$950K".
   function money(n) {
@@ -115,6 +122,6 @@
 
   return {
     LEAGUES, MAX_CANDIDATES, searchUrl, athleteUrl, https, candidates, sameBirthday, queries, draftOf, draftParts, draftText,
-    contractSeason, contractUrl, seasonLabel, contractOf, money, contractParts, contractText,
+    contractSeason, contractUrl, seasonLabel, contractOf, sameContract, money, contractParts, contractText,
   };
 })();
