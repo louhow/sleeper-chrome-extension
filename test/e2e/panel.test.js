@@ -2782,9 +2782,11 @@ test('chopped league team tab: points per week, FAAB left and the safe chance in
 
 // Sleeper's own NFL player card header, as its web bundle draws it (2026-10-26): the
 // profile items, with the card component's props (sport, playerId, player) on a fiber above them.
-const nflCard = (player, { playerId = '4892', width = 660 } = {}) => `<!doctype html><title>Sleeper</title>
-<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .player-card-header { width: 1300px; margin: 40px; padding: 24px; background: #e8622c; border-radius: 12px; } .player-info-container { width: ${width}px; box-sizing: border-box; }
-  /* Sleeper's own rules for the header (its CSS bundle, 2026-10-26). */
+const nflCard = (player, { playerId = '4892', width = 980 } = {}) => `<!doctype html><title>Sleeper</title>
+<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .player-card-header { width: ${width}px; margin: 40px; background: #e8622c; border-radius: 12px; } .player-image-container { flex: 0 0 250px; }
+  /* Sleeper's own rules for the header (its CSS bundle, 2026-10-26): its content scrolls sideways, and the info column grows with what's in it. */
+  .player-card-header { min-height: 215px; flex: 0 0 215px; display: flex; flex-direction: column; position: relative; }
+  .player-card-header .player-card-content-container { z-index: 1; display: flex; flex-direction: row; overflow-x: auto; }
   .player-card-header .player-info-container { flex-grow: 1; padding: 25px 26px 18px 0px; }
   .player-card-header .player-info-container .profile-items-container { display: flex; flex-direction: row; align-items: center; margin-top: 25px; }
   .player-card-header .player-info-container .profile-items-container .profile-item { text-align: center; }
@@ -2798,11 +2800,11 @@ const nflCard = (player, { playerId = '4892', width = 660 } = {}) => `<!doctype 
   .player-card-header .player-info-container .player-ranking-container .player-ranking-row .rank-item { margin-right: 16px; display: flex; flex-direction: row; align-items: center; }
   .player-card-header .player-info-container .player-ranking-container .player-ranking-row .rank-item .rank-value { font-size: 22px; font-weight: 800; color: #fff; }
   .player-card-header .player-info-container .player-ranking-container .player-ranking-row .rank-item .rank-label { font-size: 10px; font-weight: 800; color: #a3bbd3; letter-spacing: 1px; padding-left: 3px; }</style>
-<div class="player-card-header"><div class="player-card-content-container"><div class="player-info-container"><div class="profile-items-container">
+<div class="modal" style="display: flex; flex-direction: column; height: 600px"><div class="player-card-header"><div class="player-card-content-container"><div class="player-image-container"></div><div class="player-info-container"><div class="profile-items-container">
 ${[['AGE', '31'], ['HEIGHT', '6\'1"'], ['WEIGHT', '215<div class="profile-item-unit"> lbs</div>'], ['EXP', '8'], ['COLLEGE', 'Oklahoma']].map(([label, value], i) => `<div class="profile-item-wrapper">${i ? '<div class="profile-item-divider"></div>' : ''}<div class="profile-item"><div class="profile-item-label">${label}</div><div class="profile-item-value">${value}</div></div></div>`).join('')}
 </div><div class="player-ranking-container"><div class="profile-item-label">PLAYER RANKINGS</div><div class="player-ranking-row">
 ${[['#4', 'QB'], ['#7', 'OVERALL'], ['91%', 'ROSTERED'], ['57%', 'STARTED']].map(([value, label]) => `<div class="rank-item"><div class="rank-value">${value}</div><div class="rank-label">${label}</div></div>`).join('')}
-</div></div></div></div></div>
+</div></div></div></div></div><div class="game-logs" style="flex: 1; background: #233">GAME LOGS</div></div>
 <script>
   document.querySelector('.player-ranking-container').__reactInternalInstance$test = { memoizedProps: { className: 'player-ranking-container' }, return: { memoizedProps: {}, return: { memoizedProps: { sport: 'nfl', playerId: '${playerId}', player: ${JSON.stringify(player)} } } } };
 </script>`;
@@ -2810,7 +2812,7 @@ ${[['#4', 'QB'], ['#7', 'OVERALL'], ['91%', 'ROSTERED'], ['57%', 'STARTED']].map
 test('NFL player card: DRAFT and CONTRACT blocks beside PLAYER RANKINGS, from ESPN, matched on the birth date', async () => {
   // Derrick Henry, without Sleeper's ESPN id: ESPN's search, accepted on the birthday.
   const henry = { first_name: 'Derrick', last_name: 'Henry', birth_date: '1994-01-04' };
-  documentBody = nflCard(henry, { playerId: '3198', width: 1100 });
+  documentBody = nflCard(henry, { playerId: '3198', width: 1500 });
   await page.goto(NFL_TEAM_URL);
   const block = (kind) => page.locator(`.player-ranking-container > .snp-espn[data-kind="${kind}"]`);
   for (const kind of ['draft', 'contract']) await block(kind).locator('.rank-label').waitFor({ timeout: 30000 });
@@ -2824,17 +2826,20 @@ test('NFL player card: DRAFT and CONTRACT blocks beside PLAYER RANKINGS, from ES
   // A wide card: both beside the rankings, labels level with PLAYER RANKINGS, inside the card's info column.
   const labelsTop = await page.locator('.player-ranking-container .profile-item-label').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
   assert.equal(new Set(labelsTop).size, 1, `level: ${labelsTop}`);
+  // Inside what the card shows: its content scrolls sideways rather than grow, so nothing may need scrolling.
   const inside = () => page.evaluate(() => {
+    const box = document.querySelector('.player-card-content-container');
     const right = Math.max(...[...document.querySelectorAll('.snp-espn > *')].map((el) => el.getBoundingClientRect().right));
-    const column = document.querySelector('.player-info-container');
-    return right <= column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight) + 0.5;
+    const bottom = Math.max(...[...document.querySelectorAll('.snp-espn > *')].map((el) => el.getBoundingClientRect().bottom));
+    return box.scrollWidth <= box.clientWidth && right <= box.getBoundingClientRect().left + box.clientWidth - 26 + 0.5
+      && bottom <= document.querySelector('.game-logs').getBoundingClientRect().top;
   });
   assert.ok(await inside(), 'inside the card');
   // Sleeper's AGE ... COLLEGE row is left as it was.
   assert.equal(await page.locator('.profile-items-container .profile-item-label').evaluateAll((els) => els.map((el) => el.textContent).join(' ')), 'AGE HEIGHT WEIGHT EXP COLLEGE');
   await page.locator('.player-card-header').screenshot({ path: `${OUT}nfl-card-espn.png` });
-  // Narrower cards (Sleeper's is about 660px): under the rankings side by side, then one under another; always inside the card.
-  for (const [width, layout] of [[660, 'snp-espn-below'], [420, 'snp-espn-stack']]) {
+  // Narrower cards (Sleeper's is about 980px): under the rankings side by side, then one under another; always inside the card.
+  for (const [width, layout] of [[980, 'snp-espn-below'], [720, 'snp-espn-stack']]) {
     documentBody = nflCard(henry, { playerId: '3198', width });
     await page.goto(NFL_TEAM_URL);
     await block('contract').locator('.rank-label').waitFor({ timeout: 30000 });

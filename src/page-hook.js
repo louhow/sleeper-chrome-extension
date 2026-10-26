@@ -1194,6 +1194,8 @@
     .player-ranking-container:has(> .snp-espn) > .profile-item-label { grid-area: rl; }
     .player-ranking-container:has(> .snp-espn) > .player-ranking-row { grid-area: rr; }
     .snp-espn { display: contents; }
+    /* Sleeper's header is 215px tall in the card's column; under the rankings, ours need it taller. */
+    .player-card-header:has(.snp-espn) { flex-basis: auto !important; }
     .snp-espn[data-kind="draft"] > .profile-item-label { grid-area: dl; }
     .snp-espn[data-kind="draft"] > .player-ranking-row { grid-area: dr; }
     .snp-espn[data-kind="contract"] > .profile-item-label { grid-area: cl; }
@@ -1359,12 +1361,15 @@
       fitEspn(rankings);
     }
   }
-  // The first layout that keeps the blocks inside the card's info column:
-  // beside the rankings, under them side by side, or one under another.
+  // The first layout that keeps the blocks inside what the card shows: beside
+  // the rankings, under them side by side, or one under another. Measured
+  // against the card's content box, which scrolls sideways, since the info
+  // column inside it grows with whatever it holds (ours included).
   function fitEspn(rankings) {
     const column = rankings.closest('.player-info-container');
+    const box = rankings.closest('.player-card-content-container') || column;
     if (!column) return;
-    const room = column.getBoundingClientRect().right - (parseFloat(getComputedStyle(column).paddingRight) || 0);
+    const room = box.getBoundingClientRect().left + box.clientWidth - (parseFloat(getComputedStyle(column).paddingRight) || 0);
     for (const layout of ESPN_LAYOUTS) {
       rankings.classList.remove(...ESPN_LAYOUTS.filter(Boolean));
       if (layout) rankings.classList.add(layout);
