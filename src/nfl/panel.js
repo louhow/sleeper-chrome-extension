@@ -6,8 +6,10 @@
 // league is known to be NFL and ours stays blank until its first load is in,
 // so nothing shifts.
 //   ctx: { leagueId, api, league, info: { currentWeek, tiers }, lineup(full),
-//   nflSave(detail), openDialog(), dialogOpen() }
-(globalThis.SNP ||= {}).nflPanel = ({ leagueId, api, league, info, lineup, nflSave, openDialog, dialogOpen }) => {
+//   nflSave(detail), openDialog(), dialogOpen(), livePages (more pages whose
+//   week reads live, e.g. a chopped league's League tab), onUpdate() (after
+//   any change to the panel's data) }
+(globalThis.SNP ||= {}).nflPanel = ({ leagueId, api, league, info, lineup, nflSave, openDialog, dialogOpen, livePages = [], onUpdate }) => {
   const { model, scoring, ui, nflPanelView, loaders, shared, bridge } = globalThis.SNP;
   const SLEEPER_VIEW = 'snp:nfl-sleeper-view';
   const BACK_ID = 'snp-nfl-back';
@@ -49,6 +51,7 @@
       state.now = Date.now();
       state.sessionExpired = api.sessionExpired();
       state.tiers = info.tiers;
+      onUpdate?.();
       if (!state.ready || !panel.styled || !host.isConnected) return;
       const top = root.querySelector('.body')?.scrollTop ?? 0;
       root.innerHTML = nflPanelView.render(state, api.log);
@@ -174,7 +177,7 @@
   }
   function liveRead() {
     if (destroyed) return;
-    if (document.visibilityState !== 'visible' || !PAGES.has(state.page)) return planLiveRead();
+    if (document.visibilityState !== 'visible' || !(PAGES.has(state.page) || livePages.includes(state.page))) return planLiveRead();
     lastLiveRead = Date.now();
     loadWeek(state.week, true).catch(() => planLiveRead());
   }
@@ -349,5 +352,20 @@
     return true;
   }
 
-  return { load: () => load().catch(fail), fail, attach, show, notify, refresh: schedule, destroy };
+  // The panel's data as views read it, showing `week` (loaded on first ask):
+  // null until it's in.
+  function weekView(week) {
+    if (!state.ready || state.error) return null;
+    if (!state.weeks[week]) {
+      if (!pendingWeeks.has(week)) {
+        pendingWeeks.add(week);
+        loadWeek(week).catch(fail).finally(() => pendingWeeks.delete(week));
+      }
+      return null;
+    }
+    return { ...state, week };
+  }
+  const pendingWeeks = new Set();
+
+  return { load: () => load().catch(fail), fail, attach, show, notify, refresh: schedule, destroy, weekView, openTeam };
 };

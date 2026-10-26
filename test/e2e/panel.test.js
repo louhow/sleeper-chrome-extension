@@ -335,6 +335,16 @@ ${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchu
 </script>`;
 };
 
+// A chopped NFL league (settings.type 3, teams chopped already) and Sleeper's
+// own League tab in one (from its web bundle, 2026-10-26): no matchups, the
+// standings (all 0-0 in a chopped league), then Recent Activity.
+const CHOP_LEAGUE = '1397415652704129024';
+const chopLeagueTab = () => `<!doctype html><title>Sleeper</title>
+<script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>
+<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .league-tab-container { width: 820px; margin: 40px 0 0 260px; padding: 24px; background: rgb(36, 45, 60); border-radius: 12px; } .league-standings-container, .league-activity-card { padding: 16px; margin-bottom: 16px; background: rgb(44, 54, 72); border-radius: 12px; }</style>
+<div class="league-tab-container"><div class="row"></div><div class="panel-row"><div class="league-tab-standings"><div class="league-standings-container"><div class="title">Standings</div><div class="league-standing-list">1 someone 0-0</div></div></div></div>
+<div class="league-activity-card"><div class="title">Recent Activity</div></div></div>`;
+
 // `wrapped`: inside Sleeper's tab frame (its tab row and scroll container), which
 // the extension's own Team and Matchup tabs take the place of. `token`: logged in.
 const nflTeamTab = ({ wrapped = false, rosterId = 4, round = 7, token = false } = {}) => `<!doctype html><title>Sleeper</title>
@@ -535,10 +545,12 @@ async function answerGraphql(route) {
       });
     await sleeper.rostersLoading;
   }
-  if (/query league_rosters\b/.test(query) && query.includes(NFL_LEAGUE)) {
-    return json({ data: { league_rosters: await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json() } });
+  for (const nfl of [NFL_LEAGUE, CHOP_LEAGUE]) {
+    if (/query league_rosters\b/.test(query) && query.includes(nfl)) {
+      return json({ data: { league_rosters: await (await fetch(`https://api.sleeper.app/v1/league/${nfl}/rosters`)).json() } });
+    }
+    if (/query matchup_legs\b/.test(query) && query.includes(nfl)) return json({ data: { matchup_legs: null } });
   }
-  if (/query matchup_legs\b/.test(query) && query.includes(NFL_LEAGUE)) return json({ data: { matchup_legs: null } });
   if (/query league_rosters\b/.test(query)) return json({ data: { league_rosters: sleeper.rosters } });
   if (/query league_transactions_filtered\b/.test(query)) {
     return json({ data: { league_transactions_filtered: sleeper.claims.filter((c) => c.status === 'pending') } });
@@ -2638,6 +2650,43 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   // A card opens that matchup the way Sleeper's own card does.
   await cards.nth(1).click();
   assert.deepEqual(await page.evaluate(() => window.__nflOpened), [0], 'the other matchup is Sleeper\'s first card');
+  documentBody = LOGGED_OUT;
+});
+
+test('chopped league tab: your safe status, the chopping block, chopped players on waivers and the graveyard, in place of Sleeper\'s standings', async () => {
+  const [league, rosters] = await Promise.all(['', '/rosters'].map(async (path) => (await fetch(`https://api.sleeper.app/v1/league/${CHOP_LEAGUE}${path}`)).json()));
+  const alive = rosters.filter((r) => !r.settings?.eliminated);
+  const dead = rosters.filter((r) => r.settings?.eliminated);
+  sleeper.me = alive[0].owner_id;
+  documentBody = chopLeagueTab();
+  await page.goto(`https://sleeper.com/leagues/${CHOP_LEAGUE}/league`);
+  const tab = (sel) => page.locator(`#sleeper-nfl-chop .chop-tab ${sel}`);
+  await tab('.chop-row[data-open-team]').first().waitFor({ timeout: 30000 });
+  // Every team still alive, once, worst first: one in the chop zone, three in danger, the rest safe.
+  assert.equal(await tab('.chop-row[data-open-team]').count(), alive.length);
+  const zones = await tab('.chop-row[data-open-team]').evaluateAll((els) => els.map((el) => el.classList[1]));
+  assert.deepEqual(zones, ['chop', 'danger', 'danger', 'danger', ...Array(alive.length - 4).fill('safe')]);
+  const ranks = await tab('.chop-row[data-open-team] .chop-rank').allTextContents();
+  assert.deepEqual(ranks.map(Number), alive.map((_, i) => alive.length - i));
+  assert.deepEqual(await tab('.chop-zone').allTextContents(), ['Chop zone', 'Danger', 'Safe']);
+  for (const row of await tab('.chop-row[data-open-team]').all()) assert.match(await row.innerText(), /\d+%\s+\d+\/\d+\s+(–|\d+\.\d\d)\s+\d+\.\d\d$/);
+  // Yours: rank among the teams alive, points per week, FAAB left and its safe chance; its row marked.
+  assert.match(await tab('.chop-me').innerText(), new RegExp(`\\d+(st|nd|rd|th) of ${alive.length} · \\d+\\.\\d\\d avg fpts · \\$\\d+ faab[\\s\\S]*\\d+% safe`, 'i'));
+  assert.equal(await tab('.chop-row.own').count(), 1);
+  // The graveyard: every chopped team, latest first.
+  const weeks = (await tab('.grave-row:not(.chop-cols) .chop-rank').allTextContents()).map(Number);
+  assert.deepEqual(weeks, dead.map((r) => r.settings.eliminated).sort((a, b) => b - a));
+  // Chopped players still unclaimed, from the chopped weeks' transactions; sorting by week puts the latest chop first.
+  await tab('.chop-player, .chop-card .msg:not(.error)').first().waitFor({ timeout: 30000 });
+  await tab('[data-chop-sort="week"]').click();
+  assert.equal(await tab('[data-chop-sort="week"]').getAttribute('aria-pressed'), 'true');
+  const chopWeeks = (await tab('.chop-from').allTextContents()).map((t) => Number(t.match(/wk (\d+)/)[1]));
+  assert.deepEqual(chopWeeks, [...chopWeeks].sort((a, b) => b - a));
+  for (const w of chopWeeks) assert.ok(w <= league.settings.last_chopped_leg);
+  // Sleeper's standings hide; Recent Activity stays below.
+  assert.equal(await page.locator('.league-tab-standings').isVisible(), false);
+  assert.equal(await page.locator('.league-activity-card').isVisible(), true);
+  await page.screenshot({ path: `${OUT}chop-league.png`, fullPage: true });
   documentBody = LOGGED_OUT;
 });
 

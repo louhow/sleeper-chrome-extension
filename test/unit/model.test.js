@@ -867,3 +867,55 @@ test('live reads: every so often while a game is on, else a minute after the nex
   assert.equal(model.nextLiveRead([at(-200, 'complete')], now, 90e3), null);
   assert.equal(model.nextLiveRead([], now, 90e3), null);
 });
+
+// ---- Chopped leagues ----
+
+test('isChopped: Sleeper\'s guillotine type only', () => {
+  assert.equal(model.isChopped({ settings: { type: 3 } }), true);
+  assert.equal(model.isChopped({ settings: { type: 2 } }), false);
+  assert.equal(model.isChopped(null), false);
+});
+
+test('safeChances: the likely last team is least safe; settled scores decide it', () => {
+  const [low, mid, high] = model.safeChances([{ points: 70, proj: 70 }, { points: 60, proj: 95 }, { points: 0, proj: 120 }]);
+  assert.ok(low < 0.2, `settled at 70 below two teams projected over 95: ${low}`);
+  assert.ok(mid > 0.85 && high > 0.85 && low < mid && low < high, `${mid} ${high}`);
+  assert.deepEqual(plain(model.safeChances([{ points: 80, proj: 80 }, { points: 90, proj: 90 }])), [0, 1]);
+  assert.deepEqual(plain(model.safeChances([{ points: 80, proj: 80 }, { points: 80, proj: 80 }, { points: 90, proj: 90 }])), [0.5, 0.5, 1], 'a tie for last');
+  for (const p of model.safeChances([{ points: null, proj: 0 }, { points: null, proj: 0 }])) assert.ok(Number.isFinite(p));
+});
+
+test('chopBlock: worst first by live projection, the last in the chop zone and three in danger', () => {
+  const teams = [100, 90, 80, 70, 60, 120].map((proj, i) => ({ rosterId: i + 1, points: null, proj }));
+  const block = model.chopBlock(teams);
+  assert.deepEqual(block.map((t) => t.rosterId), [5, 4, 3, 2, 1, 6]);
+  assert.deepEqual(block.map((t) => t.rank), [6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(block.map((t) => t.zone), ['chop', 'danger', 'danger', 'danger', 'safe', 'safe']);
+  assert.deepEqual(model.chopBlock(teams.slice(0, 3)).map((t) => t.zone), ['chop', 'danger', 'safe'], 'the best team is never in danger');
+  assert.deepEqual(model.chopBlock(teams.slice(0, 1)).map((t) => t.zone), ['safe'], 'the last one standing');
+});
+
+test('graveyard: chopped teams latest first, FAAB left and points per week played', () => {
+  const league = { settings: { start_week: 1, last_scored_leg: 6, waiver_budget: 1000 } };
+  const rosters = [
+    { roster_id: 1, settings: { fpts: 600, fpts_decimal: 0, waiver_budget_used: 100 } },
+    { roster_id: 2, settings: { eliminated: 2, fpts: 150, fpts_decimal: 50, waiver_budget_used: 0 } },
+    { roster_id: 3, settings: { eliminated: 5, fpts: 500, fpts_decimal: 0, waiver_budget_used: 352 } },
+  ];
+  assert.deepEqual(plain(model.graveyard(league, rosters).map((d) => [d.roster.roster_id, d.week, d.faab, d.avg])), [[3, 5, 648, 100], [2, 2, 1000, 75.25]]);
+  assert.deepEqual(plain(model.chopTeamStats(league, rosters[0])), { avg: 100, faab: 900 }, 'an active team: through the last week scored');
+});
+
+test('choppedPlayers: dropped by a chop and on no roster, the latest chop for a player dropped twice', () => {
+  const tx = [
+    { type: 'chopped', status: 'complete', leg: 2, drops: { a: 7, b: 7, c: 7 } },
+    { type: 'free_agent', status: 'complete', leg: 3, drops: { d: 1 } },
+    { type: 'chopped', status: 'complete', leg: 4, drops: { c: 9, e: 9 } },
+  ];
+  const rosters = [{ roster_id: 1, players: ['b'] }];
+  assert.deepEqual(plain(model.choppedPlayers(tx, rosters)).sort((x, y) => x.id.localeCompare(y.id)), [
+    { id: 'a', rosterId: 7, week: 2 },
+    { id: 'c', rosterId: 9, week: 4 },
+    { id: 'e', rosterId: 9, week: 4 },
+  ]);
+});

@@ -1,18 +1,24 @@
 // An NFL league's session (nba/session.js hands over to it once the league
 // turns out to be NFL): the extension's own Team and Matchup tabs (panel.js),
-// the League tab's matchup cards (league.js), Optimize lineup (optimize.js)
-// and the Players tab's Last 5 column (players.js). Sleeper's own Team
+// the League tab's matchup cards (league.js), or in a chopped league its
+// chopping block (chop.js), Optimize lineup (optimize.js) and the Players
+// tab's Last 5 column (players.js). Sleeper's own Team
 // component reads and saves the lineup (page-hook.js).
 //   nflSession(leagueId, page, api, league) -> { attach, show, destroy, refresh }
 (globalThis.SNP ||= {}).nflSession = (leagueId, initialPage, api, league) => {
-  const { bridge, loaders, nflPanel, nflOptimize, nflLeague, nflPlayers } = globalThis.SNP;
+  const { bridge, loaders, model, nflPanel, nflOptimize, nflLeague, nflChop, nflPlayers } = globalThis.SNP;
   const info = { currentWeek: null, tiers: null }; // the week on now and the league's score colors
   // The Team tab's lineup as Sleeper's Team component holds it; without `full`, only whether it's yours to edit.
   const lineup = (full) => bridge.ask('snp:nfl-lineup', { leagueId, full });
   // Saves starters through Sleeper's Team component: { ok, error }.
   const nflSave = (detail) => bridge.call('snp:nfl-lineup-save', { leagueId, ...detail });
   // The tab's handlers go first, so an Escape that closes the dialog doesn't also cancel a swap under it.
-  const panel = nflPanel({ leagueId, api, league, info, lineup, nflSave, openDialog: () => optimizer.open(), dialogOpen: () => optimizer.isOpen() });
+  const chopped = model.isChopped(league);
+  const panel = nflPanel({
+    leagueId, api, league, info, lineup, nflSave, openDialog: () => optimizer.open(), dialogOpen: () => optimizer.isOpen(),
+    livePages: chopped ? ['league'] : [], onUpdate: () => chop?.refresh(),
+  });
+  const chop = chopped ? nflChop({ leagueId, api, league, info, panel }) : null;
   const optimizer = nflOptimize({ lineup, nflSave, notify: (text) => panel.notify(text) });
   const leagueCards = nflLeague(league);
   const playersTab = nflPlayers({ api, league, info });
@@ -37,6 +43,7 @@
   function attachNow() {
     if (destroyed) return;
     leagueCards.attach(page);
+    chop?.attach(page);
     panel.attach();
     optimizer.attachButton(page);
   }
@@ -63,6 +70,7 @@
     cancelAnimationFrame(frame);
     playersTab.destroy();
     leagueCards.destroy();
+    chop?.destroy();
     optimizer.destroy();
     panel.destroy();
     if (document.documentElement.dataset.snpPlayersLeague === leagueId) delete document.documentElement.dataset.snpPlayersLeague;

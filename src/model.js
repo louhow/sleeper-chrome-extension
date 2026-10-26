@@ -846,6 +846,15 @@
   }
   const clamp = (lo, hi, v) => Math.max(lo, Math.min(hi, v || 0));
 
+  // A side's final score as a normal distribution: centred on its projection,
+  // tighter as the current score nears it. No projection: as wide as a side
+  // with nothing scored yet.
+  function scoreSpread(current, proj) {
+    const n = 1 + 10 * (proj ? 1 - current / proj : 1);
+    const variance = Math.sqrt((current - proj) ** 2 / n) ** 2 || 0.1;
+    return { mean: proj, variance };
+  }
+
   function winProbability(current1, proj1, current2, proj2) {
     const [c1, p1, c2, p2] = [current1, proj1, current2, proj2].map((n) => Number(n) || 0);
     const r2 = (n) => Number(n.toFixed(2));
@@ -854,19 +863,111 @@
       const b = r2(c2);
       return a === b ? [0.5, 0.5] : a > b ? [1, 0] : [0, 1];
     }
-    const spread = (current, proj) => {
-      // No projection: as wide as a side with nothing scored yet.
-      const n = 1 + 10 * (proj ? 1 - current / proj : 1);
-      const variance = Math.sqrt((current - proj) ** 2 / n) ** 2 || 0.1;
-      return { mean: proj, variance };
-    };
-    const a = spread(c1, p1);
-    const b = spread(c2, p2);
+    const a = scoreSpread(c1, p1);
+    const b = scoreSpread(c2, p2);
     const mean = a.mean - b.mean;
     const sd = Math.sqrt(a.variance + b.variance);
     const cdf0 = 0.5 * erfc(mean / (sd * Math.SQRT2));
     const win = clamp(0.01, 0.99, 1 - cdf0);
     return [win, clamp(0.01, 0.99, 1 - win)];
+  }
+
+  // ---- Chopped leagues ----
+
+  // A chopped league (Sleeper's "guillotine", settings.type 3): each week the
+  // lowest scoring team is eliminated and its roster dropped to waivers.
+  const CHOPPED_TYPE = 3;
+  const isChopped = (league) => league?.settings?.type === CHOPPED_TYPE;
+  // Above the chop zone, this many teams are in danger, as Sleeper's app draws it.
+  const CHOP_DANGER = 3;
+
+  // Each team's chance of not finishing the week last: one minus the chance its
+  // final score (scoreSpread) is under every other team's, summed over a fine
+  // grid around its own. Once every team is settled, the score decides it.
+  function safeChances(teams) {
+    const sides = teams.map((t) => {
+      const current = Number(t.points) || 0;
+      const proj = Number(t.proj) || 0;
+      const settled = Number(current.toFixed(2)) === Number(proj.toFixed(2));
+      return { ...scoreSpread(current, proj), settled };
+    });
+    if (sides.every((x) => x.settled)) {
+      const low = Math.min(...sides.map((x) => Number(x.mean.toFixed(2))));
+      const last = sides.filter((x) => Number(x.mean.toFixed(2)) === low).length;
+      return sides.map((x) => (Number(x.mean.toFixed(2)) === low ? 1 - 1 / last : 1));
+    }
+    const STEPS = 400;
+    return sides.map((me, i) => {
+      const sd = Math.sqrt(me.variance);
+      const from = me.mean - 8 * sd;
+      const dx = (16 * sd) / STEPS;
+      let lowest = 0;
+      for (let k = 0; k < STEPS; k++) {
+        const x = from + (k + 0.5) * dx;
+        const z = (x - me.mean) / sd;
+        let above = Math.exp(-z * z / 2) / (sd * Math.sqrt(2 * Math.PI)) * dx;
+        for (let j = 0; j < sides.length && above > 1e-12; j++) {
+          if (j === i) continue;
+          const o = sides[j];
+          above *= 0.5 * erfc((x - o.mean) / Math.sqrt(2 * o.variance));
+        }
+        lowest += above;
+      }
+      return Math.max(0, Math.min(1, 1 - lowest));
+    });
+  }
+
+  // The week's chopping block from the teams still alive, worst first, as
+  // Sleeper's app lists it: ranked by live projection (then points), each with
+  // its rank (1 the best), safe chance (safeChances) and zone: the last team
+  // 'chop', the CHOP_DANGER above it 'danger' (the best team never), else 'safe'.
+  //   teams: [{ rosterId, points (null before any game), proj, ... }]
+  function chopBlock(teams) {
+    const safe = safeChances(teams);
+    const ranked = teams.map((t, i) => ({ ...t, safe: safe[i] }))
+      .sort((a, b) => (b.proj ?? 0) - (a.proj ?? 0) || (b.points ?? 0) - (a.points ?? 0) || a.rosterId - b.rosterId);
+    const last = ranked.length - 1;
+    const danger = Math.max(0, Math.min(CHOP_DANGER, last - 1));
+    const zone = (i) => (last < 1 ? 'safe' : i === last ? 'chop' : i >= last - danger ? 'danger' : 'safe');
+    return ranked.map((t, i) => ({ ...t, rank: i + 1, zone: zone(i) })).reverse();
+  }
+
+  // Weeks a team has played: through the last week scored, or the week it was chopped.
+  function chopWeeksPlayed(league, roster) {
+    const s = league?.settings || {};
+    const last = roster?.settings?.eliminated || s.last_scored_leg || 0;
+    return Math.max(0, last - (s.start_week || 1) + 1);
+  }
+
+  // A roster's season points per week played (null before any), and its FAAB left.
+  function chopTeamStats(league, roster) {
+    const st = roster?.settings || {};
+    const weeks = chopWeeksPlayed(league, roster);
+    const fpts = (st.fpts ?? 0) + (st.fpts_decimal ?? 0) / 100;
+    return { avg: weeks ? fpts / weeks : null, faab: faabLeft(league, roster) };
+  }
+
+  // The chopped teams, latest first: { roster, week, avg, faab }.
+  function graveyard(league, rosters) {
+    return (rosters || []).filter((r) => r.settings?.eliminated)
+      .map((r) => ({ roster: r, week: r.settings.eliminated, ...chopTeamStats(league, r) }))
+      .sort((a, b) => b.week - a.week || a.roster.roster_id - b.roster.roster_id);
+  }
+
+  // Players dropped when their team was chopped and still on no roster:
+  // [{ id, rosterId, week }], the latest chop for a player dropped twice.
+  //   transactions: every week's, any type (only 'chopped' ones count).
+  function choppedPlayers(transactions, rosters) {
+    const owned = new Set((rosters || []).flatMap((r) => r.players || []));
+    const out = new Map();
+    for (const t of transactions || []) {
+      if (t?.type !== 'chopped' || t.status !== 'complete') continue;
+      for (const [id, rosterId] of Object.entries(t.drops || {})) {
+        if (owned.has(id) || (out.get(id)?.week ?? -1) > t.leg) continue;
+        out.set(id, { id, rosterId, week: t.leg });
+      }
+    }
+    return [...out.values()];
   }
 
   // ---- League median ----
@@ -1070,7 +1171,8 @@
     taxiEligible, taxiOpen, reserveEligible,
     lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
-    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
+    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
+    isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, graveyard, choppedPlayers,
   };
 })();

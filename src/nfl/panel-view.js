@@ -237,5 +237,5 @@
     </div>`;
   }
 
-  return { render, lineup, moveLineup, targetsOf };
+  return { render, lineup, totals, moveLineup, targetsOf };
 })();
