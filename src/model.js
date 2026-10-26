@@ -954,22 +954,6 @@
       .sort((a, b) => b.week - a.week || a.roster.roster_id - b.roster.roster_id);
   }
 
-  // Players dropped when their team was chopped and still on no roster:
-  // [{ id, rosterId, week }], the latest chop for a player dropped twice.
-  //   transactions: every week's, any type (only 'chopped' ones count).
-  function choppedPlayers(transactions, rosters) {
-    const owned = new Set((rosters || []).flatMap((r) => r.players || []));
-    const out = new Map();
-    for (const t of transactions || []) {
-      if (t?.type !== 'chopped' || t.status !== 'complete') continue;
-      for (const [id, rosterId] of Object.entries(t.drops || {})) {
-        if (owned.has(id) || (out.get(id)?.week ?? -1) > t.leg) continue;
-        out.set(id, { id, rosterId, week: t.leg });
-      }
-    }
-    return [...out.values()];
-  }
-
   // ---- League median ----
 
   // With "league median" on (settings.league_average_match), each regular-season
@@ -1173,6 +1157,6 @@
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
     openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
-    isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, graveyard, choppedPlayers,
+    isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, graveyard,
   };
 })();

@@ -949,8 +949,7 @@ span.team-link:hover {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 /* A chopped league's League tab (nfl/chop-view.js): your safe status, the
-   chopping block worst first under its zone headers, chopped players on
-   waivers and the graveyard. In Sleeper's standings' place, so it pads itself. */
+   chopping block worst first under its zone headers, and the graveyard. In Sleeper's standings' place, so it pads itself. */
 .app.league.chop-tab {
   display: grid;
   gap: 12px;
@@ -1163,61 +1162,6 @@ b.safe {
   font-size: 12px;
   text-align: center;
 }
-.chop-sorts {
-  display: inline-flex;
-  gap: 4px;
-}
-.chop-sorts button {
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 800;
-}
-.chop-sorts button.on,
-.chop-sorts button.on:hover {
-  background: var(--accent);
-  color: var(--ink);
-}
-.chop-player {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto 56px;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 4px;
-  border-top: 1px solid var(--line);
-}
-.chop-player .headshot {
-  width: 34px;
-  height: 34px;
-  cursor: pointer;
-}
-.chop-player .name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-weight: 800;
-}
-.chop-player .name button {
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.chop-player .name button:hover {
-  background: none;
-  text-decoration: underline;
-}
-.chop-from {
-  text-align: right;
-  line-height: 1.3;
-}
-
 /* The league median (ui.medal, ui.medianBanner): a team over it wears a
    medallion on its avatar, outlined while it's over, solid once it's likely to
    stay over, gold and lit once it has won. */

@@ -622,6 +622,27 @@
     owner.append(line);
   }
 
+  // Chopped leagues: a red axe after the name of each player the latest chop
+  // dropped and no one has picked up since, as Sleeper's app marks them. Sleeper's
+  // own Players panel holds who that is (the Chopped filter's list).
+  const AXE = '<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(35 12 12)"><path d="M10.6 2.5h4.2c2.2 0 4.2-.9 5.8-2.3v11.2c-1.6-1.4-3.6-2.3-5.8-2.3h-4.2z" fill="currentColor"/><path d="M12.2 3v20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></g></svg>';
+  function chopMark(row, id, panel) {
+    const name = row.querySelector('.player-meta-container .name');
+    if (!name) return;
+    const chopped = panel.state.choppedData;
+    const week = chopped?.latestChoppedPlayersMap?.[id] && !panel.props.ownedPlayers?.[id] ? chopped.latestElmininationWeek || '' : null;
+    const mark = name.querySelector(':scope > .snp-chop');
+    if (week == null) return mark?.remove();
+    if (mark?.dataset.week === String(week)) return;
+    mark?.remove();
+    const el = document.createElement('span');
+    el.className = 'snp-chop';
+    el.dataset.week = String(week);
+    el.title = week ? `Chopped in week ${week}: on waivers` : 'Chopped: on waivers';
+    el.innerHTML = AXE;
+    name.append(el);
+  }
+
   // Shooting: a small +/- at the end of the column header, while Stats is on,
   // shows the shot-volume columns there (it doesn't take room in Sleeper's
   // filter row, which would wrap).
@@ -822,6 +843,7 @@
       if (id == null) continue;
       const s = map[id];
       ownerLine(row, id, panel);
+      chopMark(row, id, panel);
       keys.forEach((key, i) => {
         if (key === DELTA_KEY || !cells[i]) return;
         if (key === WEEK_KEY) {
@@ -1129,6 +1151,8 @@
     ${PLAYERS_PANEL} .snp-team-label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
     ${PLAYERS_PANEL} .snp-team-label small { color: rgb(120, 134, 156); font-size: 11px; line-height: 14px; }
     ${PLAYERS_PANEL} .owner[data-snp-owner] > :not(.snp-owner) { display: none !important; }
+    ${PLAYERS_PANEL} .snp-chop { display: inline-flex; width: 16px; height: 16px; margin-left: 4px; vertical-align: -3px; color: rgb(255, 77, 125); }
+    ${PLAYERS_PANEL} .snp-chop svg { width: 100%; height: 100%; }
     /* NFL rows have a game line too: the team line takes no more height than Sleeper's own (12px). */
     ${PLAYERS_PANEL} .name-container:has(.game-schedule-live-description) .snp-owner { line-height: 12px; }
     ${PLAYERS_PANEL} .name-container:has(.game-schedule-live-description) .snp-owner-avatar { width: 12px; height: 12px; }

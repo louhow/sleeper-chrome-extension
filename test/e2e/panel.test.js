@@ -2367,7 +2367,11 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
     { id: 'qbx', pos: 'QB', team: 'DET', owner: 'Cookie Monster', stats: stats(20), game: '5:28 4th 13-43 vs TB', redZone: true },
     { id: 'tex', pos: 'TE', team: 'KC', owner: 'Cling Kong', stats: stats(12) },
     { id: 'rbx', pos: 'RB', team: 'SF', stats: stats(8) },
-  ], { statType: 'stat', statInterval: 6, statKeys: NFL_KEYS, sort: 'fpts' }, {
+  ], {
+    statType: 'stat', statInterval: 6, statKeys: NFL_KEYS, sort: 'fpts',
+    // As in a chopped league: the latest chop's players (the TE has been picked up since).
+    choppedData: { latestChoppedPlayersMap: { rbx: true, tex: true }, latestElmininationWeek: 6 },
+  }, {
     leagueId: NFL_LEAGUE, sport: 'nfl', leg: 7, schedulesMap,
     sections: [['fantasy', 96], ['rushing', 160], ['receiving', 197], ['passing', 55]],
   });
@@ -2454,6 +2458,11 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
   const avg = (id) => recent.avg[id];
   const order = await page.locator('.player-list-item').evaluateAll((els) => els.map((r) => r.dataset.id));
   assert.deepEqual(order, ['qbx', 'tex', 'rbx'].sort((a, b) => avg(b) - avg(a)));
+  // In a chopped league, a red axe after the name of each chopped player no one has picked up.
+  await page.locator('.player-list-item[data-id="rbx"] .name .snp-chop').waitFor();
+  assert.equal(await page.locator('.player-list-item[data-id="rbx"] .snp-chop').getAttribute('title'), 'Chopped in week 6: on waivers');
+  assert.equal(await page.locator('.snp-chop').count(), 1, 'only the chopped player still on waivers');
+  await page.locator('.player-table').screenshot({ path: `${OUT}nfl-players-chopped.png` });
   // The team picker and team lines, as on the NBA Players tab.
   const picker = page.locator('.header-top .snp-team-pick');
   await picker.locator('.snp-team-button').click();
@@ -2653,8 +2662,8 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   documentBody = LOGGED_OUT;
 });
 
-test('chopped league tab: your safe status, the chopping block, chopped players on waivers and the graveyard, in place of Sleeper\'s standings', async () => {
-  const [league, rosters] = await Promise.all(['', '/rosters'].map(async (path) => (await fetch(`https://api.sleeper.app/v1/league/${CHOP_LEAGUE}${path}`)).json()));
+test('chopped league tab: your safe status, the chopping block and the graveyard, in place of Sleeper\'s standings', async () => {
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${CHOP_LEAGUE}/rosters`)).json();
   const alive = rosters.filter((r) => !r.settings?.eliminated);
   const dead = rosters.filter((r) => r.settings?.eliminated);
   sleeper.me = alive[0].owner_id;
@@ -2676,13 +2685,6 @@ test('chopped league tab: your safe status, the chopping block, chopped players 
   // The graveyard: every chopped team, latest first.
   const weeks = (await tab('.grave-row:not(.chop-cols) .chop-rank').allTextContents()).map(Number);
   assert.deepEqual(weeks, dead.map((r) => r.settings.eliminated).sort((a, b) => b - a));
-  // Chopped players still unclaimed, from the chopped weeks' transactions; sorting by week puts the latest chop first.
-  await tab('.chop-player, .chop-card .msg:not(.error)').first().waitFor({ timeout: 30000 });
-  await tab('[data-chop-sort="week"]').click();
-  assert.equal(await tab('[data-chop-sort="week"]').getAttribute('aria-pressed'), 'true');
-  const chopWeeks = (await tab('.chop-from').allTextContents()).map((t) => Number(t.match(/wk (\d+)/)[1]));
-  assert.deepEqual(chopWeeks, [...chopWeeks].sort((a, b) => b - a));
-  for (const w of chopWeeks) assert.ok(w <= league.settings.last_chopped_leg);
   // Sleeper's standings hide; Recent Activity stays below.
   assert.equal(await page.locator('.league-tab-standings').isVisible(), false);
   assert.equal(await page.locator('.league-activity-card').isVisible(), true);

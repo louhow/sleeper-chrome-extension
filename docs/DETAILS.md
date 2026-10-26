@@ -278,9 +278,9 @@ Sleeper's web app has no Matchup tab for one and its standings are all 0-0, so t
 - Your team: its rank among the teams still alive ("3rd of 12"), points per week played, FAAB left, points and projection, and its safe chance with a bar. A chopped team says "Chopped · wk 6" instead.
 - Chopping Block, for the week on now: every team still alive, worst first, ranked by live projection, under Sleeper's app's headers: the last team in the Chop zone, the three above it in Danger, the rest Safe. Each shows its safe chance, starters played ("7/8"), points and projection. A team opens on the Team tab.
 - Safe % is the chance of not finishing the week last: each team's final score is a normal distribution around its live projection, as in Sleeper's win chance (tighter as its score nears the projection), and a team's chance of being last is summed over every score it could finish on. Once every game is over, the score decides it.
-- Chopped players on waivers: everyone dropped when a team was chopped and on no roster now, with the team they came from and the week, and their projection this week. Sort by projection, week chopped (latest first) or position; the choice is kept in the page's storage. A player's name or headshot opens Sleeper's player card. Sleeper's own Players tab "Chopped" filter only shows the latest chop.
 - Graveyard: every chopped team, latest first, with the week, FAAB left and points per week played.
-- The week's numbers are the NFL Team tab's (the same loads), read again during games while the League tab is on screen. The chopped players come from each chopped week's transactions, read once a session.
+- The week's numbers are the NFL Team tab's (the same loads), read again during games while the League tab is on screen.
+- On the Players tab, a red axe after a player's name marks each player the latest chop dropped who no one has picked up since, as Sleeper's app marks them (hover: "Chopped in week 6: on waivers"). Who that is comes from Sleeper's own Players panel, the list its Chopped filter shows, so it costs no extra calls.
 
 ### NFL: Players tab
 
@@ -387,7 +387,6 @@ The API log stays available, and once the page holds a new token (after logging 
 | `GET /v1/league/<id>/winners_bracket` | Last week of the season |
 | `GET /v1/league/<id>/traded_picks`, `/drafts` | Draft picks held |
 | `GET /v1/league/<id>/matchups/<week>` | Weekly starters, points, opponent |
-| `GET /v1/league/<id>/transactions/<week>` | Chopped leagues: the players each chop dropped to waivers |
 | `GET /v1/state/nba` | Current week |
 | `GET /v1/players/nba` | Names, teams, positions, injuries (~2.5 MB, cached 12h in `chrome.storage.local`) |
 | `GET /projections/nba/<season>/<week>` | Per-game projected stats, scored with the league's settings |

@@ -905,17 +905,3 @@ test('graveyard: chopped teams latest first, FAAB left and points per week playe
   assert.deepEqual(plain(model.graveyard(league, rosters).map((d) => [d.roster.roster_id, d.week, d.faab, d.avg])), [[3, 5, 648, 100], [2, 2, 1000, 75.25]]);
   assert.deepEqual(plain(model.chopTeamStats(league, rosters[0])), { avg: 100, faab: 900 }, 'an active team: through the last week scored');
 });
-
-test('choppedPlayers: dropped by a chop and on no roster, the latest chop for a player dropped twice', () => {
-  const tx = [
-    { type: 'chopped', status: 'complete', leg: 2, drops: { a: 7, b: 7, c: 7 } },
-    { type: 'free_agent', status: 'complete', leg: 3, drops: { d: 1 } },
-    { type: 'chopped', status: 'complete', leg: 4, drops: { c: 9, e: 9 } },
-  ];
-  const rosters = [{ roster_id: 1, players: ['b'] }];
-  assert.deepEqual(plain(model.choppedPlayers(tx, rosters)).sort((x, y) => x.id.localeCompare(y.id)), [
-    { id: 'a', rosterId: 7, week: 2 },
-    { id: 'c', rosterId: 9, week: 4 },
-    { id: 'e', rosterId: 9, week: 4 },
-  ]);
-});

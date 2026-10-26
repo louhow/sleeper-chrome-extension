@@ -18,7 +18,7 @@
     leagueId, api, league, info, lineup, nflSave, openDialog: () => optimizer.open(), dialogOpen: () => optimizer.isOpen(),
     livePages: chopped ? ['league'] : [], onUpdate: () => chop?.refresh(),
   });
-  const chop = chopped ? nflChop({ leagueId, api, league, info, panel }) : null;
+  const chop = chopped ? nflChop({ info, panel }) : null;
   const optimizer = nflOptimize({ lineup, nflSave, notify: (text) => panel.notify(text) });
   const leagueCards = nflLeague(league);
   const playersTab = nflPlayers({ api, league, info });
