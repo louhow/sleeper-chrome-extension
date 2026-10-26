@@ -206,6 +206,16 @@ Clicking a player's name or headshot on the Team or Matchup tab, or a player on 
 - Career: one row per season with fantasy points, position rank, per-game averages and shooting.
 - Transaction history in this league (logged in), latest news, and the team's depth chart.
 
+### Real-life draft (player cards)
+
+Sleeper doesn't carry where a player was drafted in real life, so the player cards get it from ESPN's public API: the NBA card (the extension's own) and Sleeper's own NFL card both show a DRAFT item after COLLEGE.
+
+- It reads "2020" with "Rd 1, Pk 21 (PHI)" under it on the NBA card (beside it, in Sleeper's small unit style, on the NFL card), or "Undrafted".
+- Matching a Sleeper player to ESPN's: Sleeper's `espn_id` when it has one (about a quarter of NFL players, no NBA players), else ESPN's player search for the name (then the last name alone), only that sport's league, accepted only on an exact birth-date match with Sleeper's. No match shows a quiet "-", never a guess, so players with the same name or a spelling difference can't get someone else's pick.
+- Only on the cards, never on tables or the Team tab: one lookup when a card opens for a player not looked up before. The extension's service worker (`src/background.js`) makes the calls, since ESPN turns down calls from sleeper.com's pages; each gives up after 8 seconds. A draft is kept in `chrome.storage.local` for good (it never changes), a "no match" for a week (ESPN may add a rookie later), an error not at all. Cards asking about the same player at once share one lookup.
+- While ESPN answers, the item shows a placeholder the rest of the card doesn't wait on; if ESPN is slow or down, it shows "-" (the NFL card gives up after 15 seconds), and nothing else on the card or in Sleeper changes.
+- The ESPN calls show in the API tab (`espn search`, `espn athlete`, `espn team`, or a cache entry).
+
 ### What-if scoring
 
 What-if scoring is an admin tool, hidden by default.
@@ -396,6 +406,7 @@ The API log stays available, and once the page holds a new token (after logging 
 | Call | Used for |
 | --- | --- |
 | `GET /v1/league/<id>` | Name, sport check, slot order, scoring, reserve/taxi slot counts, draft rounds, league type |
+| ESPN `site.web.api.espn.com/apis/search/v2`, `sports.core.api.espn.com/v2/sports/<sport>/leagues/<league>/athletes/<id>` (and its draft team) | Player cards: the real-life draft (see above), from the service worker |
 | `GET /v1/league/<id>/users`, `/rosters` | Team names, avatars, players, starters, taxi, IR, record |
 | `GET /v1/league/<id>/winners_bracket` | Last week of the season |
 | `GET /v1/league/<id>/traded_picks`, `/drafts` | Draft picks held |

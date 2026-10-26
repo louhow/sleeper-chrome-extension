@@ -113,6 +113,7 @@
                 ${item('Weight', bio?.weight ? `${esc(bio.weight)}<small>lbs</small>` : '-', true)}
                 ${item('Exp', bio?.years_exp ?? p.years_exp ?? '-')}
                 ${item('College', esc(bio?.college || '-'), true)}
+                ${item('Draft', draftValue(c.draft), true, 'draft')}
               </div>
               <div class="pc-label">Player Rankings</div>
               <div class="pc-ranks">
@@ -139,8 +140,17 @@
     </div>`;
   }
 
-  function item(label, value, raw = false) {
-    return `<div class="pc-item"><div class="pc-item-label">${label}</div><div class="pc-item-value">${raw ? value : esc(value)}</div></div>`;
+  // The real-life draft (draft.js): a placeholder while ESPN answers, then
+  // the year with "Rd 1, Pk 1 (CLE)" small under it, or "Undrafted"; without a
+  // match, or with ESPN slow or down, a quiet "-".
+  function draftValue(d) {
+    if (!d || d.status === 'loading') return '<span class="pc-loading" aria-label="Loading draft"></span>';
+    if (!d.text) return `<span title="${esc(d.status === 'error' ? "ESPN didn't answer" : 'No draft found on ESPN')}">-</span>`;
+    return `<span title="Real-life draft, from ESPN: ${esc(d.text)}">${esc(d.main)}${d.detail ? `<small>${esc(d.detail)}</small>` : ''}</span>`;
+  }
+
+  function item(label, value, raw = false, cls = '') {
+    return `<div class="pc-item${cls ? ` ${cls}` : ''}"><div class="pc-item-label">${label}</div><div class="pc-item-value">${raw ? value : esc(value)}</div></div>`;
   }
 
   // Placeholders hold a section's size while it loads, so nothing below jumps:

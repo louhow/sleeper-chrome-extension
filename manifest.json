@@ -20,8 +20,13 @@
     "storage"
   ],
   "host_permissions": [
-    "https://api.sleeper.app/*"
+    "https://api.sleeper.app/*",
+    "https://site.web.api.espn.com/*",
+    "https://sports.core.api.espn.com/*"
   ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -38,6 +43,8 @@
         "src/settings-view.js",
         "src/settings.js",
         "src/loaders.js",
+        "src/espn.js",
+        "src/draft.js",
         "src/nba/week.js",
         "src/nba/panel-view.js",
         "src/nba/matchup-view.js",

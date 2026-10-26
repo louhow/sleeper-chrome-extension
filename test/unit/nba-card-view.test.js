@@ -93,3 +93,13 @@ test('while loading, every section holds the shape of what it will show', () => 
   assert.deepEqual(depth, ['PG 2', 'SG 1', 'SF 1', 'PF 1', 'C 1'], 'a line per teammate at the position');
   assert.equal((html.match(/aria-busy="true"/g) || []).length, 4);
 });
+
+test('draft: a placeholder while ESPN answers, then the real-life draft, Undrafted, or a quiet "-"', () => {
+  const html = (draft) => card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } }, cards: { p1: { draft } } });
+  const value = (draft) => html(draft).match(/Draft<\/div><div class="pc-item-value">(.*?)<\/div>/)[1];
+  assert.match(value({ status: 'loading' }), /class="pc-loading"/);
+  assert.match(value({ status: 'found', text: '2017 · Rd 1, Pk 13 (DEN)', main: '2017', detail: 'Rd 1, Pk 13 (DEN)' }), />2017<small>Rd 1, Pk 13 \(DEN\)<\/small></);
+  assert.match(value({ status: 'undrafted', text: 'Undrafted', main: 'Undrafted', detail: '' }), />Undrafted<\/span>/);
+  assert.match(value({ status: 'none', text: null }), /title="No draft found on ESPN">-</);
+  assert.match(value({ status: 'error', text: null }), /title="ESPN didn&#39;t answer">-</);
+});

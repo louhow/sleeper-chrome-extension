@@ -1,8 +1,8 @@
-// The NBA player card's data: bio, game logs, career, news, depth chart and
-// transaction history, each part loading on its own and rendering as it
+// The NBA player card's data: bio, real-life draft (ESPN, draft.js), game logs,
+// career, news, depth chart and transaction history, each part loading on its own and rendering as it
 // arrives (card-view.js draws it). Kept for the session in `state.cards`.
 (globalThis.SNP ||= {}).nbaCard = ({ state, api, leagueId, schedule }) => {
-  const { loaders } = globalThis.SNP;
+  const { loaders, draft } = globalThis.SNP;
   // Career seasons fetched for the player card (one request each).
   const CAREER_SEASONS = 10;
   const CARD_SEASON_TABS = 6;
@@ -34,7 +34,16 @@
       })
       .finally(schedule);
 
-    part(api.get(`/players/nba/${id}`), (bio) => { c.bio = bio; });
+    const bio = api.get(`/players/nba/${id}`);
+    part(bio, (b) => { c.bio = b; });
+    // The real-life draft, from ESPN once the bio's name and birth date are in; it shows on its own.
+    c.draft = { status: 'loading' };
+    bio.then((b) => draft.lookup(api, { sport: 'nba', playerId, name: [b?.first_name, b?.last_name].filter(Boolean).join(' '), lastName: b?.last_name, birthDate: b?.birth_date, espnId: b?.espn_id }))
+      .catch(() => ({ status: 'error' }))
+      .then((d) => {
+        c.draft = d;
+        schedule();
+      });
     part(Promise.all(years.map((season) => api.get(`/stats/nba/player/${id}?season_type=regular&season=${season}`)
       .then((row) => ({ season, team: row?.team, stats: row?.stats || null }))
       .catch(() => ({ season, stats: null })))), (rows) => {

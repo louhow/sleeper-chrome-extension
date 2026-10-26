@@ -857,5 +857,5 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     schedule();
   }
 
-  return { leagueId, attach, show, destroy, setAdmin: setAdminTools };
+  return { leagueId, api, attach, show, destroy, setAdmin: setAdminTools };
 };

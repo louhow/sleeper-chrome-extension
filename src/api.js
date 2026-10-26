@@ -95,8 +95,14 @@
     record({ path, url: REST + path, status: 'cache', ms: 0, bytes, json });
   }
 
+  // Logs a call made outside this page (the service worker's ESPN calls):
+  // { label, url, status, ms, bytes, error }.
+  function external({ label, url, status, ms, bytes, error }) {
+    record({ path: label, url, status, ms, bytes, error });
+  }
+
   // Logged in, but Sleeper turned the session down: the page needs a fresh login.
   const sessionExpired = () => rejectedToken != null && sessionToken() === rejectedToken;
 
-  return { get, graphql, graphqlAny, cached, log, loggedIn: () => Boolean(sessionToken()), sessionExpired };
+  return { get, graphql, graphqlAny, cached, external, log, loggedIn: () => Boolean(sessionToken()), sessionExpired };
 };

@@ -2294,6 +2294,36 @@ h2.pc-name {
   font-size: 14px;
   opacity: 0.8;
 }
+/* The real-life draft: the year in line with the other values, "Rd 1, Pk 1 (CLE)"
+   on a small line under it, so the item is only as wide as the year. */
+.pc-item.draft {
+  position: relative;
+}
+.pc-item.draft small {
+  position: absolute;
+  top: 100%;
+  left: 14px;
+  margin: 3px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* The real-life draft while ESPN answers: a soft bar the size of a short value, so nothing shifts when it lands. */
+.pc-loading {
+  display: inline-block;
+  width: 60px;
+  height: 0.8em;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.22);
+  vertical-align: middle;
+  animation: pc-fade 1.2s ease-in-out infinite;
+}
+@keyframes pc-fade {
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-loading { animation: none; }
+}
 .pc-label {
   margin-top: 12px;
 }

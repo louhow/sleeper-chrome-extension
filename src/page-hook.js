@@ -1186,7 +1186,11 @@
     ${PLAYERS_PANEL} .snp-delta {
       min-width: 28px; padding: 2px 6px; border-radius: 4px; box-sizing: border-box;
       font-size: 12px; font-weight: 700; text-align: center; color: rgba(255, 255, 255, 0.45); font-variant-numeric: tabular-nums;
-    }`;
+    }
+    /* Sleeper's NFL player card: the DRAFT item's placeholder while ESPN answers (cardDraft). */
+    .snp-draft-loading { display: inline-block; width: 96px; height: 0.8em; border-radius: 6px; background: rgba(255, 255, 255, 0.3); vertical-align: middle; animation: snp-draft-fade 1.2s ease-in-out infinite; }
+    @keyframes snp-draft-fade { 50% { opacity: 0.45; } }
+    @media (prefers-reduced-motion: reduce) { .snp-draft-loading { animation: none; } }`;
   (document.head || document.documentElement).append(adminStyle, volumeStyle);
 
   // NFL Team tab. Sleeper's own Team component holds the lineup as shown
@@ -1291,6 +1295,50 @@
     const { card, open } = caught;
     open({ ...card, key: null, props: { ...card.props, playerIds: [playerId], selectedPlayerId: playerId, playersMap: { ...caught.playersMap, [playerId]: player } } });
   });
+
+  // Sleeper's NFL player card: a DRAFT item after its COLLEGE, the player's
+  // real-life draft from ESPN (the extension's draft.js answers 'snp:draft').
+  // A placeholder shows while ESPN answers, and a quiet "-" if it doesn't
+  // (no match, ESPN down, or no answer in DRAFT_WAIT_MS), so the card itself
+  // never waits on it. The item is a copy of Sleeper's COLLEGE item, so it
+  // looks like the rest; one per player shown (the card can page through players).
+  const CARD_ITEMS = '.player-card-header .profile-items-container';
+  const DRAFT_WAIT_MS = 15e3;
+  function cardDraft() {
+    for (const items of document.querySelectorAll(CARD_ITEMS)) {
+      const card = props(items, (x) => x.playerId && x.sport && 'player' in x);
+      const player = card?.player;
+      if (card?.sport !== 'nfl' || !player) continue;
+      const id = String(card.playerId);
+      const shown = items.querySelector(':scope > .snp-draft');
+      if (shown?.dataset.player === id) continue;
+      shown?.remove();
+      const college = [...items.children].pop();
+      if (!college?.querySelector('.profile-item-label') || !college.querySelector('.profile-item-value')) continue;
+      const item = college.cloneNode(true);
+      item.classList.add('snp-draft');
+      item.dataset.player = id;
+      item.querySelector('.profile-item-label').textContent = 'DRAFT';
+      const out = item.querySelector('.profile-item-value');
+      out.innerHTML = '<span class="snp-draft-loading" aria-label="Loading draft"></span>';
+      items.append(item);
+      const ask = { sport: 'nfl', playerId: id, name: [player.first_name, player.last_name].filter(Boolean).join(' '), lastName: player.last_name, birthDate: player.birth_date, espnId: player.espn_id };
+      Promise.race([bridge.call('snp:draft', ask), new Promise((resolve) => setTimeout(resolve, DRAFT_WAIT_MS, null))]).then((reply) => {
+        if (item.dataset.player !== id) return;
+        // The year large and "Rd 1, Pk 1 (CLE)" in Sleeper's small unit style, as "lbs" after a weight.
+        out.textContent = reply?.main || '-';
+        if (reply?.detail) out.append(Object.assign(document.createElement('div'), { className: 'profile-item-unit', textContent: ` ${reply.detail}` }));
+        out.title = reply?.text ? `Real-life draft, from ESPN: ${reply.text}` : reply?.status === 'error' || !reply ? "ESPN didn't answer" : 'No draft found on ESPN';
+      });
+    }
+  }
+  let cardFrame = 0;
+  new MutationObserver(() => {
+    cardFrame ||= requestAnimationFrame(() => {
+      cardFrame = 0;
+      cardDraft();
+    });
+  }).observe(document.documentElement, { childList: true, subtree: true });
 
   // NFL League tab: Sleeper's own matchup cards, read as they show (so the
   // extension's cards carry Sleeper's exact live numbers), and which is yours.
