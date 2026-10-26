@@ -104,3 +104,11 @@ test('draft: beside the rankings, a placeholder while ESPN answers, then the rea
   assert.match(value({ status: 'error', text: null }), /title="ESPN didn&#39;t answer"><b>–<\/b>/);
   assert.doesNotMatch(html({ status: 'loading' }), /pc-item[^"]*">\s*<div class="pc-item-label">Draft/, 'not in the AGE ... COLLEGE row');
 });
+
+test('contract: beside the draft, "FA 2028" with years left, pay and since when, or a quiet "–"', () => {
+  const html = (contract) => card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } }, cards: { p1: { contract } } });
+  const value = (contract) => html(contract).match(/<div class="pc-contract">\s*<div class="pc-label">Contract<\/div>\s*<div class="pc-ranks">(.*?)<\/div>/)[1];
+  assert.match(value({ status: 'loading' }), /class="pc-loading" aria-label="Loading contract"/);
+  assert.match(value({ status: 'found', text: 'FA 2028 · 2 yrs left · $50.1M · since 2025-26', main: 'FA 2028', detail: '2 yrs left · $50.1M · since 2025-26' }), /title="Contract, from ESPN: FA 2028 · 2 yrs left · \$50.1M · since 2025-26"><b>FA 2028<\/b>2 yrs left · \$50.1M · since 2025-26<\/span>/);
+  assert.match(value({ status: 'none', text: null }), /title="No contract found on ESPN"><b>–<\/b>/);
+});

@@ -1422,6 +1422,9 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
     return block && !block.querySelector('.pc-loading');
   }, null, { timeout: 30000 });
   assert.match((await draft.textContent()).trim(), /^(\d{4}Rd \d+ · Pk \d+( · [A-Z]+)?|Undrafted)$/, 'ESPN matched the player');
+  // And the contract beside it: when he's a free agent, years left, pay, since when.
+  await page.waitForFunction(() => !document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('.pc-contract .pc-loading'), null, { timeout: 30000 });
+  assert.match((await page.locator(dialog('.pc-contract .pc-ranks')).textContent()).trim(), /^FA 20\d\d(\d yrs left|Final year)( · \$[\d.]+[MK])?( · since 20\d\d-\d\d)?$/);
   // Inside the card, the small line under the year included, not past its edge,
   // even beside a long college (which gives way with an ellipsis).
   const edge = await page.locator(dialog('.pc-hero')).boundingBox();
@@ -1430,7 +1433,8 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
     const right = await draft.evaluate((el) => Math.max(...[...el.querySelectorAll('span, b')].map((c) => c.getBoundingClientRect().right)));
     assert.ok(right <= edge.x + edge.width, `the draft fits with ${college || 'the college'} (${Math.round(right)} of ${Math.round(edge.x + edge.width)}px)`);
   }
-  await page.locator(dialog('.pc-hero')).screenshot({ path: `${OUT}player-card-draft.png` });
+  // The card redraws as each part lands, so a clip of the page rather than of the (replaced) element.
+  await page.screenshot({ path: `${OUT}player-card-draft.png`, clip: await page.locator(dialog('.pc-hero')).boundingBox() });
   assert.match(await page.locator(dialog('.pc-number')).textContent(), /[A-Z0-9 ]+( #\d+)?/);
 
   // This season: upcoming games with projections; last season: played games, heat-shaded.
@@ -2779,7 +2783,7 @@ test('chopped league team tab: points per week, FAAB left and the safe chance in
 // Sleeper's own NFL player card header, as its web bundle draws it (2026-10-26): the
 // profile items, with the card component's props (sport, playerId, player) on a fiber above them.
 const nflCard = (player, { playerId = '4892', width = 660 } = {}) => `<!doctype html><title>Sleeper</title>
-<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .player-card-header { width: 1000px; margin: 40px; padding: 24px; background: #e8622c; border-radius: 12px; } .player-info-container { width: ${width}px; box-sizing: border-box; }
+<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .player-card-header { width: 1300px; margin: 40px; padding: 24px; background: #e8622c; border-radius: 12px; } .player-info-container { width: ${width}px; box-sizing: border-box; }
   /* Sleeper's own rules for the header (its CSS bundle, 2026-10-26). */
   .player-card-header .player-info-container { flex-grow: 1; padding: 25px 26px 18px 0px; }
   .player-card-header .player-info-container .profile-items-container { display: flex; flex-direction: row; align-items: center; margin-top: 25px; }
@@ -2803,41 +2807,50 @@ ${[['#4', 'QB'], ['#7', 'OVERALL'], ['91%', 'ROSTERED'], ['57%', 'STARTED']].map
   document.querySelector('.player-ranking-container').__reactInternalInstance$test = { memoizedProps: { className: 'player-ranking-container' }, return: { memoizedProps: {}, return: { memoizedProps: { sport: 'nfl', playerId: '${playerId}', player: ${JSON.stringify(player)} } } } };
 </script>`;
 
-test('NFL player card: a DRAFT block beside PLAYER RANKINGS with the real-life draft from ESPN, matched on the birth date', async () => {
-  // Sleeper has no ESPN id for him here, so it's ESPN's search, accepted on the birthday.
-  documentBody = nflCard({ first_name: 'Baker', last_name: 'Mayfield', birth_date: '1995-04-14' });
+test('NFL player card: DRAFT and CONTRACT blocks beside PLAYER RANKINGS, from ESPN, matched on the birth date', async () => {
+  // Derrick Henry, without Sleeper's ESPN id: ESPN's search, accepted on the birthday.
+  const henry = { first_name: 'Derrick', last_name: 'Henry', birth_date: '1994-01-04' };
+  documentBody = nflCard(henry, { playerId: '3198', width: 1100 });
   await page.goto(NFL_TEAM_URL);
-  const draft = page.locator('.player-ranking-container > .snp-draft');
-  await draft.waitFor({ timeout: 30000 });
-  assert.equal(await draft.locator('.profile-item-label').textContent(), 'DRAFT');
-  await draft.locator('.rank-label').waitFor({ timeout: 30000 });
-  // In the rankings' own style: the year large, "RD 1 · PK 1 · CLE" small beside it.
-  assert.equal(await draft.locator('.rank-value').textContent(), '2018');
-  assert.equal(await draft.locator('.rank-label').textContent(), 'RD 1 · PK 1 · CLE');
-  // Beside the rankings: its label level with PLAYER RANKINGS, and inside the card's info column.
-  const [label, theirs, info] = await Promise.all([draft.locator('.profile-item-label'), page.locator('.player-ranking-container > .profile-item-label'), page.locator('.player-info-container')].map((el) => el.boundingBox()));
-  assert.equal(Math.round(label.y), Math.round(theirs.y), 'level with PLAYER RANKINGS');
-  assert.ok(label.x > theirs.x + theirs.width, 'to its right');
-  const right = await draft.evaluate((el) => Math.max(...[...el.children].map((c) => c.getBoundingClientRect().right)));
-  assert.ok(right <= info.x + info.width, `inside the card (${Math.round(right)} of ${Math.round(info.x + info.width)}px)`);
+  const block = (kind) => page.locator(`.player-ranking-container > .snp-espn[data-kind="${kind}"]`);
+  for (const kind of ['draft', 'contract']) await block(kind).locator('.rank-label').waitFor({ timeout: 30000 });
+  assert.deepEqual(await page.locator('.snp-espn > .profile-item-label').allTextContents(), ['DRAFT', 'CONTRACT']);
+  // In the rankings' own style: the large value, the rest small beside it.
+  assert.equal(await block('draft').locator('.rank-value').textContent(), '2016');
+  assert.equal(await block('draft').locator('.rank-label').textContent(), 'RD 2 · PK 45 · TEN');
+  // His deal runs through the 2027 season: a free agent in 2028.
+  assert.equal(await block('contract').locator('.rank-value').textContent(), 'FA 2028');
+  assert.match(await block('contract').locator('.rank-label').textContent(), /^(\d YRS LEFT|FINAL YEAR) · \$[\d.]+M · SINCE 20\d\d$/);
+  // A wide card: both beside the rankings, labels level with PLAYER RANKINGS, inside the card's info column.
+  const labelsTop = await page.locator('.player-ranking-container .profile-item-label').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+  assert.equal(new Set(labelsTop).size, 1, `level: ${labelsTop}`);
+  const inside = () => page.evaluate(() => {
+    const right = Math.max(...[...document.querySelectorAll('.snp-espn > *')].map((el) => el.getBoundingClientRect().right));
+    const column = document.querySelector('.player-info-container');
+    return right <= column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight) + 0.5;
+  });
+  assert.ok(await inside(), 'inside the card');
   // Sleeper's AGE ... COLLEGE row is left as it was.
   assert.equal(await page.locator('.profile-items-container .profile-item-label').evaluateAll((els) => els.map((el) => el.textContent).join(' ')), 'AGE HEIGHT WEIGHT EXP COLLEGE');
-  await page.locator('.player-card-header').screenshot({ path: `${OUT}nfl-card-draft.png` });
-  // A card too narrow for both: the draft goes under the rankings, still inside the card.
-  documentBody = nflCard({ first_name: 'Baker', last_name: 'Mayfield', birth_date: '1995-04-14' }, { width: 470 });
-  await page.goto(NFL_TEAM_URL);
-  await draft.locator('.rank-label').waitFor({ timeout: 30000 });
-  await page.locator('.player-ranking-container.snp-draft-below').waitFor();
-  const [under, ranks] = await Promise.all([draft.locator('.profile-item-label'), page.locator('.player-ranking-row').first()].map((el) => el.boundingBox()));
-  assert.ok(under.y >= ranks.y + ranks.height, 'under the rankings');
-  await page.locator('.player-card-header').screenshot({ path: `${OUT}nfl-card-draft-narrow.png` });
-  // A birthday ESPN has for no Baker Mayfield: no draft, rather than a guess.
+  await page.locator('.player-card-header').screenshot({ path: `${OUT}nfl-card-espn.png` });
+  // Narrower cards (Sleeper's is about 660px): under the rankings side by side, then one under another; always inside the card.
+  for (const [width, layout] of [[660, 'snp-espn-below'], [420, 'snp-espn-stack']]) {
+    documentBody = nflCard(henry, { playerId: '3198', width });
+    await page.goto(NFL_TEAM_URL);
+    await block('contract').locator('.rank-label').waitFor({ timeout: 30000 });
+    await page.locator(`.player-ranking-container.${layout}`).waitFor();
+    assert.ok(await inside(), `inside the ${width}px card`);
+    await page.locator('.player-card-header').screenshot({ path: `${OUT}nfl-card-espn-${width}.png` });
+  }
+  // A birthday ESPN has for no Baker Mayfield: no draft and no contract, rather than a guess.
   documentBody = nflCard({ first_name: 'Baker', last_name: 'Mayfield', birth_date: '1990-01-01' }, { playerId: 'e2e-no-match' });
   await page.goto(NFL_TEAM_URL);
-  const item = page.locator('.snp-draft[data-player="e2e-no-match"] .rank-item');
-  await item.locator('.rank-value').filter({ hasText: /\S/ }).waitFor({ timeout: 30000 });
-  assert.equal(await item.locator('.rank-value').textContent(), '-');
-  assert.equal(await item.getAttribute('title'), 'No draft found on ESPN');
+  for (const [kind, none] of [['draft', 'No draft found on ESPN'], ['contract', 'No contract found on ESPN']]) {
+    const item = page.locator(`.snp-espn[data-kind="${kind}"][data-player="e2e-no-match"] .rank-item`);
+    await item.locator('.rank-value').filter({ hasText: /\S/ }).waitFor({ timeout: 30000 });
+    assert.equal(await item.locator('.rank-value').textContent(), '-');
+    assert.equal(await item.getAttribute('title'), none);
+  }
   documentBody = LOGGED_OUT;
 });
 

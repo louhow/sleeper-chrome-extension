@@ -206,15 +206,17 @@ Clicking a player's name or headshot on the Team or Matchup tab, or a player on 
 - Career: one row per season with fantasy points, position rank, per-game averages and shooting.
 - Transaction history in this league (logged in), latest news, and the team's depth chart.
 
-### Real-life draft (player cards)
+### Real-life draft and contract (player cards)
 
-Sleeper doesn't carry where a player was drafted in real life, so the player cards get it from ESPN's public API: the NBA card (the extension's own) and Sleeper's own NFL card both show a DRAFT block next to PLAYER RANKINGS, leaving the AGE ... COLLEGE row as it is.
+Sleeper doesn't carry where a player was drafted in real life or his contract, so the player cards get them from ESPN's public API: the NBA card (the extension's own) and Sleeper's own NFL card both show DRAFT and CONTRACT blocks next to PLAYER RANKINGS, leaving the AGE ... COLLEGE row as it is.
 
-- It reads like the rankings: "2016" large with "RD 2 · PK 45 · TEN" small beside it, or "Undrafted". On Sleeper's NFL card it's built from Sleeper's own ranking classes, beside the rankings when the card has room and under them when it doesn't. The NBA card is narrower, so there it's under the rankings, and the header grows to fit it.
+- They read like the rankings, the large value with the rest small beside it: DRAFT "2016" with "RD 2 · PK 45 · TEN" (or "Undrafted"); CONTRACT "FA 2028" with "2 YRS LEFT · $11M · SINCE 2025" ("FINAL YEAR" in its last).
+- CONTRACT: the year he's a free agent, seasons left counting this one, this season's pay (ESPN's salary plus bonus; for NFL that's pay, not the cap hit) and the season the deal started. NFL contracts go by league year (from March) and ESPN's "signed through" year; NBA by season (from July; ESPN calls 2026-27 "2027"), so an NBA "FA 2028" means a free agent in the summer of 2028. The start is the earliest season in a row with the same free-agent year (ESPN keeps a record per season).
+- On Sleeper's NFL card they're built from Sleeper's own ranking classes. Beside the rankings when the card has room; else under them, side by side; else one under another (Sleeper's card is usually the middle one). The NBA card is narrower, so there they're under the rankings, side by side, and the header grows to fit them.
 - Matching a Sleeper player to ESPN's: Sleeper's `espn_id` when it has one (about a quarter of NFL players, no NBA players), else ESPN's player search for the name (then the last name alone), only that sport's league, accepted only on an exact birth-date match with Sleeper's. No match shows a quiet "-", never a guess, so players with the same name or a spelling difference can't get someone else's pick.
-- Only on the cards, never on tables or the Team tab: one lookup when a card opens for a player not looked up before. The extension's service worker (`src/background.js`) makes the calls, since ESPN turns down calls from sleeper.com's pages; each gives up after 8 seconds. A draft is kept in `chrome.storage.local` for good (it never changes), a "no match" for a week (ESPN may add a rookie later), an error not at all. Cards asking about the same player at once share one lookup.
+- Only on the cards, never on tables or the Team tab. The extension's service worker (`src/background.js`) makes the calls, since ESPN turns down calls from sleeper.com's pages; each gives up after 8 seconds. Kept in `chrome.storage.local`: the player's ESPN id for good (a "no match" for a week, as ESPN may add a rookie later), a draft for good, a contract for a day (when it still ends the same year, only the current season is read again), an error not at all. Cards asking about the same player at once share one lookup. A first card is a search, a record and a few contract seasons; after that, a contract a day.
 - While ESPN answers, the item shows a placeholder the rest of the card doesn't wait on; if ESPN is slow or down, it shows "-" (the NFL card gives up after 15 seconds), and nothing else on the card or in Sleeper changes.
-- The ESPN calls show in the API tab (`espn search`, `espn athlete`, `espn team`, or a cache entry).
+- The ESPN calls show in the API tab (`espn search`, `espn athlete`, `espn team`, `espn contract <season>`, or a cache entry).
 
 ### What-if scoring
 
@@ -406,7 +408,7 @@ The API log stays available, and once the page holds a new token (after logging 
 | Call | Used for |
 | --- | --- |
 | `GET /v1/league/<id>` | Name, sport check, slot order, scoring, reserve/taxi slot counts, draft rounds, league type |
-| ESPN `site.web.api.espn.com/apis/search/v2`, `sports.core.api.espn.com/v2/sports/<sport>/leagues/<league>/athletes/<id>` (and its draft team) | Player cards: the real-life draft (see above), from the service worker |
+| ESPN `site.web.api.espn.com/apis/search/v2`, `sports.core.api.espn.com/v2/sports/<sport>/leagues/<league>/athletes/<id>` (its draft team, and `/contracts/<season>`) | Player cards: the real-life draft and contract (see above), from the service worker |
 | `GET /v1/league/<id>/users`, `/rosters` | Team names, avatars, players, starters, taxi, IR, record |
 | `GET /v1/league/<id>/winners_bracket` | Last week of the season |
 | `GET /v1/league/<id>/traded_picks`, `/drafts` | Draft picks held |

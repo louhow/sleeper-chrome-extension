@@ -1,8 +1,8 @@
-// The NBA player card's data: bio, real-life draft (ESPN, draft.js), game logs,
+// The NBA player card's data: bio, real-life draft and contract (ESPN, espn-client.js), game logs,
 // career, news, depth chart and transaction history, each part loading on its own and rendering as it
 // arrives (card-view.js draws it). Kept for the session in `state.cards`.
 (globalThis.SNP ||= {}).nbaCard = ({ state, api, leagueId, schedule }) => {
-  const { loaders, draft } = globalThis.SNP;
+  const { loaders, espnClient } = globalThis.SNP;
   // Career seasons fetched for the player card (one request each).
   const CAREER_SEASONS = 10;
   const CARD_SEASON_TABS = 6;
@@ -36,14 +36,16 @@
 
     const bio = api.get(`/players/nba/${id}`);
     part(bio, (b) => { c.bio = b; });
-    // The real-life draft, from ESPN once the bio's name and birth date are in; it shows on its own.
-    c.draft = { status: 'loading' };
-    bio.then((b) => draft.lookup(api, { sport: 'nba', playerId, name: [b?.first_name, b?.last_name].filter(Boolean).join(' '), lastName: b?.last_name, birthDate: b?.birth_date, espnId: b?.espn_id }))
-      .catch(() => ({ status: 'error' }))
-      .then((d) => {
-        c.draft = d;
-        schedule();
-      });
+    // The real-life draft and contract, from ESPN once the bio's name and birth date are in; each shows on its own.
+    for (const kind of ['draft', 'contract']) {
+      c[kind] = { status: 'loading' };
+      bio.then((b) => espnClient[kind](api, { sport: 'nba', playerId, name: [b?.first_name, b?.last_name].filter(Boolean).join(' '), lastName: b?.last_name, birthDate: b?.birth_date, espnId: b?.espn_id }))
+        .catch(() => ({ status: 'error' }))
+        .then((d) => {
+          c[kind] = d;
+          schedule();
+        });
+    }
     part(Promise.all(years.map((season) => api.get(`/stats/nba/player/${id}?season_type=regular&season=${season}`)
       .then((row) => ({ season, team: row?.team, stats: row?.stats || null }))
       .catch(() => ({ season, stats: null })))), (rows) => {

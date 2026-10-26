@@ -13,7 +13,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 Everything runs locally in your browser.
 There is no server: the extension talks to Sleeper, the same way Sleeper's own site does (and to ESPN for one thing, below).
 It calls `api.sleeper.app` and `sleeper.com` for league data, and loads player headshots, team logos and avatars from Sleeper's image CDN (`sleepercdn.com`).
-The one exception: the player cards' real-life draft (year, round, pick), which Sleeper doesn't have, comes from ESPN's public API (`site.web.api.espn.com`, `sports.core.api.espn.com`). Opening a card sends ESPN that player's name, nothing about you or your league, once per player; the answer is kept in your browser.
+The one exception: the player cards' real-life draft and contract, which Sleeper doesn't have, come from ESPN's public API (`site.web.api.espn.com`, `sports.core.api.espn.com`). Opening a card sends ESPN that player's name, nothing about you or your league; the answers are kept in your browser (a draft for good, a contract for a day).
 No data is sent to the author or any third party, we never see your data.
 
 ## Install
@@ -61,7 +61,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Player card with next match, projections, game log, career (each season's club) and history.
 
 **All sports**
-- Player cards (NBA, and Sleeper's own NFL card): the player's real-life draft, year, round, pick and team, from ESPN, next to the rankings.
+- Player cards (NBA, and Sleeper's own NFL card): the player's real-life draft (year, round, pick, team) and contract (when he's a free agent, years left, this season's pay, since when), from ESPN, next to the rankings.
 - Score colors (green, yellow, red) from the league's own games: the thirds of its starters' recent scores, per position in NFL.
 - Each league opens on the tab you were last on in it when you switch leagues in the sidebar.
 - Settings: the gear in Sleeper's sidebar opens the extension's settings (a switch for the NFL pages and tools, so Sleeper's own show instead), with Sleeper's account settings a button away.

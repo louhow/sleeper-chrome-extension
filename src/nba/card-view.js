@@ -126,7 +126,11 @@
                 </div>
                 <div class="pc-draft">
                   <div class="pc-label">Draft</div>
-                  <div class="pc-ranks">${draftValue(c.draft)}</div>
+                  <div class="pc-ranks">${espnValue(c.draft, 'draft')}</div>
+                </div>
+                <div class="pc-contract">
+                  <div class="pc-label">Contract</div>
+                  <div class="pc-ranks">${espnValue(c.contract, 'contract')}</div>
                 </div>
               </div>
             </div>
@@ -147,13 +151,16 @@
     </div>`;
   }
 
-  // The real-life draft (draft.js), beside the rankings and in their style:
-  // a placeholder while ESPN answers, then "2016" with "Rd 2 · Pk 45 · TEN",
-  // or "Undrafted"; without a match, or with ESPN slow or down, a quiet "–".
-  function draftValue(d) {
-    if (!d || d.status === 'loading') return '<span><i class="pc-loading" aria-label="Loading draft"></i></span>';
-    if (!d.text) return `<span title="${esc(d.status === 'error' ? "ESPN didn't answer" : 'No draft found on ESPN')}"><b>–</b></span>`;
-    return `<span title="Real-life draft, from ESPN: ${esc(d.text)}"><b>${esc(d.main)}</b>${esc(d.detail)}</span>`;
+  // The real-life draft and contract (espn-client.js), beside the rankings and
+  // in their style: a placeholder while ESPN answers, then "2016" with
+  // "Rd 2 · Pk 45 · TEN" (or "Undrafted"), "FA 2028" with "2 yrs left · $11M ·
+  // since 2025"; without one, or with ESPN slow or down, a quiet "–".
+  const ESPN_WHAT = { draft: ['Real-life draft', 'No draft found on ESPN'], contract: ['Contract', 'No contract found on ESPN'] };
+  function espnValue(d, kind) {
+    const [what, none] = ESPN_WHAT[kind];
+    if (!d || d.status === 'loading') return `<span><i class="pc-loading" aria-label="Loading ${kind}"></i></span>`;
+    if (!d.text) return `<span title="${esc(d.status === 'error' ? "ESPN didn't answer" : none)}"><b>–</b></span>`;
+    return `<span title="${what}, from ESPN: ${esc(d.text)}"><b>${esc(d.main)}</b>${esc(d.detail)}</span>`;
   }
 
   function item(label, value, raw = false, cls = '') {

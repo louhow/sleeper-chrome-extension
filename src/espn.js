@@ -1,7 +1,8 @@
-// ESPN's public API, for the one thing Sleeper doesn't carry: a player's
-// real-life draft (year, round, pick, team). Pure: URLs, matching and text.
-// background.js makes the calls (ESPN refuses ones from sleeper.com), and
-// both player cards show draftParts.
+// ESPN's public API, for what Sleeper doesn't carry: a player's real-life
+// draft (year, round, pick, team) and contract (when he's a free agent, years
+// left, this season's pay, since when). Pure: URLs, matching, contract rules
+// and text. background.js makes the calls (ESPN refuses ones from
+// sleeper.com), and both player cards show draftParts and contractParts.
 // Matching: Sleeper's espn_id when it has one (a quarter of NFL players, no
 // NBA); else ESPN's player search, only that sport's league, accepted on an
 // exact birth-date match. No match is no draft, never a guess.
@@ -58,5 +59,62 @@
     return parts && [parts.main, parts.detail].filter(Boolean).join(' · ');
   }
 
-  return { LEAGUES, MAX_CANDIDATES, searchUrl, athleteUrl, https, candidates, sameBirthday, queries, draftOf, draftParts, draftText };
+  // ---- Contracts ----
+
+  // The season whose contracts are in force on `now`, as ESPN labels it: an
+  // NFL league year starts in March and goes by the year it starts; an NBA
+  // season starts in July and goes by the year it ends (2027 is 2026-27).
+  function contractSeason(sport, now = Date.now()) {
+    const d = new Date(now);
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth();
+    return sport === 'nfl' ? (month >= 2 ? year : year - 1) : (month >= 6 ? year + 1 : year);
+  }
+  const contractUrl = (sport, id, season) => `${athleteUrl(sport, id)}/contracts/${encodeURIComponent(season)}`;
+  // "2025" for NFL, "2025-26" for NBA's 2026.
+  const seasonLabel = (sport, season) => (sport === 'nba' ? `${season - 1}-${String(season).slice(2)}` : String(season));
+
+  // One season's contract record: { fa, years, pay }, or null for none.
+  //   fa: the year he's a free agent (NFL's signedThrough, at least next year;
+  //     NBA: the summer after the last season, the year that season ends).
+  //   years: seasons left counting this one. pay: salary plus bonus this season.
+  function contractOf(sport, season, record) {
+    if (!record) return null;
+    const pay = (Number(record.salary) || 0) + (Number(record.bonus) || 0) || null;
+    if (sport === 'nfl') {
+      const through = Number(record.signedThrough);
+      if (!through) return null;
+      // A rookie deal's last year reads "signed through" that same year.
+      const fa = Math.max(through, season + 1);
+      return { fa, years: fa - season, pay };
+    }
+    const years = Number(record.yearsRemaining);
+    if (!(years >= 1)) return null;
+    return { fa: season + years - 1, years, pay };
+  }
+
+  // "$11M", "$50.1M", "$950K".
+  function money(n) {
+    if (!n) return '';
+    if (n >= 1e6) return `$${(n / 1e6).toFixed(n >= 1e8 ? 0 : 1).replace(/\.0$/, '')}M`;
+    return `$${Math.round(n / 1e3)}K`;
+  }
+
+  // A contract lookup as the cards show it: { main: 'FA 2028', detail: '2 yrs left · $11M · since 2025' },
+  // "Final year" in its last; null without one (no contract on ESPN, or ESPN didn't answer).
+  function contractParts(result) {
+    const c = result?.status === 'found' ? result.contract : null;
+    if (!c?.fa) return null;
+    const left = c.years === 1 ? 'Final year' : `${c.years} yrs left`;
+    return { main: `FA ${c.fa}`, detail: [left, money(c.pay), c.since && `since ${c.since}`].filter(Boolean).join(' · ') };
+  }
+  const contractText = (result) => {
+    const parts = contractParts(result);
+    return parts && `${parts.main} · ${parts.detail}`;
+  };
+
+  return {
+    LEAGUES, MAX_CANDIDATES, searchUrl, athleteUrl, https, candidates, sameBirthday, queries, draftOf, draftParts, draftText,
+    contractSeason, contractUrl, seasonLabel, contractOf, money, contractParts, contractText,
+  };
 })();

@@ -44,7 +44,7 @@
         "src/settings.js",
         "src/loaders.js",
         "src/espn.js",
-        "src/draft.js",
+        "src/espn-client.js",
         "src/nba/week.js",
         "src/nba/panel-view.js",
         "src/nba/matchup-view.js",

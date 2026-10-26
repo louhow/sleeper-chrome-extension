@@ -1187,17 +1187,25 @@
       min-width: 28px; padding: 2px 6px; border-radius: 4px; box-sizing: border-box;
       font-size: 12px; font-weight: 700; text-align: center; color: rgba(255, 255, 255, 0.45); font-variant-numeric: tabular-nums;
     }
-    /* Sleeper's NFL player card's DRAFT block (cardDraft): a second column beside PLAYER RANKINGS
-       (Sleeper's label, then its row; ours likewise), or under them when the card is too narrow. */
-    .player-ranking-container:has(> .snp-draft) { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: max-content; column-gap: 28px; }
-    .player-ranking-container.snp-draft-below { grid-auto-flow: row; grid-template-rows: none; }
-    .player-ranking-container.snp-draft-below > .snp-draft > .profile-item-label { margin-top: 14px; }
-    .snp-draft { display: contents; }
-    .snp-draft .rank-value, .snp-draft .rank-label { white-space: nowrap; }
-    /* The DRAFT block's placeholder while ESPN answers. */
-    .snp-draft-loading { display: inline-block; width: 90px; height: 0.8em; border-radius: 6px; background: rgba(255, 255, 255, 0.3); vertical-align: middle; animation: snp-draft-fade 1.2s ease-in-out infinite; }
-    @keyframes snp-draft-fade { 50% { opacity: 0.45; } }
-    @media (prefers-reduced-motion: reduce) { .snp-draft-loading { animation: none; } }`;
+    /* Sleeper's NFL player card's DRAFT and CONTRACT blocks (cardEspn): columns beside PLAYER RANKINGS
+       (Sleeper's label over its row, each of ours likewise); under them side by side, or one under
+       another, when the card is too narrow (fitEspn). */
+    .player-ranking-container:has(> .snp-espn) { display: grid; justify-content: start; justify-items: start; column-gap: 28px; grid-template-columns: repeat(3, max-content); grid-template-areas: "rl dl cl" "rr dr cr"; }
+    .player-ranking-container:has(> .snp-espn) > .profile-item-label { grid-area: rl; }
+    .player-ranking-container:has(> .snp-espn) > .player-ranking-row { grid-area: rr; }
+    .snp-espn { display: contents; }
+    .snp-espn[data-kind="draft"] > .profile-item-label { grid-area: dl; }
+    .snp-espn[data-kind="draft"] > .player-ranking-row { grid-area: dr; }
+    .snp-espn[data-kind="contract"] > .profile-item-label { grid-area: cl; }
+    .snp-espn[data-kind="contract"] > .player-ranking-row { grid-area: cr; }
+    .player-ranking-container.snp-espn-below { grid-template-columns: repeat(2, max-content); grid-template-areas: "rl rl" "rr rr" "dl cl" "dr cr"; }
+    .player-ranking-container.snp-espn-stack { grid-template-columns: max-content; grid-template-areas: "rl" "rr" "dl" "dr" "cl" "cr"; }
+    .player-ranking-container:is(.snp-espn-below, .snp-espn-stack) > .snp-espn > .profile-item-label { margin-top: 14px; }
+    .snp-espn .rank-value, .snp-espn .rank-label { white-space: nowrap; }
+    /* A block's placeholder while ESPN answers. */
+    .snp-espn-loading { display: inline-block; width: 90px; height: 0.8em; border-radius: 6px; background: rgba(255, 255, 255, 0.3); vertical-align: middle; animation: snp-espn-fade 1.2s ease-in-out infinite; }
+    @keyframes snp-espn-fade { 50% { opacity: 0.45; } }
+    @media (prefers-reduced-motion: reduce) { .snp-espn-loading { animation: none; } }`;
   (document.head || document.documentElement).append(adminStyle, volumeStyle);
 
   // NFL Team tab. Sleeper's own Team component holds the lineup as shown
@@ -1303,61 +1311,72 @@
     open({ ...card, key: null, props: { ...card.props, playerIds: [playerId], selectedPlayerId: playerId, playersMap: { ...caught.playersMap, [playerId]: player } } });
   });
 
-  // Sleeper's NFL player card: a DRAFT block beside its PLAYER RANKINGS, the
-  // player's real-life draft from ESPN (the extension's draft.js answers
-  // 'snp:draft'): "2016" with "RD 2 · PK 45 · TEN" in the rankings' own style,
-  // or "Undrafted". It's built from Sleeper's own classes, so it looks like the
-  // row beside it, and leaves Sleeper's AGE ... COLLEGE row as it is. A card too
-  // narrow for both gets it under the rankings instead (.snp-draft-below). While
-  // ESPN answers it shows Sleeper's own shimmer, and a quiet "-" if it doesn't
-  // (no match, ESPN down, or no answer in DRAFT_WAIT_MS), so the card never
-  // waits on it. One per player shown (the card can page through players).
+  // Sleeper's NFL player card: DRAFT and CONTRACT blocks beside its PLAYER
+  // RANKINGS, the player's real-life draft and contract from ESPN (the
+  // extension's espn-client.js answers 'snp:espn'): "2016" with "RD 2 · PK 45 ·
+  // TEN", "FA 2028" with "2 YRS LEFT · $11M · SINCE 2025", in the rankings' own
+  // style. They're built from Sleeper's own classes, so they look like the row
+  // beside them, and leave Sleeper's AGE ... COLLEGE row as it is. A card too
+  // narrow for all three gets them under the rankings, side by side, or one under
+  // another (fitEspn). While ESPN answers each shows a shimmer, and a quiet "-"
+  // if it doesn't (no match, ESPN down, or no answer in ESPN_WAIT_MS), so the
+  // card never waits on them. One set per player shown (the card can page through players).
   const CARD_RANKINGS = '.player-card-header .player-ranking-container';
-  const DRAFT_WAIT_MS = 15e3;
-  function cardDraft() {
+  const ESPN_WAIT_MS = 15e3;
+  const ESPN_BLOCKS = [
+    { kind: 'draft', label: 'DRAFT', what: 'Real-life draft', none: 'No draft found on ESPN' },
+    { kind: 'contract', label: 'CONTRACT', what: 'Contract', none: 'No contract found on ESPN' },
+  ];
+  const ESPN_LAYOUTS = ['', 'snp-espn-below', 'snp-espn-stack'];
+  function cardEspn() {
     for (const rankings of document.querySelectorAll(CARD_RANKINGS)) {
       const card = props(rankings, (x) => x.playerId && x.sport && 'player' in x);
       const player = card?.player;
       if (card?.sport !== 'nfl' || !player) continue;
       const id = String(card.playerId);
-      const shown = rankings.querySelector(':scope > .snp-draft');
-      if (shown?.dataset.player === id) {
-        fitDraft(rankings);
+      const shown = [...rankings.querySelectorAll(':scope > .snp-espn')];
+      if (shown.length === ESPN_BLOCKS.length && shown.every((el) => el.dataset.player === id)) {
+        fitEspn(rankings);
         continue;
       }
-      shown?.remove();
-      const block = document.createElement('div');
-      block.className = 'snp-draft';
-      block.dataset.player = id;
-      block.innerHTML = '<div class="profile-item-label">DRAFT</div><div class="player-ranking-row"><div class="rank-item"><div class="rank-value"><span class="shimmer snp-draft-loading" aria-label="Loading draft"></span></div></div></div>';
-      rankings.append(block);
-      fitDraft(rankings);
-      const item = block.querySelector('.rank-item');
+      shown.forEach((el) => el.remove());
       const ask = { sport: 'nfl', playerId: id, name: [player.first_name, player.last_name].filter(Boolean).join(' '), lastName: player.last_name, birthDate: player.birth_date, espnId: player.espn_id };
-      Promise.race([bridge.call('snp:draft', ask), new Promise((resolve) => setTimeout(resolve, DRAFT_WAIT_MS, null))]).then((reply) => {
-        if (block.dataset.player !== id) return;
-        item.replaceChildren(Object.assign(document.createElement('div'), { className: 'rank-value', textContent: reply?.main || '-' }));
-        if (reply?.detail) item.append(Object.assign(document.createElement('div'), { className: 'rank-label', textContent: reply.detail.toUpperCase() }));
-        item.title = reply?.text ? `Real-life draft, from ESPN: ${reply.text}` : reply?.status === 'error' || !reply ? "ESPN didn't answer" : 'No draft found on ESPN';
-        fitDraft(rankings);
-      });
+      for (const { kind, label, what, none } of ESPN_BLOCKS) {
+        const block = document.createElement('div');
+        block.className = 'snp-espn';
+        Object.assign(block.dataset, { kind, player: id });
+        block.innerHTML = `<div class="profile-item-label">${label}</div><div class="player-ranking-row"><div class="rank-item"><div class="rank-value"><span class="shimmer snp-espn-loading" aria-label="Loading ${kind}"></span></div></div></div>`;
+        rankings.append(block);
+        const item = block.querySelector('.rank-item');
+        Promise.race([bridge.call('snp:espn', { kind, ...ask }), new Promise((resolve) => setTimeout(resolve, ESPN_WAIT_MS, null))]).then((reply) => {
+          if (block.dataset.player !== id) return;
+          item.replaceChildren(Object.assign(document.createElement('div'), { className: 'rank-value', textContent: reply?.main || '-' }));
+          if (reply?.detail) item.append(Object.assign(document.createElement('div'), { className: 'rank-label', textContent: reply.detail.toUpperCase() }));
+          item.title = reply?.text ? `${what}, from ESPN: ${reply.text}` : reply?.status === 'error' || !reply ? "ESPN didn't answer" : none;
+          fitEspn(rankings);
+        });
+      }
+      fitEspn(rankings);
     }
   }
-  // Beside the rankings when it fits in the card's info column, else under them.
-  function fitDraft(rankings) {
-    const block = rankings.querySelector(':scope > .snp-draft');
+  // The first layout that keeps the blocks inside the card's info column:
+  // beside the rankings, under them side by side, or one under another.
+  function fitEspn(rankings) {
     const column = rankings.closest('.player-info-container');
-    if (!block || !column) return;
-    rankings.classList.remove('snp-draft-below');
-    const right = Math.max(...[...block.children].map((el) => el.getBoundingClientRect().right));
+    if (!column) return;
     const room = column.getBoundingClientRect().right - (parseFloat(getComputedStyle(column).paddingRight) || 0);
-    if (right > room + 0.5) rankings.classList.add('snp-draft-below');
+    for (const layout of ESPN_LAYOUTS) {
+      rankings.classList.remove(...ESPN_LAYOUTS.filter(Boolean));
+      if (layout) rankings.classList.add(layout);
+      const right = Math.max(...[...rankings.querySelectorAll(':scope > .snp-espn > *')].map((el) => el.getBoundingClientRect().right));
+      if (right <= room + 0.5) return;
+    }
   }
   let cardFrame = 0;
   new MutationObserver(() => {
     cardFrame ||= requestAnimationFrame(() => {
       cardFrame = 0;
-      cardDraft();
+      cardEspn();
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
 
