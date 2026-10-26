@@ -10,3 +10,14 @@ test('every extension script compiles', () => {
     assert.doesNotThrow(() => new vm.Script(readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8'), { filename: file }), file);
   }
 });
+
+// Chrome won't load an extension whose icons are missing; its description is capped at 132 characters.
+test('the manifest\'s icons are square PNGs of their size, and its description fits', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../../manifest.json', import.meta.url), 'utf8'));
+  assert.ok(manifest.description.length <= 132, `${manifest.description.length} characters`);
+  for (const [size, file] of Object.entries(manifest.icons)) {
+    const png = readFileSync(new URL(`../../${file}`, import.meta.url));
+    assert.equal(png.toString('ascii', 1, 4), 'PNG', file);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [Number(size), Number(size)], file);
+  }
+});
