@@ -1168,6 +1168,65 @@ b.safe {
   font-size: 12px;
   text-align: center;
 }
+/* Chopped leagues' icons (nflUi): zone header marks, the lock before a chopped
+   team's owner, and over its avatar a halo or devil's horns with the axe badge. */
+.chop-tab .ico,
+.team-card .ico {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+.chop-zone .ico.axe {
+  width: 18px;
+  height: 18px;
+}
+.sub .ico.lock {
+  width: 11px;
+  height: 11px;
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: var(--text);
+}
+.chop-av {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  line-height: 0;
+}
+.chop-av .halo,
+.chop-av .horns {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.chop-av .halo {
+  top: -7px;
+  width: 80%;
+}
+.chop-av .horns {
+  top: -4px;
+  width: 112%;
+}
+.chop-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 46%;
+  height: 46%;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: #b9b4f5;
+  color: var(--ink);
+}
+.chop-badge .ico.axe {
+  width: 80%;
+  height: 80%;
+}
+
 /* The league median (ui.medal, ui.medianBanner): a team over it wears a
    medallion on its avatar, outlined while it's over, solid once it's likely to
    stay over, gold and lit once it has won. */

@@ -62,3 +62,17 @@ test('team tab card: points per week and FAAB left in place of the record, and t
   s.league.settings.type = 0;
   assert.match(card(s), /louhow · 4-2 · vs Blitz/);
 });
+
+test('icons: each zone header its mark, and a chopped team its lock, halo or horns and axe badge', () => {
+  const html = nflChopView.render(chopped());
+  assert.match(html, /chop-zone chop"><svg class="ico axe"[^]*Chop zone/);
+  assert.match(html, /chop-zone safe"><svg class="ico"[^]*Safe/);
+  // Gone Team's 80.10 a week beats the league's (1000.5 points over 6 + 6 + 5 weeks: 58.85), so a halo.
+  assert.match(html, /grave-row[^]*<span class="chop-av"><svg class="halo"[^]*<span class="chop-badge" title="Chopped"><svg class="ico axe"/);
+  assert.match(html, /<svg class="ico lock"[^]*<\/svg>@ghost/);
+  const s = chopped();
+  s.rosters[2].settings.fpts = 100;
+  assert.match(nflChopView.render(s), /grave-row[^]*<svg class="horns"/, 'at 20.10 a week, horns');
+  assert.match(nflPanelView.render({ ...s, rosterId: 3 }, []), /team-card">\s*<span class="chop-av"><svg class="horns"/, 'on the Team tab card too');
+});
+

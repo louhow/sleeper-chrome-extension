@@ -905,3 +905,16 @@ test('graveyard: chopped teams latest first, FAAB left and points per week playe
   assert.deepEqual(plain(model.graveyard(league, rosters).map((d) => [d.roster.roster_id, d.week, d.faab, d.avg])), [[3, 5, 648, 100], [2, 2, 1000, 75.25]]);
   assert.deepEqual(plain(model.chopTeamStats(league, rosters[0])), { avg: 100, faab: 900 }, 'an active team: through the last week scored');
 });
+
+test('graveyard: a halo for a chopped team that scored better than the league a week, horns otherwise', () => {
+  const league = { settings: { start_week: 1, last_scored_leg: 4, waiver_budget: 100 } };
+  const rosters = [
+    { roster_id: 1, settings: { fpts: 400 } },
+    { roster_id: 2, settings: { eliminated: 3, fpts: 330 } },
+    { roster_id: 3, settings: { eliminated: 2, fpts: 150 } },
+  ];
+  // 880 points over 4 + 3 + 2 weeks: 97.78 a week. 110 beats it; 75 doesn't.
+  assert.equal(Math.round(model.chopLeagueAvg(league, rosters) * 100) / 100, 97.78);
+  assert.deepEqual(plain(model.graveyard(league, rosters).map((d) => [d.roster.roster_id, d.angel])), [[2, true], [3, false]]);
+});
+

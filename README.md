@@ -46,7 +46,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Optimize lineup, slot by slot like the NBA one; apply one row or all of them.
 - League tab matchups drawn like the NBA ones, with Sleeper's own live numbers.
 - League median on the League tab and medallions on the Matchup and League tabs, as on NBA.
-- Chopped leagues: the League tab shows the Chopping Block as Sleeper's app does (your safe %, every team in the chop zone, danger or safe) and the Graveyard; the Team tab's card shows avg points, FAAB and safe %; on the Players tab a red axe marks each chopped player still on waivers.
+- Chopped leagues: the League tab shows the Chopping Block as Sleeper's app does (your safe %, every team in the chop zone, danger or safe) and the Graveyard (halos and devil's horns included); the Team tab's card shows avg points, FAAB and safe %; on the Players tab a red axe marks each chopped player still on waivers.
 - Players tab: a Last 5 column (the last five weeks played, a mark each in its score's color, scores on hover; sorts by points per game), a team picker, team avatars on rostered players.
 
 **Premier League (EPL)**

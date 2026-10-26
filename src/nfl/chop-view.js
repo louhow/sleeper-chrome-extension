@@ -5,6 +5,7 @@
   const { esc, f2, avatar, avatarImg, teamName, ownerName, owns, loading } = globalThis.SNP.ui;
   const { chopTeamStats, graveyard } = globalThis.SNP.model;
   const { chopBlockOf, chopBar: bar } = globalThis.SNP.nflPanelView;
+  const { LOCK, ZONE_ICONS, chopAvatar } = globalThis.SNP.nflUi;
   // Sleeper's app's wording.
   const ZONES = { chop: 'Chop zone', danger: 'Danger', safe: 'Safe' };
 
@@ -32,13 +33,14 @@
     if (!roster) return '';
     const { avg, faab } = chopTeamStats(s.league, roster);
     const stats = `${avg == null ? '–' : f2(avg)} avg fpts · $${faab} faab`;
-    const head = (sub, score = '') => `<div class="chop-me-row">
-        ${avatarImg(avatar(s, roster), 'avatar', s.failedAvatars)}
+    const head = (sub, score = '', angel = null) => `<div class="chop-me-row">
+        ${angel == null ? avatarImg(avatar(s, roster), 'avatar', s.failedAvatars) : chopAvatar(avatarImg(avatar(s, roster), 'avatar', s.failedAvatars), angel)}
         <div class="who"><div class="team-name">${esc(teamName(s, roster))}</div><div class="sub">${sub}</div></div>
         ${score}
       </div>`;
     if (roster.settings?.eliminated) {
-      return `<section class="chop-me chopped">${head(`<b class="chop-tag">Chopped</b> · wk ${esc(roster.settings.eliminated)} · ${stats}`)}</section>`;
+      const angel = graveyard(s.league, s.rosters).find((d) => d.roster === roster)?.angel;
+      return `<section class="chop-me chopped">${head(`<b class="chop-tag">Chopped</b> · wk ${esc(roster.settings.eliminated)} · ${stats}`, '', angel)}</section>`;
     }
     const t = block.find((x) => x.rosterId === roster.roster_id);
     if (!t) return '';
@@ -54,7 +56,7 @@
   function blockView(s, block) {
     let zone = null;
     const rows = block.map((t) => {
-      const header = t.zone === zone ? '' : `<div class="chop-zone ${t.zone}">${ZONES[t.zone]}</div>`;
+      const header = t.zone === zone ? '' : `<div class="chop-zone ${t.zone}">${ZONE_ICONS[t.zone]}${ZONES[t.zone]}</div>`;
       zone = t.zone;
       const label = `${teamName(s, t.roster)}'s team`;
       return `${header}<div class="chop-row ${t.zone}${owns(s, t.roster) ? ' own' : ''}" data-open-team="${esc(t.rosterId)}" role="link" tabindex="0" title="${esc(label)}">
@@ -82,8 +84,8 @@
       <div class="grave-row chop-cols"><span>Week</span><span></span><span>Name</span><span>FAAB rem</span><span>FPTS</span></div>
       ${dead.map((d) => `<div class="grave-row${owns(s, d.roster) ? ' own' : ''}">
         <span class="chop-rank">${esc(d.week)}</span>
-        ${avatarImg(avatar(s, d.roster), 'avatar', s.failedAvatars)}
-        <div class="who"><div class="team-name">${esc(teamName(s, d.roster))}</div><div class="sub">@${esc(ownerName(s, d.roster) || 'unknown')}</div></div>
+        ${chopAvatar(avatarImg(avatar(s, d.roster), 'avatar', s.failedAvatars), d.angel)}
+        <div class="who"><div class="team-name">${esc(teamName(s, d.roster))}</div><div class="sub">${LOCK}@${esc(ownerName(s, d.roster) || 'unknown')}</div></div>
         <span>$${esc(d.faab)}</span>
         <span>${d.avg == null ? '–' : f2(d.avg)}</span>
       </div>`).join('')}

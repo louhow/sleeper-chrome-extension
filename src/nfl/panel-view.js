@@ -4,8 +4,8 @@
 (globalThis.SNP ||= {}).nflPanelView = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
     shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
-  const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian, medianStanding, isChopped, chopBlock, chopTeamStats } = globalThis.SNP.model;
-  const { slotBadge, headshot, injury } = globalThis.SNP.nflUi;
+  const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian, medianStanding, isChopped, chopBlock, chopTeamStats, graveyard } = globalThis.SNP.model;
+  const { slotBadge, headshot, injury, chopAvatar } = globalThis.SNP.nflUi;
   // Sleeper's apps list bench players by position in this order.
   const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
 
@@ -136,6 +136,11 @@
     return `<div class="sub">${out ? `<b class="chop-tag">Chopped</b> · wk ${esc(out)} · ` : ''}${stats}</div>
       ${t ? `<div class="chop-me-safe"><b class="${t.zone}">${Math.round(t.safe * 100)}% safe</b>${chopBar(t.safe, t.zone)}</div>` : ''}`;
   }
+  // A chopped team's avatar marks on the Team tab card (halo or horns, the axe badge); none for a team alive.
+  function chopFace(s, roster) {
+    const d = isChopped(s.league) && roster.settings?.eliminated ? graveyard(s.league, s.rosters).find((x) => x.roster === roster) : null;
+    return d ? (img) => chopAvatar(img, d.angel) : undefined;
+  }
   // A share as a bar, in its zone's color.
   const chopBar = (safe, zone) => `<span class="chop-bar ${zone}"><span style="width:${Math.round(safe * 100)}%"></span></span>`;
 
@@ -173,7 +178,7 @@
     const row = (slot, id, spot) => playerRow(ctx, slot, id, spot);
     const head = (title, hint = '') => rowHead(title, { hint, cls: 'nfl', middle: '<div class="nfl-game-h">Game</div>' });
     // IR and taxi keep the league's slots, open ones included, so the page holds its shape.
-    return `${teamCard(s, l.roster, { points: t.points, proj: t.proj, opponent: oppId != null && s.rosters.find((r) => r.roster_id === oppId), week: l.week, sub: chopLine(s, l.roster) })}
+    return `${teamCard(s, l.roster, { points: t.points, proj: t.proj, opponent: oppId != null && s.rosters.find((r) => r.roster_id === oppId), week: l.week, sub: chopLine(s, l.roster), face: chopFace(s, l.roster) })}
       ${head('Starters', swapHint(s, l.editable, real(picked) ? s.players[picked]?.name || 'them' : null))}
       ${l.starters.map((id, i) => row(l.slots[i] ?? 'FLEX', id, `s:${i}`)).join('')}
       ${l.bench.length ? `${head('Bench')}${l.bench.map((id) => row('BN', id, `b:${id}`)).join('')}` : ''}

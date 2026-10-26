@@ -947,10 +947,28 @@
     return { avg: weeks ? fpts / weeks : null, faab: faabLeft(league, roster) };
   }
 
-  // The chopped teams, latest first: { roster, week, avg, faab }.
+  // The league's points per team-week played, chopped teams' weeks included; null before any.
+  function chopLeagueAvg(league, rosters) {
+    let points = 0;
+    let weeks = 0;
+    for (const r of rosters || []) {
+      points += (r.settings?.fpts ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100;
+      weeks += chopWeeksPlayed(league, r);
+    }
+    return weeks ? points / weeks : null;
+  }
+
+  // The chopped teams, latest first: { roster, week, avg, faab, angel }. As in
+  // Sleeper's app, a chopped team wears a halo (`angel`) when it scored better
+  // than the league a week (chopped unluckily), else devil's horns. (Sleeper
+  // doesn't say its rule; this one matches its app on a real league.)
   function graveyard(league, rosters) {
+    const par = chopLeagueAvg(league, rosters);
     return (rosters || []).filter((r) => r.settings?.eliminated)
-      .map((r) => ({ roster: r, week: r.settings.eliminated, ...chopTeamStats(league, r) }))
+      .map((r) => {
+        const stats = chopTeamStats(league, r);
+        return { roster: r, week: r.settings.eliminated, ...stats, angel: par != null && stats.avg != null && stats.avg >= par };
+      })
       .sort((a, b) => b.week - a.week || a.roster.roster_id - b.roster.roster_id);
   }
 
@@ -1157,6 +1175,6 @@
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
     openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
-    isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, graveyard,
+    isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, chopLeagueAvg, graveyard,
   };
 })();

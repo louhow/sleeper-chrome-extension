@@ -337,11 +337,12 @@
   // The Team tab's summary: the team, its record and opponent (or `sub`, HTML
   // in their place), points (– until there are any) and projection, then
   // `extra` (e.g. the Waivers button) and the week.
-  function teamCard(s, roster, { points = null, proj = null, opponent = null, week = null, extra = '', sub = null } = {}) {
+  // `face` wraps the avatar's HTML (e.g. a chopped team's halo or horns).
+  function teamCard(s, roster, { points = null, proj = null, opponent = null, week = null, extra = '', sub = null, face = (img) => img } = {}) {
     const owner = s.usersById?.[roster.owner_id];
     const name = teamName(s, roster);
     return `<section class="team-card">
-      ${avatarImg(avatar(s, roster), 'avatar', failedOf(s))}
+      ${face(avatarImg(avatar(s, roster), 'avatar', failedOf(s)))}
       <div class="who">
         <div class="team-name">${esc(name)}</div>
         ${sub ?? `<div class="sub">${owner && owner.display_name !== name ? `${esc(owner.display_name)} · ` : ''}${record(roster)}${opponent ? ` · vs ${esc(teamName(s, opponent))}` : ''}</div>`}
