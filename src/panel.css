@@ -2187,7 +2187,8 @@ img.headshot[data-player] {
   display: grid;
   grid-template-columns: 270px minmax(0, 1fr);
   flex: none;
-  height: 217px;
+  /* Taller when the draft wraps under the rankings. */
+  min-height: 217px;
   overflow: hidden;
   background: color-mix(in srgb, var(--team) 35%, #10151d);
 }
@@ -2304,26 +2305,19 @@ h2.pc-name {
   font-size: 14px;
   opacity: 0.8;
 }
-/* The real-life draft: the year in line with the other values, "Rd 1, Pk 1 (CLE)"
-   on a small line under it, ending where the year does (it's the row's last
-   item), so the item is only as wide as the year. */
-.pc-item.draft {
-  position: relative;
+/* Player rankings, then the real-life draft beside them (under them on a narrow card). */
+.pc-rows {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 32px;
+  padding-bottom: 14px;
 }
-.pc-item.draft small {
-  position: absolute;
-  top: 100%;
-  right: 14px;
-  margin: 3px 0 0;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-/* The real-life draft while ESPN answers: a soft bar the size of a short value, so nothing shifts when it lands. */
+/* The real-life draft while ESPN answers: a soft bar the size of the value it waits for. */
 .pc-loading {
   display: inline-block;
-  width: 60px;
-  height: 0.8em;
+  width: 130px;
+  height: 20px;
+  margin-top: 4px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.22);
   vertical-align: middle;

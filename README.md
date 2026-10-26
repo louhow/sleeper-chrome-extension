@@ -61,7 +61,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Player card with next match, projections, game log, career (each season's club) and history.
 
 **All sports**
-- Player cards (NBA, and Sleeper's own NFL card): the player's real-life draft, year, round, pick and team, from ESPN.
+- Player cards (NBA, and Sleeper's own NFL card): the player's real-life draft, year, round, pick and team, from ESPN, next to the rankings.
 - Score colors (green, yellow, red) from the league's own games: the thirds of its starters' recent scores, per position in NFL.
 - Each league opens on the tab you were last on in it when you switch leagues in the sidebar.
 - Settings: the gear in Sleeper's sidebar opens the extension's settings (a switch for the NFL pages and tools, so Sleeper's own show instead), with Sleeper's account settings a button away.

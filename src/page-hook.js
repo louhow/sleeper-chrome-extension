@@ -1187,14 +1187,15 @@
       min-width: 28px; padding: 2px 6px; border-radius: 4px; box-sizing: border-box;
       font-size: 12px; font-weight: 700; text-align: center; color: rgba(255, 255, 255, 0.45); font-variant-numeric: tabular-nums;
     }
-    /* Sleeper's NFL player card's DRAFT item (cardDraft): one line like the rest, the detail under it. */
-    .snp-draft .profile-item { position: relative; }
-    /* Room for it: the row's dividers a little closer, and every value on one line (a two-line COLLEGE would lift its label). */
-    .profile-items-container:has(> .snp-draft) .profile-item-divider { margin: 0 8px !important; }
-    .profile-items-container:has(> .snp-draft) .profile-item-value { white-space: nowrap; }
-    .snp-draft-detail { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 2px; font-size: 13px; font-weight: 800; white-space: nowrap; opacity: 0.85; }
-    /* The DRAFT item's placeholder while ESPN answers. */
-    .snp-draft-loading { display: inline-block; width: 96px; height: 0.8em; border-radius: 6px; background: rgba(255, 255, 255, 0.3); vertical-align: middle; animation: snp-draft-fade 1.2s ease-in-out infinite; }
+    /* Sleeper's NFL player card's DRAFT block (cardDraft): a second column beside PLAYER RANKINGS
+       (Sleeper's label, then its row; ours likewise), or under them when the card is too narrow. */
+    .player-ranking-container:has(> .snp-draft) { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: max-content; column-gap: 28px; }
+    .player-ranking-container.snp-draft-below { grid-auto-flow: row; grid-template-rows: none; }
+    .player-ranking-container.snp-draft-below > .snp-draft > .profile-item-label { margin-top: 14px; }
+    .snp-draft { display: contents; }
+    .snp-draft .rank-value, .snp-draft .rank-label { white-space: nowrap; }
+    /* The DRAFT block's placeholder while ESPN answers. */
+    .snp-draft-loading { display: inline-block; width: 90px; height: 0.8em; border-radius: 6px; background: rgba(255, 255, 255, 0.3); vertical-align: middle; animation: snp-draft-fade 1.2s ease-in-out infinite; }
     @keyframes snp-draft-fade { 50% { opacity: 0.45; } }
     @media (prefers-reduced-motion: reduce) { .snp-draft-loading { animation: none; } }`;
   (document.head || document.documentElement).append(adminStyle, volumeStyle);
@@ -1302,43 +1303,55 @@
     open({ ...card, key: null, props: { ...card.props, playerIds: [playerId], selectedPlayerId: playerId, playersMap: { ...caught.playersMap, [playerId]: player } } });
   });
 
-  // Sleeper's NFL player card: a DRAFT item after its COLLEGE, the player's
-  // real-life draft from ESPN (the extension's draft.js answers 'snp:draft').
-  // A placeholder shows while ESPN answers, and a quiet "-" if it doesn't
-  // (no match, ESPN down, or no answer in DRAFT_WAIT_MS), so the card itself
-  // never waits on it. The item is a copy of Sleeper's COLLEGE item, so it
-  // looks like the rest, and the year is all that's in its row, so the row keeps
-  // its shape; one per player shown (the card can page through players).
-  const CARD_ITEMS = '.player-card-header .profile-items-container';
+  // Sleeper's NFL player card: a DRAFT block beside its PLAYER RANKINGS, the
+  // player's real-life draft from ESPN (the extension's draft.js answers
+  // 'snp:draft'): "2016" with "RD 2 · PK 45 · TEN" in the rankings' own style,
+  // or "Undrafted". It's built from Sleeper's own classes, so it looks like the
+  // row beside it, and leaves Sleeper's AGE ... COLLEGE row as it is. A card too
+  // narrow for both gets it under the rankings instead (.snp-draft-below). While
+  // ESPN answers it shows Sleeper's own shimmer, and a quiet "-" if it doesn't
+  // (no match, ESPN down, or no answer in DRAFT_WAIT_MS), so the card never
+  // waits on it. One per player shown (the card can page through players).
+  const CARD_RANKINGS = '.player-card-header .player-ranking-container';
   const DRAFT_WAIT_MS = 15e3;
   function cardDraft() {
-    for (const items of document.querySelectorAll(CARD_ITEMS)) {
-      const card = props(items, (x) => x.playerId && x.sport && 'player' in x);
+    for (const rankings of document.querySelectorAll(CARD_RANKINGS)) {
+      const card = props(rankings, (x) => x.playerId && x.sport && 'player' in x);
       const player = card?.player;
       if (card?.sport !== 'nfl' || !player) continue;
       const id = String(card.playerId);
-      const shown = items.querySelector(':scope > .snp-draft');
-      if (shown?.dataset.player === id) continue;
+      const shown = rankings.querySelector(':scope > .snp-draft');
+      if (shown?.dataset.player === id) {
+        fitDraft(rankings);
+        continue;
+      }
       shown?.remove();
-      const college = [...items.children].pop();
-      if (!college?.querySelector('.profile-item-label') || !college.querySelector('.profile-item-value')) continue;
-      const item = college.cloneNode(true);
-      item.classList.add('snp-draft');
-      item.dataset.player = id;
-      item.querySelector('.profile-item-label').textContent = 'DRAFT';
-      const out = item.querySelector('.profile-item-value');
-      out.innerHTML = '<span class="snp-draft-loading" aria-label="Loading draft"></span>';
-      items.append(item);
+      const block = document.createElement('div');
+      block.className = 'snp-draft';
+      block.dataset.player = id;
+      block.innerHTML = '<div class="profile-item-label">DRAFT</div><div class="player-ranking-row"><div class="rank-item"><div class="rank-value"><span class="shimmer snp-draft-loading" aria-label="Loading draft"></span></div></div></div>';
+      rankings.append(block);
+      fitDraft(rankings);
+      const item = block.querySelector('.rank-item');
       const ask = { sport: 'nfl', playerId: id, name: [player.first_name, player.last_name].filter(Boolean).join(' '), lastName: player.last_name, birthDate: player.birth_date, espnId: player.espn_id };
       Promise.race([bridge.call('snp:draft', ask), new Promise((resolve) => setTimeout(resolve, DRAFT_WAIT_MS, null))]).then((reply) => {
-        if (item.dataset.player !== id) return;
-        // The year in line with Sleeper's other values; "Rd 1, Pk 1 (CLE)" on a small
-        // line under it, out of the row's flow, so the row keeps its height and width.
-        out.textContent = reply?.main || '-';
-        if (reply?.detail) out.append(Object.assign(document.createElement('div'), { className: 'snp-draft-detail', textContent: reply.detail }));
-        out.title = reply?.text ? `Real-life draft, from ESPN: ${reply.text}` : reply?.status === 'error' || !reply ? "ESPN didn't answer" : 'No draft found on ESPN';
+        if (block.dataset.player !== id) return;
+        item.replaceChildren(Object.assign(document.createElement('div'), { className: 'rank-value', textContent: reply?.main || '-' }));
+        if (reply?.detail) item.append(Object.assign(document.createElement('div'), { className: 'rank-label', textContent: reply.detail.toUpperCase() }));
+        item.title = reply?.text ? `Real-life draft, from ESPN: ${reply.text}` : reply?.status === 'error' || !reply ? "ESPN didn't answer" : 'No draft found on ESPN';
+        fitDraft(rankings);
       });
     }
+  }
+  // Beside the rankings when it fits in the card's info column, else under them.
+  function fitDraft(rankings) {
+    const block = rankings.querySelector(':scope > .snp-draft');
+    const column = rankings.closest('.player-info-container');
+    if (!block || !column) return;
+    rankings.classList.remove('snp-draft-below');
+    const right = Math.max(...[...block.children].map((el) => el.getBoundingClientRect().right));
+    const room = column.getBoundingClientRect().right - (parseFloat(getComputedStyle(column).paddingRight) || 0);
+    if (right > room + 0.5) rankings.classList.add('snp-draft-below');
   }
   let cardFrame = 0;
   new MutationObserver(() => {

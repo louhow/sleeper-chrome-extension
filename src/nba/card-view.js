@@ -113,14 +113,21 @@
                 ${item('Weight', bio?.weight ? `${esc(bio.weight)}<small>lbs</small>` : '-', true)}
                 ${item('Exp', bio?.years_exp ?? p.years_exp ?? '-')}
                 ${item('College', `<span title="${esc(bio?.college || '')}">${esc(bio?.college || '-')}</span>`, true, 'college')}
-                ${item('Draft', draftValue(c.draft), true, 'draft')}
               </div>
-              <div class="pc-label">Player Rankings</div>
-              <div class="pc-ranks">
-                <span><b>${latest ? `#${latest.stats.pos_rank_std}` : '–'}</b>${esc(position)}</span>
-                <span><b>${latest ? `#${latest.stats.rank_std}` : '–'}</b>Overall</span>
-                <span><b>${share(research?.owned)}</b>Rostered</span>
-                <span><b>${share(research?.started)}</b>Started</span>
+              <div class="pc-rows">
+                <div>
+                  <div class="pc-label">Player Rankings</div>
+                  <div class="pc-ranks">
+                    <span><b>${latest ? `#${latest.stats.pos_rank_std}` : '–'}</b>${esc(position)}</span>
+                    <span><b>${latest ? `#${latest.stats.rank_std}` : '–'}</b>Overall</span>
+                    <span><b>${share(research?.owned)}</b>Rostered</span>
+                    <span><b>${share(research?.started)}</b>Started</span>
+                  </div>
+                </div>
+                <div class="pc-draft">
+                  <div class="pc-label">Draft</div>
+                  <div class="pc-ranks">${draftValue(c.draft)}</div>
+                </div>
               </div>
             </div>
           </header>
@@ -140,13 +147,13 @@
     </div>`;
   }
 
-  // The real-life draft (draft.js): a placeholder while ESPN answers, then
-  // the year with "Rd 1, Pk 1 (CLE)" small under it, or "Undrafted"; without a
-  // match, or with ESPN slow or down, a quiet "-".
+  // The real-life draft (draft.js), beside the rankings and in their style:
+  // a placeholder while ESPN answers, then "2016" with "Rd 2 · Pk 45 · TEN",
+  // or "Undrafted"; without a match, or with ESPN slow or down, a quiet "–".
   function draftValue(d) {
-    if (!d || d.status === 'loading') return '<span class="pc-loading" aria-label="Loading draft"></span>';
-    if (!d.text) return `<span title="${esc(d.status === 'error' ? "ESPN didn't answer" : 'No draft found on ESPN')}">-</span>`;
-    return `<span title="Real-life draft, from ESPN: ${esc(d.text)}">${esc(d.main)}${d.detail ? `<small>${esc(d.detail)}</small>` : ''}</span>`;
+    if (!d || d.status === 'loading') return '<span><i class="pc-loading" aria-label="Loading draft"></i></span>';
+    if (!d.text) return `<span title="${esc(d.status === 'error' ? "ESPN didn't answer" : 'No draft found on ESPN')}"><b>–</b></span>`;
+    return `<span title="Real-life draft, from ESPN: ${esc(d.text)}"><b>${esc(d.main)}</b>${esc(d.detail)}</span>`;
   }
 
   function item(label, value, raw = false, cls = '') {

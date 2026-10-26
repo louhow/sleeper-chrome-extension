@@ -1416,20 +1416,19 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
   const bio = await page.locator(dialog('.pc-bio')).textContent();
   assert.match(bio, /Age\s*\d+\s*Height\s*\d'\d+"\s*Weight\s*\d+\s*lbs\s*Exp\s*\d+\s*College/);
   // The real-life draft, from ESPN through the service worker: a placeholder, then the pick (or "Undrafted").
-  const draft = page.locator(dialog('.pc-item')).filter({ hasText: /^Draft/ }).locator('.pc-item-value');
+  const draft = page.locator(dialog('.pc-draft .pc-ranks'));
   await page.waitForFunction(() => {
-    const items = [...document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelectorAll('.pc-item')];
-    return items.some((el) => /^Draft/.test(el.textContent) && !el.querySelector('.pc-loading'));
+    const block = document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('.pc-draft');
+    return block && !block.querySelector('.pc-loading');
   }, null, { timeout: 30000 });
-  assert.match(await draft.textContent(), /^(\d{4}Rd \d+, Pk \d+( \([A-Z]+\))?|Undrafted)$/, 'ESPN matched the player');
+  assert.match((await draft.textContent()).trim(), /^(\d{4}Rd \d+ · Pk \d+( · [A-Z]+)?|Undrafted)$/, 'ESPN matched the player');
   // Inside the card, the small line under the year included, not past its edge,
   // even beside a long college (which gives way with an ellipsis).
   const edge = await page.locator(dialog('.pc-hero')).boundingBox();
   for (const college of [null, 'South Carolina State University']) {
     if (college) await page.evaluate((text) => { document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('.pc-item.college .pc-item-value span').textContent = text; }, college);
-    for (const box of await Promise.all([draft, draft.locator('small')].map(async (el) => (await el.count()) && el.boundingBox()))) {
-      if (box) assert.ok(box.x + box.width <= edge.x + edge.width, `the draft fits beside ${college || 'the college'} (${Math.round(box.x + box.width)} of ${Math.round(edge.x + edge.width)}px)`);
-    }
+    const right = await draft.evaluate((el) => Math.max(...[...el.querySelectorAll('span, b')].map((c) => c.getBoundingClientRect().right)));
+    assert.ok(right <= edge.x + edge.width, `the draft fits with ${college || 'the college'} (${Math.round(right)} of ${Math.round(edge.x + edge.width)}px)`);
   }
   await page.locator(dialog('.pc-hero')).screenshot({ path: `${OUT}player-card-draft.png` });
   assert.match(await page.locator(dialog('.pc-number')).textContent(), /[A-Z0-9 ]+( #\d+)?/);
@@ -2779,52 +2778,66 @@ test('chopped league team tab: points per week, FAAB left and the safe chance in
 
 // Sleeper's own NFL player card header, as its web bundle draws it (2026-10-26): the
 // profile items, with the card component's props (sport, playerId, player) on a fiber above them.
-const nflCard = (player, playerId = '4892') => `<!doctype html><title>Sleeper</title>
-<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .player-card-header { width: 900px; margin: 40px; padding: 24px; background: #e8622c; border-radius: 12px; } .player-info-container { width: 470px; }
-  /* Sleeper's own rules for the header's items (its CSS bundle, 2026-10-26). */
+const nflCard = (player, { playerId = '4892', width = 660 } = {}) => `<!doctype html><title>Sleeper</title>
+<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .player-card-header { width: 1000px; margin: 40px; padding: 24px; background: #e8622c; border-radius: 12px; } .player-info-container { width: ${width}px; box-sizing: border-box; }
+  /* Sleeper's own rules for the header (its CSS bundle, 2026-10-26). */
+  .player-card-header .player-info-container { flex-grow: 1; padding: 25px 26px 18px 0px; }
   .player-card-header .player-info-container .profile-items-container { display: flex; flex-direction: row; align-items: center; margin-top: 25px; }
   .player-card-header .player-info-container .profile-items-container .profile-item { text-align: center; }
   .player-card-header .player-info-container .profile-items-container .profile-item-divider { height: 36px; width: 1.5px; opacity: 0.5; background-color: #d8e2ed; margin: 0 12px; }
   .player-card-header .player-info-container .profile-items-container .profile-item-wrapper { display: flex; flex-direction: row; align-items: center; }
   .player-card-header .player-info-container .profile-item-label { font-size: 14px; font-weight: 800; opacity: 0.5; letter-spacing: 1.4px; color: #fff; margin-bottom: 9px; }
   .player-card-header .player-info-container .profile-item-value { font-size: 24px; font-weight: 800; opacity: 0.8; color: #fff; }
-  .player-card-header .player-info-container .profile-item-unit { display: inline; font-size: 14px; opacity: 0.8; color: #fff; }</style>
+  .player-card-header .player-info-container .profile-item-unit { display: inline; font-size: 14px; opacity: 0.8; color: #fff; }
+  .player-card-header .player-info-container .player-ranking-container { margin-top: 18px; }
+  .player-card-header .player-info-container .player-ranking-container .player-ranking-row { display: flex; flex-direction: row; align-items: center; margin-top: 5px; }
+  .player-card-header .player-info-container .player-ranking-container .player-ranking-row .rank-item { margin-right: 16px; display: flex; flex-direction: row; align-items: center; }
+  .player-card-header .player-info-container .player-ranking-container .player-ranking-row .rank-item .rank-value { font-size: 22px; font-weight: 800; color: #fff; }
+  .player-card-header .player-info-container .player-ranking-container .player-ranking-row .rank-item .rank-label { font-size: 10px; font-weight: 800; color: #a3bbd3; letter-spacing: 1px; padding-left: 3px; }</style>
 <div class="player-card-header"><div class="player-card-content-container"><div class="player-info-container"><div class="profile-items-container">
-${[['AGE', '31'], ['HEIGHT', '6\'1"'], ['WEIGHT', '215<div class="profile-item-unit"> lbs</div>'], ['EXP', '8'], ['COLLEGE', 'Ole Miss']].map(([label, value], i) => `<div class="profile-item-wrapper">${i ? '<div class="profile-item-divider"></div>' : ''}<div class="profile-item"><div class="profile-item-label">${label}</div><div class="profile-item-value">${value}</div></div></div>`).join('')}
-</div></div></div></div>
+${[['AGE', '31'], ['HEIGHT', '6\'1"'], ['WEIGHT', '215<div class="profile-item-unit"> lbs</div>'], ['EXP', '8'], ['COLLEGE', 'Oklahoma']].map(([label, value], i) => `<div class="profile-item-wrapper">${i ? '<div class="profile-item-divider"></div>' : ''}<div class="profile-item"><div class="profile-item-label">${label}</div><div class="profile-item-value">${value}</div></div></div>`).join('')}
+</div><div class="player-ranking-container"><div class="profile-item-label">PLAYER RANKINGS</div><div class="player-ranking-row">
+${[['#4', 'QB'], ['#7', 'OVERALL'], ['91%', 'ROSTERED'], ['57%', 'STARTED']].map(([value, label]) => `<div class="rank-item"><div class="rank-value">${value}</div><div class="rank-label">${label}</div></div>`).join('')}
+</div></div></div></div></div>
 <script>
-  document.querySelector('.profile-items-container').__reactInternalInstance$test = { memoizedProps: { className: 'profile-items-container' }, return: { memoizedProps: {}, return: { memoizedProps: { sport: 'nfl', playerId: '${playerId}', player: ${JSON.stringify(player)} } } } };
+  document.querySelector('.player-ranking-container').__reactInternalInstance$test = { memoizedProps: { className: 'player-ranking-container' }, return: { memoizedProps: {}, return: { memoizedProps: { sport: 'nfl', playerId: '${playerId}', player: ${JSON.stringify(player)} } } } };
 </script>`;
 
-test('NFL player card: a DRAFT item after COLLEGE with the real-life draft from ESPN, matched on the birth date', async () => {
+test('NFL player card: a DRAFT block beside PLAYER RANKINGS with the real-life draft from ESPN, matched on the birth date', async () => {
   // Sleeper has no ESPN id for him here, so it's ESPN's search, accepted on the birthday.
   documentBody = nflCard({ first_name: 'Baker', last_name: 'Mayfield', birth_date: '1995-04-14' });
   await page.goto(NFL_TEAM_URL);
-  const draft = page.locator('.profile-items-container > .snp-draft');
+  const draft = page.locator('.player-ranking-container > .snp-draft');
   await draft.waitFor({ timeout: 30000 });
   assert.equal(await draft.locator('.profile-item-label').textContent(), 'DRAFT');
-  await draft.locator('.profile-item-value').filter({ hasText: /\S/ }).waitFor({ timeout: 30000 });
-  // The year in the row, the rest on a small line under it.
-  assert.equal(await draft.locator('.profile-item-value').textContent(), '2018Rd 1, Pk 1 (CLE)');
-  assert.equal(await draft.locator('.snp-draft-detail').textContent(), 'Rd 1, Pk 1 (CLE)');
-  assert.equal(await page.locator('.profile-item-label').evaluateAll((els) => els.map((el) => el.textContent).join(' ')), 'AGE HEIGHT WEIGHT EXP COLLEGE DRAFT');
-  // It keeps Sleeper's row as it was: every label on one line, every value one line high (COLLEGE's too).
-  const rows = await page.locator('.profile-item').evaluateAll((els) => els.map((el) => {
-    const [label, value] = [el.querySelector('.profile-item-label'), el.querySelector('.profile-item-value')].map((x) => x.getBoundingClientRect());
-    return { top: Math.round(label.top), height: Math.round(value.height) };
-  }));
-  assert.equal(new Set(rows.map((r) => r.top)).size, 1, `labels in line: ${JSON.stringify(rows)}`);
-  assert.equal(new Set(rows.map((r) => r.height)).size, 1, `values one line high: ${JSON.stringify(rows)}`);
-  const [row, info] = await Promise.all(['.profile-items-container > :last-child', '.player-info-container'].map((sel) => page.locator(sel).boundingBox()));
-  assert.ok(row.x + row.width <= info.x + info.width, `the row fits (${Math.round(row.x + row.width)} of ${Math.round(info.x + info.width)}px)`);
+  await draft.locator('.rank-label').waitFor({ timeout: 30000 });
+  // In the rankings' own style: the year large, "RD 1 · PK 1 · CLE" small beside it.
+  assert.equal(await draft.locator('.rank-value').textContent(), '2018');
+  assert.equal(await draft.locator('.rank-label').textContent(), 'RD 1 · PK 1 · CLE');
+  // Beside the rankings: its label level with PLAYER RANKINGS, and inside the card's info column.
+  const [label, theirs, info] = await Promise.all([draft.locator('.profile-item-label'), page.locator('.player-ranking-container > .profile-item-label'), page.locator('.player-info-container')].map((el) => el.boundingBox()));
+  assert.equal(Math.round(label.y), Math.round(theirs.y), 'level with PLAYER RANKINGS');
+  assert.ok(label.x > theirs.x + theirs.width, 'to its right');
+  const right = await draft.evaluate((el) => Math.max(...[...el.children].map((c) => c.getBoundingClientRect().right)));
+  assert.ok(right <= info.x + info.width, `inside the card (${Math.round(right)} of ${Math.round(info.x + info.width)}px)`);
+  // Sleeper's AGE ... COLLEGE row is left as it was.
+  assert.equal(await page.locator('.profile-items-container .profile-item-label').evaluateAll((els) => els.map((el) => el.textContent).join(' ')), 'AGE HEIGHT WEIGHT EXP COLLEGE');
   await page.locator('.player-card-header').screenshot({ path: `${OUT}nfl-card-draft.png` });
-  // A birthday ESPN has for no Baker Mayfield: no draft, rather than a guess.
-  documentBody = nflCard({ first_name: 'Baker', last_name: 'Mayfield', birth_date: '1990-01-01' }, 'e2e-no-match');
+  // A card too narrow for both: the draft goes under the rankings, still inside the card.
+  documentBody = nflCard({ first_name: 'Baker', last_name: 'Mayfield', birth_date: '1995-04-14' }, { width: 470 });
   await page.goto(NFL_TEAM_URL);
-  const value = page.locator('.snp-draft[data-player="e2e-no-match"] .profile-item-value');
-  await value.filter({ hasText: /\S/ }).waitFor({ timeout: 30000 });
-  assert.equal(await value.textContent(), '-');
-  assert.equal(await value.getAttribute('title'), 'No draft found on ESPN');
+  await draft.locator('.rank-label').waitFor({ timeout: 30000 });
+  await page.locator('.player-ranking-container.snp-draft-below').waitFor();
+  const [under, ranks] = await Promise.all([draft.locator('.profile-item-label'), page.locator('.player-ranking-row').first()].map((el) => el.boundingBox()));
+  assert.ok(under.y >= ranks.y + ranks.height, 'under the rankings');
+  await page.locator('.player-card-header').screenshot({ path: `${OUT}nfl-card-draft-narrow.png` });
+  // A birthday ESPN has for no Baker Mayfield: no draft, rather than a guess.
+  documentBody = nflCard({ first_name: 'Baker', last_name: 'Mayfield', birth_date: '1990-01-01' }, { playerId: 'e2e-no-match' });
+  await page.goto(NFL_TEAM_URL);
+  const item = page.locator('.snp-draft[data-player="e2e-no-match"] .rank-item');
+  await item.locator('.rank-value').filter({ hasText: /\S/ }).waitFor({ timeout: 30000 });
+  assert.equal(await item.locator('.rank-value').textContent(), '-');
+  assert.equal(await item.getAttribute('title'), 'No draft found on ESPN');
   documentBody = LOGGED_OUT;
 });
 

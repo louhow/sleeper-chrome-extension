@@ -94,12 +94,13 @@ test('while loading, every section holds the shape of what it will show', () => 
   assert.equal((html.match(/aria-busy="true"/g) || []).length, 4);
 });
 
-test('draft: a placeholder while ESPN answers, then the real-life draft, Undrafted, or a quiet "-"', () => {
+test('draft: beside the rankings, a placeholder while ESPN answers, then the real-life draft, Undrafted, or a quiet "–"', () => {
   const html = (draft) => card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } }, cards: { p1: { draft } } });
-  const value = (draft) => html(draft).match(/Draft<\/div><div class="pc-item-value">(.*?)<\/div>/)[1];
+  const value = (draft) => html(draft).match(/<div class="pc-draft">\s*<div class="pc-label">Draft<\/div>\s*<div class="pc-ranks">(.*?)<\/div>/)[1];
   assert.match(value({ status: 'loading' }), /class="pc-loading"/);
-  assert.match(value({ status: 'found', text: '2017 · Rd 1, Pk 13 (DEN)', main: '2017', detail: 'Rd 1, Pk 13 (DEN)' }), />2017<small>Rd 1, Pk 13 \(DEN\)<\/small></);
-  assert.match(value({ status: 'undrafted', text: 'Undrafted', main: 'Undrafted', detail: '' }), />Undrafted<\/span>/);
-  assert.match(value({ status: 'none', text: null }), /title="No draft found on ESPN">-</);
-  assert.match(value({ status: 'error', text: null }), /title="ESPN didn&#39;t answer">-</);
+  assert.match(value({ status: 'found', text: '2017 · Rd 1 · Pk 13 · DEN', main: '2017', detail: 'Rd 1 · Pk 13 · DEN' }), /<b>2017<\/b>Rd 1 · Pk 13 · DEN<\/span>/);
+  assert.match(value({ status: 'undrafted', text: 'Undrafted', main: 'Undrafted', detail: '' }), /<b>Undrafted<\/b><\/span>/);
+  assert.match(value({ status: 'none', text: null }), /title="No draft found on ESPN"><b>–<\/b>/);
+  assert.match(value({ status: 'error', text: null }), /title="ESPN didn&#39;t answer"><b>–<\/b>/);
+  assert.doesNotMatch(html({ status: 'loading' }), /pc-item[^"]*">\s*<div class="pc-item-label">Draft/, 'not in the AGE ... COLLEGE row');
 });

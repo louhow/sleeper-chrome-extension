@@ -42,18 +42,17 @@
     return { year: d.year, round: d.round ?? null, pick: d.selection ?? null, teamRef: d.team?.$ref ? https(d.team.$ref) : null };
   }
 
-  // A lookup's result as the cards show it: the year large and the rest small
-  // (as "lbs" after a weight), { main: '2018', detail: 'Rd 1, Pk 1 (CLE)' }, or
-  // { main: 'Undrafted' }; null without one (no match, or ESPN didn't answer).
+  // A lookup's result as the cards show it, the year large and the rest small
+  // beside it (as "#7 RB" in the rankings): { main: '2018', detail: 'Rd 1 · Pk 1 · CLE' },
+  // or { main: 'Undrafted' }; null without one (no match, or ESPN didn't answer).
   function draftParts(result) {
     if (result?.status === 'undrafted') return { main: 'Undrafted', detail: '' };
     const d = result?.status === 'found' ? result.draft : null;
     if (!d?.year) return null;
-    const slot = [d.round != null && `Rd ${d.round}`, d.pick != null && `Pk ${d.pick}`].filter(Boolean).join(', ');
-    return { main: String(d.year), detail: [slot, d.team && `(${d.team})`].filter(Boolean).join(' ') };
+    return { main: String(d.year), detail: [d.round != null && `Rd ${d.round}`, d.pick != null && `Pk ${d.pick}`, d.team].filter(Boolean).join(' · ') };
   }
 
-  // The same in a line: "2018 · Rd 1, Pk 1 (CLE)", "Undrafted", or null.
+  // The same in a line: "2018 · Rd 1 · Pk 1 · CLE", "Undrafted", or null.
   function draftText(result) {
     const parts = draftParts(result);
     return parts && [parts.main, parts.detail].filter(Boolean).join(' · ');
