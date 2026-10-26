@@ -14,6 +14,8 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 - Team tab: roster, weekly game strips that show what's locked, still lockable (only games the player started) or past locking, tinted by score (lock right from the cell), projections, lineup swaps, taxi and IR moves, draft picks.
 - Matchup tab: both lineups slot by slot, win probability, Lock-In status.
 - League tab: every matchup of the week, styled like the Matchup tab; click one to open it, or a team to see its roster.
+- League median, in leagues that play one: on the Matchup and League tabs, your team against the week's median score (now and projected) with your chance of finishing above it.
+- Sidebar: each NBA league shows your matchup this week under its name (both teams, points and projections), as Sleeper does for NFL.
 - Team picker: every team with its avatar, A to Z, a "My team" shortcut, and team links from the Matchup and League tabs; on the Matchup tab it picks a matchup (both teams).
 - Optimize lineup: recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.
@@ -26,6 +28,7 @@ Chrome extension (MV3) that fills in what Sleeper's website leaves out, across s
 - Matchup tab: the League tab's matchup card on top (a team opens on the Team tab), both lineups slot by slot; the picker picks a matchup.
 - Optimize lineup, slot by slot like the NBA one; apply one row or all of them.
 - League tab matchups drawn like the NBA ones, with Sleeper's own live numbers.
+- League median on the Matchup and League tabs, as on NBA.
 - Players tab: a Last 5 column (the last five weeks played, a mark each in its score's color, scores on hover; sorts by points per game), a team picker, team avatars on rostered players.
 
 **Premier League (EPL)**

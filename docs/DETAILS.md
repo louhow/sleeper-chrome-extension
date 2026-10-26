@@ -137,6 +137,27 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 - The cards are a compact take on that header, so a 14-team league's 7 matchups fit in the tab without scrolling.
 - Clicking a matchup opens it on the Matchup tab, that team on the left, through Sleeper's own MATCHUP tab; clicking a team's avatar, owner or name opens that team on the Team tab.
 
+### League median
+
+In a league that plays the median (`settings.league_average_match`), every regular-season week each team has one more matchup, against the league's median score: the top half of the league wins it.
+Sleeper's website doesn't show it; the extension does, wherever it shows the week's matchups (NBA and NFL).
+
+- On the Matchup tab, under the matchup: the team shown against the median. On the League tab, before the matchups: yours (else the team picked).
+- It's drawn as one more matchup, so it reads like the others: the team's points, projection and chance of finishing above the median (the same win formula, with the bar); the median's side, marked M, has the median score so far (– before any team has points), the median projection, and how many teams win it ("Top 7 of 14 win").
+- The median is the middle of every team's score that week (the mean of the middle two for an even count); a team without points yet counts as 0. The projection is the middle of every team's projection.
+- Not in the playoffs (from `playoff_week_start`), and not at all in a league without the median.
+- On NFL's League tab the numbers are Sleeper's own, read off its cards, and the week is the one Sleeper's week picker shows.
+
+### Sidebar
+
+Sleeper's left sidebar shows an NFL league's matchup under its name (both team names, then each side's points and projection) but an NBA league only its format ("2026 14-Team Dynasty Standard").
+The extension gives every NBA league there the same lines for your matchup this week, in Sleeper's own markup, so they look exactly like the NFL ones (the format line makes way).
+
+- The numbers are the Matchup tab's: points so far (– until there are any) and projection, added up the same way.
+- The league you're on gives its own numbers, so the sidebar always matches its tabs.
+  Any other NBA league is loaded once for the sidebar (the league, its rosters and users, the week's matchups, projections, stats and games, and your matchup legs), then again only after a game has tipped off since, at most every 10 minutes while the tab is visible.
+- Logged out, or without a team in the league, the sidebar stays as Sleeper has it.
+
 Win probability is Sleeper's own formula, ported from its web app: each side is a normal distribution centred on its projection, narrowing as the score approaches it.
 Once both sides are settled (score equals projection) the score decides it, and a tie is 50% each, where Sleeper's formula gives 0% to both.
 Rank comes from `roster_standings`; before any games are played, it falls back to the standings order (record, points, then waiver order), which is what Sleeper shows then.
@@ -244,6 +265,7 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
 - The week's matchups drawn as the NBA League tab draws them (yours first and framed; avatars, owners, team names, scores, win chance and bar, record, projection), in place of Sleeper's own cards.
 - The numbers are Sleeper's own: its cards stay on the page, hidden, and the extension reads them as they update during games, so they always match the rest of Sleeper.
 - Clicking a matchup opens it the way Sleeper's own card does. Sleeper's week picker and the rest of the tab (standings, activity) stay as they are.
+- In a league that plays the median, yours against it comes first (see League median).
 
 ### NFL: Players tab
 
@@ -284,10 +306,11 @@ Chrome injects a file once per frame, so `page-hook.js` carries a copy of its co
 
 | Helper | How | Used for |
 | --- | --- | --- |
-| `ask` / `answer` | `<name>-request`, answered with `<name>` before `dispatchEvent` returns | `snp:nfl-lineup`, `snp:nfl-league`, `snp:week-games`, `snp:week-schedule`, `snp:recent-weeks`, `snp:admin-scores` |
+| `ask` / `answer` | `<name>-request`, answered with `<name>` before `dispatchEvent` returns | `snp:nfl-lineup`, `snp:nfl-league`, `snp:nav-leagues`, `snp:week-games`, `snp:week-schedule`, `snp:recent-weeks`, `snp:admin-scores` |
 | `call` / `answerLater` | the request carries an `id` the answer echoes, so concurrent calls never take each other's answer | `snp:nfl-lineup-save` |
 | `tell` / `on` | one-way | `snp:player-action`, `snp:player-card`, `snp:nfl-player-card`, `snp:nfl-league-open`, `snp:admin-scoring`, `snp:players-ready`, `snp:week-games-ready` |
 
+`snp:nav-leagues` marks each sidebar league link with its league id and sport (`data-snp-league`, `data-snp-sport`) and lists them.
 `snp:players-ready` says the extension has a league's Players-tab data (NBA or NFL); page-hook adds no columns before it.
 `snp:week-games-ready` says a week the extension was loading is in, so page-hook asks again.
 

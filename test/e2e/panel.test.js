@@ -14,6 +14,8 @@ const TEAM_URL = `https://sleeper.com/leagues/${LEAGUE}/team`;
 const MATCHUP_URL = `https://sleeper.com/leagues/${LEAGUE}/matchup`;
 const PLAYERS_URL = `https://sleeper.com/leagues/${LEAGUE}/players`;
 const panel = (sel = '') => `#sleeper-nba-panel ${sel}`;
+// The Matchup tab's own matchup, not the league median card under it.
+const HEAD = '.mu-head:not(.median)';
 const dialog = (sel = '') => `#sleeper-nba-dialog ${sel}`;
 
 // Same structure, classes and sizes as the logged-in page (inspected 2026-10-19).
@@ -254,9 +256,10 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   document.querySelector('.integration-players-panel').__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: panel.props, stateNode: panel } };
 </script>`;
 
-// Sleeper's left sidebar, reduced to its league links: the item component's props
-// (league, selectLeague) and the router's sit a few fibers up from the link, and
-// Sleeper's own handler sends every league to /leagues/<id>.
+// Sleeper's left sidebar, reduced to its league links (inspected 2026-10-25): an
+// NFL league shows its matchup under its name, an NBA league its format. The
+// item component's props (league, selectLeague) and the router's sit a few
+// fibers up from the link, and Sleeper's own handler sends every league to /leagues/<id>.
 const NFL_LEAGUE = '1354521766382292992';
 const leagueNav = `<!doctype html><title>Sleeper</title>
 <div id="nav"></div>
@@ -270,7 +273,10 @@ const leagueNav = `<!doctype html><title>Sleeper</title>
     link.className = 'link-button nav-league-item-wrapper';
     link.href = '/';
     link.dataset.sport = sport;
-    link.innerHTML = '<div class="nav-league-item"><div class="league-title">' + sport + '</div></div>';
+    const below = sport === 'nfl'
+      ? '<div class="nav-league-matchup"><div class="team-name-container"><div class="small-text">Lou Point Conversion</div><div class="vs">vs.</div><div class="small-text right">Tank you</div></div><div class="score-container"><div class="left-score"><div class="roster-score-and-projection-matchup row"><div class="score">86.98</div><div class="projections">100.21</div></div></div><div class="win-bar-wrapper"></div><div class="right-score"><div class="roster-score-and-projection-matchup flip row"><div class="score">69.94</div><div class="projections">77.97</div></div></div></div></div>'
+      : '<div class="format-container"><div class="team">2026 14-Team Dynasty Standard</div></div>';
+    link.innerHTML = '<div class="nav-league-item"><div class="avatar-league"></div><div class="nav-info-container"><div class="league-title">' + sport + '</div><div>' + below + '</div></div></div>';
     const item = { league: { league_id: id, sport }, selectLeague: (x) => window.__selected.push(x), closeNavbar: () => {} };
     link.__reactInternalInstance$test = fiber(item, 2, fiber({ router, params: {} }, 5));
     document.getElementById('nav').append(link);
@@ -297,8 +303,8 @@ const NFL_PLAYERS = {
 };
 // Sleeper's own NFL League tab, reduced to its matchup cards (inspected
 // 2026-10-25): each row's markup as Sleeper draws it, with the live numbers it
-// works out; React-style props give the roster ids and, up the tree, the rosters
-// and your user id. Clicking a card's header opens it (recorded in __nflOpened).
+// works out; React-style props give the roster ids and, up the tree, the rosters,
+// your user id and the week shown (round). Clicking a card's header opens it (recorded in __nflOpened).
 const NFL_LEAGUE_URL = `https://sleeper.com/leagues/${NFL_LEAGUE}/league`;
 const nflLeagueTab = () => {
   const side = (t, flip) => `<div class="user${flip ? ' reverse' : ''}"><div class="matchup-owner-item"><div class="owner-container">
@@ -319,7 +325,7 @@ ${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchu
 </div></div><div class="league-tab-standings">Standings</div></div></div>
 <script>
   window.__nflOpened = [];
-  const league = { rosters: [1, 2, 3, 4].map((r) => ({ roster_id: r, owner_id: 'u' + r })), userId: 'u1' };
+  const league = { rosters: [1, 2, 3, 4].map((r) => ({ roster_id: r, owner_id: 'u' + r })), userId: 'u1', round: 7 };
   const pairs = ${JSON.stringify(pairs.map(([a, b]) => [a.r, b.r]))};
   document.querySelectorAll('.league-matchup-row-item').forEach((row, i) => {
     row.__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: { rosterId1: pairs[i][0], rosterId2: pairs[i][1] }, return: { memoizedProps: league } } };
@@ -683,6 +689,10 @@ test('fills the empty Team tab in place', async () => {
 });
 
 test('shows starters with a full week of days and real projections', async () => {
+  // Before tip-off, so every game has a start time to show, whenever the suite runs.
+  sleeper.beforeTipoff = true;
+  await page.reload();
+  await page.locator(panel('.card .days')).first().waitFor({ timeout: 30000 });
   const headings = await page.locator(panel('h3')).allTextContents();
   assert.deepEqual(headings.slice(0, 2), ['Starters', 'Bench']);
   for (const h of ['Injured Reserve', 'Taxi Squad', 'Draft Picks']) assert.ok(headings.includes(h), `missing ${h}`);
@@ -698,6 +708,9 @@ test('shows starters with a full week of days and real projections', async () =>
   await page.screenshot({ path: `${OUT}team.png` });
   await page.locator(panel('.body')).evaluate((b) => { b.scrollTop = b.scrollHeight; });
   await page.screenshot({ path: `${OUT}team-bottom.png` });
+  sleeper.beforeTipoff = false;
+  await page.reload();
+  await page.locator(panel('.card .days')).first().waitFor({ timeout: 30000 });
 });
 
 test('team picker: every team A to Z with its avatar, switches roster and persists across reloads', async () => {
@@ -837,12 +850,18 @@ test('logged in: the API log tags authenticated calls and never shows the token'
 test('matchup: fills the Matchup tab with both teams', async () => {
   documentBody = LOGGED_OUT;
   await page.goto(MATCHUP_URL);
-  await page.locator(panel('.mu-head')).waitFor({ timeout: 30000 });
+  await page.locator(panel(HEAD)).waitFor({ timeout: 30000 });
   assert.equal(await page.locator('.empty-panel-container').isVisible(), false);
   assert.match(await page.locator(panel('[data-tab="page"]')).textContent(), /Matchup/);
-  const head = await shadowText('.mu-head');
+  const head = await shadowText(HEAD);
   assert.match(head, /\d+% WIN.*VS.*\d+% WIN/s);
   assert.match(head, /\(#\d+\)/, 'standings rank');
+  // The league plays a median: the team shown against it, under the matchup.
+  const median = page.locator(panel('.mu-head.median'));
+  assert.equal(await median.count(), 1);
+  assert.equal(await page.evaluate(() => document.querySelector('#sleeper-nba-panel').shadowRoot.querySelector('.mu-head.median').previousElementSibling.matches('.mu-head:not(.median)')), true, 'right under the matchup');
+  assert.equal(await median.locator('.mu-team.mine .team-name').textContent(), await page.locator(panel(`${HEAD} .mu-team.mine .team-name`)).textContent());
+  assert.match(await median.innerText(), /\d+% WIN[\s\S]*VS\s+M\s+Beat it for an extra win\s+League Median\s+(–|\d+\.\d\d)\s+Top 7 of 14 win\s+\d+\.\d\d$/);
   assert.equal(await page.locator(panel('.mu-row')).first().locator('.mp').count(), 2);
   assert.ok(await page.locator(panel('.chip img')).count(), 'team logos for the week');
   assert.ok(!(await page.locator(panel('[data-lock]')).count()), 'no lock controls when logged out');
@@ -850,8 +869,8 @@ test('matchup: fills the Matchup tab with both teams', async () => {
   // The picker picks a matchup: both teams, each with its avatar and name.
   const pick = page.locator(panel('.pair-pick'));
   const names = async (el) => (await el.locator('.tp-name').allTextContents()).map((x) => x.trim());
-  const left = (await page.locator(panel('.mu-team.mine .team-name')).textContent()).trim();
-  const right = (await page.locator(panel('.mu-team.theirs .team-name')).textContent()).trim();
+  const left = (await page.locator(panel(`${HEAD} .mu-team.mine .team-name`)).textContent()).trim();
+  const right = (await page.locator(panel(`${HEAD} .mu-team.theirs .team-name`)).textContent()).trim();
   assert.deepEqual(await names(pick.locator('.tp-button')), [left, right], 'the matchup shown, left team first');
   await pick.locator('.tp-button').click();
   const options = pick.locator('.tp-menu [data-pick-roster]');
@@ -864,14 +883,14 @@ test('matchup: fills the Matchup tab with both teams', async () => {
   const other = options.nth(1);
   const [a, b] = await names(other);
   await other.click();
-  await page.locator(panel('.mu-team.mine .team-name')).filter({ hasText: a }).waitFor();
-  assert.equal((await page.locator(panel('.mu-team.theirs .team-name')).textContent()).trim(), b);
+  await page.locator(panel(`${HEAD} .mu-team.mine .team-name`)).filter({ hasText: a }).waitFor();
+  assert.equal((await page.locator(panel(`${HEAD} .mu-team.theirs .team-name`)).textContent()).trim(), b);
   // Arrow keys go through the matchups and stop at the ends.
   await page.keyboard.press('ArrowUp');
-  await page.locator(panel('.mu-team.mine .team-name')).filter({ hasText: first }).waitFor();
+  await page.locator(panel(`${HEAD} .mu-team.mine .team-name`)).filter({ hasText: first }).waitFor();
   await page.keyboard.press('ArrowUp');
   await page.waitForTimeout(300);
-  assert.equal((await page.locator(panel('.mu-team.mine .team-name')).textContent()).trim(), first, 'the first matchup stays');
+  assert.equal((await page.locator(panel(`${HEAD} .mu-team.mine .team-name`)).textContent()).trim(), first, 'the first matchup stays');
 });
 
 test('matchup: switching to Team keeps the session and data', async () => {
@@ -903,7 +922,7 @@ test('matchup: locks in a finished game for your starter', async () => {
   assert.equal(Number(rosterId), myRoster.roster_id);
   const before = sleeper.mutations.length;
   // The header is Sleeper's running total: each starter's locked game, else their latest finished one.
-  const headerPts = async () => Number((await page.locator(panel('.mu-team.mine .mu-pts')).textContent()).match(/\d+\.\d\d/)[0]);
+  const headerPts = async () => Number((await page.locator(panel(`${HEAD} .mu-team.mine .mu-pts`)).textContent()).match(/\d+\.\d\d/)[0]);
   const headerBefore = await headerPts();
   await open.first().click();
   const go = page.locator(panel(`[data-lock-confirm="${ref}"]`));
@@ -938,7 +957,7 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
   const users = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}/users`)).json();
   sleeper.me = users.find((u) => u.display_name === 'louhow').user_id;
   await page.goto(`https://sleeper.com/leagues/${LEAGUE}/league`);
-  const cards = page.locator(panel('.lg-match'));
+  const cards = page.locator(panel('.lg-match[data-open-matchup]'));
   await cards.first().waitFor({ timeout: 30000 });
   const legs = sleeper.legs[1];
   assert.equal(await cards.count(), new Set(legs.map((l) => l.matchup_id)).size, 'one card per matchup');
@@ -950,6 +969,12 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
     assert.equal(await card.locator('.mu-team').count(), 2);
     assert.match(await card.innerText(), /\d+% WIN[\s\S]*VS[\s\S]*\d+% WIN/);
   }
+  // Before them, yours against the league median: its score so far, its projection,
+  // and your chance of finishing above it.
+  const median = page.locator(panel('.lg-list > .median:first-child'));
+  assert.equal(await median.locator('.mu-team.mine .team-name').textContent(), await cards.first().locator('.mu-team.mine .team-name').textContent());
+  assert.match(await median.innerText(), /\d+% WIN[\s\S]*VS\s+M\s+Beat it for an extra win\s+League Median\s+\d+\.\d\d\s+Top 7 of 14 win\s+\d+\.\d\d$/);
+  assert.equal(await median.getAttribute('role'), null, 'not a link to a matchup');
   // Sleeper's own League tab content stays, under the matchups.
   assert.equal(await page.evaluate(() => {
     const host = document.querySelector('#sleeper-nba-panel');
@@ -963,7 +988,7 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
     const box = document.querySelector('.scrollbar-container').getBoundingClientRect();
     return { bottom: list.getBoundingClientRect().bottom - box.top, room: box.height, cards: list.children.length };
   });
-  assert.equal(fit.cards, 7);
+  assert.equal(fit.cards, 8, 'the median and 7 matchups');
   assert.ok(fit.bottom <= fit.room, `all ${fit.cards} fit (${Math.round(fit.bottom)} of ${Math.round(fit.room)}px)`);
   await page.screenshot({ path: `${OUT}league-matchups.png` });
   // A team's name (or avatar, or owner) opens its Team tab; "My team" comes back.
@@ -1460,6 +1485,42 @@ test('sidebar: each league opens on the tab you were last on in it, any sport', 
   documentBody = LOGGED_OUT;
 });
 
+test('sidebar: an NBA league shows your matchup this week under its name, as Sleeper does for an NFL league', async () => {
+  documentBody = leagueNav.replace('<title>Sleeper</title>', `<title>Sleeper</title><script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>`);
+  await startMidWeek();
+  sleeper.legs = {};
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}/users`)).json();
+  sleeper.me = users.find((u) => u.display_name === 'louhow').user_id;
+  // From another league's page: loaded for the sidebar alone.
+  await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/trend`);
+  const nba = page.locator('[data-sport=nba]');
+  const ours = nba.locator('.nav-league-matchup[data-snp]');
+  await ours.waitFor({ timeout: 30000 });
+  assert.equal(await nba.locator('.format-container').isVisible(), false, "Sleeper's format line makes way");
+  // Sleeper's own markup, so its styles draw it: names, then each side's points and projection.
+  const read = () => ours.evaluate((el) => [...el.querySelectorAll('.small-text, .vs, .score, .projections')].map((x) => x.textContent));
+  const shown = await read();
+  const mine = sleeper.rosters.find((r) => r.owner_id === sleeper.me);
+  const myLeg = sleeper.legs[1].find((l) => l.roster_id === mine.roster_id);
+  const theirs = sleeper.legs[1].find((l) => l.matchup_id === myLeg.matchup_id && l !== myLeg);
+  const name = (rosterId) => {
+    const u = users.find((x) => x.user_id === sleeper.rosters.find((r) => r.roster_id === rosterId).owner_id);
+    return u?.metadata?.team_name || u?.display_name;
+  };
+  assert.deepEqual(shown.slice(0, 3), [name(mine.roster_id), 'vs.', name(theirs.roster_id)]);
+  for (const v of shown.slice(3)) assert.match(v, /^(\d+\.\d\d|–)$/);
+  assert.equal(shown[4], '157.23', "Sleeper's projection from the matchup leg");
+  assert.equal(await page.locator('[data-sport=nfl] [data-snp]').count(), 0, "an NFL league keeps Sleeper's own");
+  assert.equal(await page.locator('[data-sport=nfl] .nav-league-matchup').isVisible(), true);
+  // Its league opened: the session's numbers, the same.
+  await page.goto(`https://sleeper.com/leagues/${LEAGUE}/matchup`);
+  await page.locator(panel(HEAD)).waitFor({ timeout: 30000 });
+  await ours.waitFor();
+  assert.deepEqual(await read(), shown);
+  sleeper.midWeek = false;
+  documentBody = LOGGED_OUT;
+});
+
 test('optimize lineup: proposes changes, guards green scores, and saves only once applied', async () => {
   documentBody = LOGGED_IN;
   sleeper.rosters = null;
@@ -1709,7 +1770,7 @@ test('logged in with a session Sleeper turns down: asks to log back in instead o
   sleeper.rejectSession = false;
   await page.evaluate((t) => localStorage.setItem('token', `${t}-fresh`), FAKE_TOKEN);
   await page.locator(panel('[data-action="refresh"]')).click();
-  await page.locator(panel('.mu-head')).waitFor({ timeout: 30000 });
+  await page.locator(panel(HEAD)).waitFor({ timeout: 30000 });
   assert.equal(await page.locator(panel('.session-expired')).count(), 0);
   documentBody = LOGGED_OUT;
 });
@@ -1782,15 +1843,15 @@ test('what-if scoring: try other values from the corner on the Team, Matchup and
 
   // Remembered across reloads and pages (no ?snp-admin here); the Matchup tab sets aside Sleeper's totals and Lock-In.
   await page.goto(MATCHUP_URL);
-  await page.locator(panel('.app.whatif .mu-head')).waitFor({ timeout: 30000 });
-  assert.doesNotMatch(await page.locator(panel('.mu-head')).textContent(), /157\.23/);
+  await page.locator(panel(`.app.whatif ${HEAD}`)).waitFor({ timeout: 30000 });
+  assert.doesNotMatch(await page.locator(panel(HEAD)).textContent(), /157\.23/);
   assert.equal(await page.locator(panel('[data-lock]')).count(), 0, 'no locking real points from what-if numbers');
   await page.screenshot({ path: `${OUT}whatif-matchup.png` });
 
   // Back to the league's scoring from the switch, and back again.
   await page.locator(corner('[data-wi="league"]')).click();
   await page.locator(panel('.app.whatif')).waitFor({ state: 'detached' });
-  assert.match(await page.locator(panel('.mu-head')).textContent(), /157\.23/);
+  assert.match(await page.locator(panel(HEAD)).textContent(), /157\.23/);
   await page.locator(corner('[data-wi="whatif"]')).click();
   await page.locator(panel('.app.whatif')).waitFor();
 
@@ -2510,6 +2571,10 @@ test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup
   await head.waitFor({ timeout: 30000 });
   assert.equal(await head.locator('.mu-team').count(), 2, 'both teams, as on the League tab');
   assert.match(await head.locator('.mu-meta').first().textContent(), /\d+% WIN/);
+  // The league plays a median: the team shown against it, under the matchup.
+  const median = page.locator(nflPanel('.lg-match.nfl-mu-head + .median'));
+  assert.equal(await median.locator('.mu-team.mine .team-name').textContent(), await head.locator('.mu-team.mine .team-name').textContent());
+  assert.match(await median.innerText(), /VS\s+M\s+Beat it for an extra win\s+League Median\s+(–|\d+\.\d\d)\s+Top 6 of 12 win\s+\d+\.\d\d$/);
   const league = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}`)).json();
   const slots = league.roster_positions.filter((p) => p !== 'BN');
   assert.ok(await page.locator(nflPanel('.mu-row')).count() >= slots.length);
@@ -2539,7 +2604,7 @@ test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup
 test('NFL league tab: the week\'s matchups as the NBA League tab draws them, with Sleeper\'s own live numbers', async () => {
   documentBody = nflLeagueTab();
   await page.goto(NFL_LEAGUE_URL);
-  const cards = page.locator('#sleeper-nfl-league .lg-match');
+  const cards = page.locator('#sleeper-nfl-league .lg-match[data-nfl-matchup]');
   await cards.first().waitFor({ timeout: 30000 });
   assert.equal(await cards.count(), 2);
   assert.deepEqual(await page.locator('.league-matchup-row-item').evaluateAll((els) => els.map((el) => el.checkVisibility())), [false, false], 'Sleeper\'s own cards stay, hidden');
@@ -2552,6 +2617,9 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   assert.match(await first.getAttribute('class'), /\bown\b/);
   assert.match(await first.innerText(), /^@louhow\s+Lou Point Conversion\s+19\.40\s+90% WIN\s+8-4\s+122\.23\s+VS\s+@kalviar\s+Tank you, Jeremiah\s+6\.60\s+10% WIN\s+3-9\s+71\.77$/);
   assert.equal(await first.locator('.mu-team.mine .mu-bar span').evaluate((el) => el.style.width), '90%');
+  // Before them, yours against the league median of every card's numbers (a "-" is no points yet: 0).
+  const median = page.locator('#sleeper-nfl-league .lg-list > .median:first-child');
+  assert.match(await median.innerText(), /^@louhow\s+Lou Point Conversion\s+19\.40\s+\d+% WIN\s+8-4\s+122\.23\s+VS\s+M\s+Beat it for an extra win\s+League Median\s+13\.00\s+Top 2 of 4 win\s+105\.3\d$/);
   // Sleeper's avatar; one the CDN doesn't have (as here) draws as the plain circle, never a broken image.
   await page.waitForFunction(() => !document.querySelector('#sleeper-nfl-league').shadowRoot.querySelector('img.avatar'));
   assert.equal(await first.locator('div.avatar').count(), 2);

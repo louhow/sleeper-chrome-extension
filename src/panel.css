@@ -16,6 +16,8 @@
   --locked-green: #2f8f58;
   --locked-yellow: #977a17;
   --locked-red: #b03f59;
+  /* The league median's mark. */
+  --median: #f2741f;
   /* What-if scoring: everything scored with it wears this color. */
   --whatif: #b69cff;
   --whatif-bg: color-mix(in srgb, var(--whatif) 14%, transparent);
@@ -945,6 +947,31 @@ span.team-link:hover {
 }
 .lg-match.own .mu-team {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* The league median as an extra matchup: an orange M in place of an avatar,
+   its side set apart and without a win bar (the chance is the team's). */
+.mu-team .avatar.mark {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffb35c, var(--median) 70%);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+}
+.lg-match .mu-team .avatar.mark {
+  font-size: 13px;
+}
+.median .mu-team.theirs {
+  border-color: color-mix(in srgb, var(--median) 40%, transparent);
+}
+.median .mu-team.theirs .mu-bar {
+  visibility: hidden;
+}
+/* Under a Matchup tab's own matchup, as close as the League tab's cards. */
+.mu-head + .median {
+  margin-top: 5px;
 }
 .mu-starters {
   display: flex;

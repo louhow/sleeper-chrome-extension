@@ -151,6 +151,17 @@
     nav.router.push(`/leagues/${id}/${page}`);
   }, true);
 
+  // The sidebar's leagues, each link marked with its league id and sport
+  // (data-snp-league, data-snp-sport), which only this world can read: the
+  // extension adds NBA leagues' matchup lines there (nba/nav.js).
+  bridge.answer('snp:nav-leagues', () => [...document.querySelectorAll(NAV_LEAGUE)].flatMap((link) => {
+    const league = props(link, (x) => x.league && x.selectLeague)?.league;
+    if (!league) return [];
+    if (link.dataset.snpLeague !== league.league_id) link.dataset.snpLeague = league.league_id;
+    if (link.dataset.snpSport !== league.sport) link.dataset.snpSport = league.sport;
+    return [{ leagueId: league.league_id, sport: league.sport }];
+  }));
+
   // NBA Players tab. It opens on Projection for the current week (Sleeper's
   // own default can be the season, and its week dropdown reads "2026" on load).
   // In Stats: shot-volume columns (FGM and FGA after PTS, 3PA after 3PM, FTM
@@ -1268,9 +1279,11 @@
           bar: parseFloat(user.querySelector('.win-bar > div')?.style.width) || 0,
         };
       });
-      return { own: mine != null && (ids.rosterId1 === mine || ids.rosterId2 === mine), sides };
+      const side = mine == null ? -1 : [ids.rosterId1, ids.rosterId2].indexOf(mine);
+      return { own: side >= 0, mine: side >= 0 && sides[side] ? side : null, sides };
     });
-    return { cards };
+    // The week shown (Sleeper's week picker), for whether it plays the league median.
+    return { cards, round: league?.round ?? null };
   });
   bridge.on('snp:nfl-league-open', ({ index }) => {
     const row = document.querySelectorAll(NFL_ROW)[index];

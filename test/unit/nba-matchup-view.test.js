@@ -99,3 +99,18 @@ test('lock controls only for rosters the logged-in user owns', () => {
   const loggedOut = matchup.render(state({ me: null }));
   assert.doesNotMatch(loggedOut, /data-lock=/);
 });
+
+test('league median: the shown team against it on the Matchup tab, yours first on the League tab, only when the league plays one', () => {
+  const league = { ...state().league, settings: { reserve_slots: 1, league_average_match: 1, playoff_week_start: 19 } };
+  // Points so far 41.50 and none (0), projections 157.23 and 181.21.
+  const median = /VS M Beat it for an extra win League Median 20\.75 Top 1 of 2 win 169\.22/;
+  const out = text(matchup.render(state({ league })));
+  assert.match(out, new RegExp(`181\\.21 @louhow COOKIE MONSTER 41\\.50 \\d+% WIN 0-0 \\(#3\\) Yet to play \\(1\\) 157\\.23 ${median.source} Starters`));
+  // Picked the other team: the median is against theirs.
+  assert.match(text(matchup.render(state({ league, rosterId: 5 }))), new RegExp(`@badonkeyds Cling Kong – \\d+% WIN 0-0 \\(#7\\) Yet to play \\(1\\) 181\\.21 ${median.source}`));
+  const lg = text(matchup.league(state({ league, page: 'league', rosterId: 5 })));
+  assert.match(lg, new RegExp(`^ Matchups .*?@louhow COOKIE MONSTER 41\\.50 \\d+% WIN .*?${median.source} @louhow COOKIE MONSTER`));
+  for (const s of [state(), state({ league: { ...league, settings: { ...league.settings, playoff_week_start: 1 } } })]) {
+    assert.doesNotMatch(matchup.render(s) + matchup.league({ ...s, page: 'league' }), /League Median/);
+  }
+});

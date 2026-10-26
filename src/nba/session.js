@@ -7,12 +7,12 @@
 // buttons (see page-hook.js) with a bid dialog. Every league starts here, since
 // its sport is known only once it loads: an NFL league hands over to
 // nfl/session.js, any other sport stays hidden.
-//   nbaSession(leagueId, page, { admin }) -> { leagueId, attach, show, destroy, setAdmin }
-(globalThis.SNP ||= {}).nbaSession = (leagueId, page, { admin }) => {
+// It gives the sidebar (nav.js) its numbers for the week on now.
+//   nbaSession(leagueId, page, { admin, nav }) -> { leagueId, attach, show, destroy, setAdmin }
+(globalThis.SNP ||= {}).nbaSession = (leagueId, page, { admin, nav = null }) => {
   const { createApi, model, scoring, ui, bridge, shared, loaders,
-    nbaPanelView, nbaCardView, nbaOptimizeView, nbaWaiversView, nbaWhatIfView, nbaCard, nbaWaivers, nbaOptimize, nbaPlayers } = globalThis.SNP;
+    nbaWeek, nbaPanelView, nbaCardView, nbaOptimizeView, nbaWaiversView, nbaWhatIfView, nbaCard, nbaWaivers, nbaOptimize, nbaPlayers } = globalThis.SNP;
   const PANEL_PAGES = new Set(['team', 'matchup', 'league']);
-  const PLAYERS_KEY = 'players:nba:v4';
   const FLOAT_AFTER_MS = 4000;
   const CLOCK_MS = 60e3;
   // Lock-In needs who was starting at each tip-off, and Sleeper keeps no lineup
@@ -22,7 +22,6 @@
   const AFTER_TIP_MS = 5 * 60e3;
   // Never read the legs more often than this, whatever asks.
   const LEG_READ_GAP_MS = 60e3;
-  const LEG_FIELDS = 'leg matchup_id roster_id round starters points proj_points max_points custom_points starters_games subs';
 
   const panel = shared.shadowHost('sleeper-nba-panel', schedule);
   const { host, root } = panel;
@@ -248,18 +247,6 @@
     schedule();
   }
 
-  // The fields the panel keeps of each NBA player.
-  const toPlayer = (p) => ({
-    name: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-    first: p.first_name,
-    last: p.last_name,
-    team: p.team,
-    position: p.position,
-    positions: p.fantasy_positions || [],
-    injury: p.injury_status,
-    years_exp: p.years_exp,
-  });
-
   async function loadLeague(force = false) {
     state.error = null;
     const league = await api.get(`/v1/league/${leagueId}`);
@@ -286,7 +273,7 @@
       api.get(`/v1/league/${leagueId}/winners_bracket`),
       api.get(`/v1/league/${leagueId}/traded_picks`),
       api.get(`/v1/league/${leagueId}/drafts`),
-      loaders.players(api, 'nba', PLAYERS_KEY, toPlayer, force),
+      nbaWeek.players(api, force),
       chrome.storage.local.get([rosterKey, whatIfKey]),
       data.me(),
     ]);
@@ -311,8 +298,7 @@
       weeks: {},
     });
     updatePicks();
-    const current = Number(nbaState.display_week || nbaState.week || state.minWeek);
-    state.currentWeek = Math.min(Math.max(current, state.minWeek), state.maxWeek);
+    state.currentWeek = nbaWeek.currentWeek(league, nbaState, state.maxWeek);
     state.seasonType = nbaState.season_type;
     if (state.week == null) state.week = state.currentWeek;
     // Lineups recorded for earlier weeks are no longer needed.
@@ -326,6 +312,8 @@
     state.tiers = await tiers;
     if (state.currentWeek !== state.week) loadWeek(state.currentWeek).catch(fail);
     state.ready = true;
+    // The sidebar's line for this league, in step with the panel (but never in what-if scoring).
+    nav?.feed(leagueId, () => (ui.whatIfOn(state) ? null : { ...state, week: state.currentWeek }));
     sendAdminScoring();
     // The Players tab's columns can go in now (page-hook.js).
     bridge.tell('snp:players-ready', { leagueId });
@@ -349,19 +337,14 @@
     schedule();
     if (state.weeks[week]) return;
     const { league } = state;
-    const season = league.season;
-    const seasonType = league.season_type || 'regular';
     const standingsQuery = `query roster_standings {
 roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)}) { roster_id rank }
 }`;
     // Only the current week's lineups matter for Lock-In.
     const historyKey = week === state.currentWeek ? `lineups:${leagueId}:${week}` : null;
-    const [matchups, projections, stats, scores, research, legs, standings, stored] = await Promise.all([
-      api.get(`/v1/league/${leagueId}/matchups/${week}`),
-      api.get(`/projections/nba/${season}/${week}?season_type=${seasonType}`),
-      api.get(`/stats/nba/${season}/${week}?season_type=${seasonType}`),
-      api.graphql(`scores (week ${week})`, loaders.scoresQuery('nba', seasonType, season, week, 'date game_id metadata season season_type sport status start_time week')),
-      api.get(`/players/nba/research/${seasonType}/${season}/${week}?league_type=${league.settings?.type ?? 0}`),
+    const [core, research, legs, standings, stored] = await Promise.all([
+      nbaWeek.load(api, league, week, ui.scoringOf(state)),
+      api.get(`/players/nba/research/${league.season_type || 'regular'}/${league.season}/${week}?league_type=${league.settings?.type ?? 0}`),
       loadLegs(week),
       api.graphql(`roster_standings (week ${week})`, standingsQuery)
         .then((res) => res?.roster_standings ?? [])
@@ -369,18 +352,8 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
       historyKey ? chrome.storage.local.get(historyKey) : {},
     ]);
     if (historyKey) state.lineupHistory[week] = stored[historyKey] || {};
-    const games = scores?.scores || [];
-    const scoringSettings = ui.scoringOf(state);
     state.weeks[week] = {
-      matchups: matchups || [],
-      days: model.weekDays(games),
-      gamesByTeam: model.gamesByTeam(games),
-      games: games.map((g) => ({ start: g.start_time, status: g.status })),
-      // Raw rows stay so what-if scoring can rescore them.
-      projRows: projections || [],
-      statRows: stats || [],
-      proj: model.pointsByGame(projections || [], scoringSettings, scoring.scoreStats),
-      actual: model.pointsByGame(stats || [], scoringSettings, scoring.scoreStats),
+      ...core,
       research: research || {},
       legs,
       ranks: model.standingsRanks(state.rosters, standings),
@@ -410,7 +383,7 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
   let lastLegRead = 0;
   function loadLegs(week) {
     if (api.loggedIn()) lastLegRead = Date.now();
-    return data.legs(week, LEG_FIELDS);
+    return data.legs(week, nbaWeek.LEG_FIELDS);
   }
 
   // Reads the current week's legs again (lineups can change on Sleeper's apps too).

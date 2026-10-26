@@ -2,7 +2,7 @@
 // on top of Sleeper's, which stay on the page, hidden and still updating:
 // page-hook.js reads their live numbers ('snp:nfl-league'), again whenever
 // they change, and a click on one of ours clicks Sleeper's.
-(globalThis.SNP ||= {}).nflLeague = () => {
+(globalThis.SNP ||= {}).nflLeague = (league) => {
   const { nflLeagueView, bridge, shared } = globalThis.SNP;
   const state = { failedAvatars: new Set() };
   const { host, root } = shared.shadowHost('sleeper-nfl-league');
@@ -21,7 +21,7 @@
 
   function render() {
     if (destroyed) return;
-    const html = nflLeagueView.render(bridge.ask('snp:nfl-league')?.cards || [], state.failedAvatars);
+    const html = nflLeagueView.render(bridge.ask('snp:nfl-league') || {}, league, state.failedAvatars);
     if (root.innerHTML !== html) root.innerHTML = html;
   }
 

@@ -14,7 +14,7 @@
   // The tab's handlers go first, so an Escape that closes the dialog doesn't also cancel a swap under it.
   const panel = nflPanel({ leagueId, api, league, info, lineup, nflSave, openDialog: () => optimizer.open(), dialogOpen: () => optimizer.isOpen() });
   const optimizer = nflOptimize({ lineup, nflSave, notify: (text) => panel.notify(text) });
-  const leagueCards = nflLeague();
+  const leagueCards = nflLeague(league);
   const playersTab = nflPlayers({ api, league, info });
   let page = initialPage;
   let destroyed = false;

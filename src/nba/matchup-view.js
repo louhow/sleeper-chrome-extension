@@ -1,9 +1,10 @@
 // Matchup view: the selected team (left) against its opponent (right), slot by
 // slot, with Lock-In status and the lock control for the logged-in owner.
 (globalThis.SNP ||= {}).nbaMatchupView = (() => {
-  const { playerDays, lockState, lockInDefault, winProbability } = globalThis.SNP.model;
+  const { playerDays, lockState, winProbability } = globalThis.SNP.model;
+  const { side, median } = globalThis.SNP.nbaWeek;
   const { esc, f2, headshot, teamLogo, teamName, shortName, injuryTag, teamTag, gameTime, weekday, gameLabel, slotBadge, weekNav, lineup, real, playerOf,
-    whatIfOn, loading, errorMsg, opponentOf, teamSideOf, matchupPair, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
+    loading, errorMsg, opponentOf, teamSideOf, matchupPair, medianPair, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
 
   function render(s) {
     if (s.error) return errorMsg(s.error);
@@ -20,44 +21,16 @@
     const row = (slot, idA, idB, starter) => muRow(playerSide(s, left, idA, 'mine', starter), slotBadge(slot),
       right && playerSide(s, right, idB, 'theirs', starter));
     const section = (title, slot, a, b, count) => muSection(title, a, b, count, (idA, idB) => row(slot, idA, idB, false));
+    const med = median(s);
 
     return `
       ${matchupPair(teamOf(s, left, p1), right && teamOf(s, right, p2), { tag: 'section', failed: s.failedAvatars })}
+      ${med ? medianPair(teamOf(s, left, null), med, { failed: s.failedAvatars }) : ''}
       ${muStarters(mine.lockable ? (s.saving ? 'Saving…' : 'Lock in a finished game before the player\'s next game starts') : '', weekNav(s, mine.week))}
       ${mine.slots.map((slot, i) => row(slot, mine.starters[i], theirs?.starters[i], true)).join('')}
       ${section('Bench', 'BN', mine.bench, theirs?.bench || [])}
       ${section('Injured Reserve', 'IR', mine.reserve, theirs?.reserve || [], settings.reserve_slots)}
       ${section('Taxi Squad', 'TX', mine.taxi, theirs?.taxi || [], settings.taxi_slots)}`;
-  }
-
-  // Team totals. Sleeper's own leg numbers win when logged in; otherwise they're
-  // rebuilt from Lock-In rules (locked game, else the final game of the week).
-  function side(s, l) {
-    const states = {};
-    for (const id of l.starters) {
-      if (!real(id)) continue;
-      const days = playerDays(l.week, s.players[id]?.team, id);
-      states[id] = { days, ...lockState(days, l.locks[id], s.now, l.started ? (game) => l.started(id, game) : null) };
-    }
-    const all = Object.values(states);
-    // Sleeper's running total: each starter's locked game, else their latest finished one.
-    const live = all.reduce((sum, st) => sum + st.livePoints, 0);
-    const projected = all.reduce((sum, st) => sum + (st.counted ? st.points : lockInDefault(st.days) ?? 0), 0);
-    // Sleeper's totals use the league's scoring; what-if scoring keeps the ones added up here.
-    const server = whatIfOn(s) ? null : l.leg ?? l.matchup;
-    // The public matchup is cached for minutes, so with the (fresh) leg the total
-    // is added up from its lineup instead; Sleeper's leg points (and custom points) still win.
-    const points = !server ? live
-      : l.leg ? l.leg.custom_points ?? l.leg.points ?? live
-      : l.matchup?.custom_points ?? l.matchup?.points ?? live;
-    return {
-      l,
-      states,
-      points: points ?? 0,
-      anyPoints: all.some((st) => st.locked || st.games.some((d) => d.game.status === 'complete')) || Boolean(server && (l.leg ? l.leg.points : l.matchup?.points)),
-      proj: (server && l.leg?.proj_points) ?? projected,
-      yetToPlay: all.filter((st) => st.yetToPlay).length,
-    };
   }
 
   // A team's card over the matchup (ui.teamSide): `prob`, its chance to win.
@@ -139,7 +112,8 @@
 
   // League tab: every matchup of the week, each as the Matchup tab's header
   // (score, win chance, record and rank, yet to play, projection), yours
-  // first. Clicking one opens it on the Matchup tab.
+  // first, after yours against the league median when the league plays one.
+  // Clicking one opens it on the Matchup tab.
   function league(s) {
     const week = s.weeks?.[s.week];
     const head = `<div class="lg-head"><h3>Matchups</h3>${weekNav(s, week)}</div>`;
@@ -156,7 +130,10 @@
     const pairs = [...groups.entries()].sort(([a, x], [b, y]) => (y.some(mine) - x.some(mine)) || a - b)
       .map(([, list]) => list.sort((a, b) => mine(b) - mine(a)));
     if (!pairs.length) return `${head}<p class="msg">No matchups this week.</p>`;
-    return `${head}<div class="lg-list">${pairs.map(([a, b]) => {
+    // The median against your team (else the team picked).
+    const med = median(s);
+    const you = med && (pairs.flat().find((l) => l.mine) ?? lineup(s));
+    return `${head}<div class="lg-list">${you ? medianPair(teamOf(s, side(s, you), null), med, { failed: s.failedAvatars }) : ''}${pairs.map(([a, b]) => {
       const left = side(s, a);
       const right = b && side(s, b);
       const [p1, p2] = right ? winProbability(left.points, left.proj, right.points, right.proj) : [null, null];

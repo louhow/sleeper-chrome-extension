@@ -1,12 +1,14 @@
 // The content scripts' entry: follows Sleeper's in-page navigation and keeps
 // one session per league, an NBA one to start with (nba/session.js), which
-// hands an NFL league over to nfl/session.js once its sport is known. Also the
-// admin switch (?snp-admin), saved for the whole browser.
+// hands an NFL league over to nfl/session.js once its sport is known; the
+// sidebar's lines for NBA leagues (nba/nav.js), on every page. Also the admin
+// switch (?snp-admin), saved for the whole browser.
 (() => {
-  const { nbaSession } = globalThis.SNP;
+  const { nbaSession, nbaNav } = globalThis.SNP;
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
 
   let active = null;
+  const nav = nbaNav();
 
   // Admin tools (what-if scoring: the Scoring control and the Players tab's
   // adminFPTS and adminDelta columns) are hidden unless turned on with
@@ -48,10 +50,11 @@
     // One session per league, kept across its tabs; the panel only shows on Team and Matchup.
     if (leagueId !== (active?.leagueId ?? null)) {
       active?.destroy();
-      active = leagueId ? nbaSession(leagueId, page, { admin }) : null;
+      active = leagueId ? nbaSession(leagueId, page, { admin, nav }) : null;
     }
     active?.show(page);
     active?.attach();
+    nav.attach(active?.leagueId ?? null);
   }
 
   // Runs at document_start: watching the DOM puts the panel in place in the

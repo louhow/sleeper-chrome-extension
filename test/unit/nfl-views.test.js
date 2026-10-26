@@ -87,7 +87,7 @@ test('NFL optimize dialog: names open the player card, like NBA', () => {
 
 test('NFL league cards: Sleeper\'s own numbers, broken avatars as the plain circle', () => {
   const side = (team, win, avatar = null) => ({ avatar, owner: team.toLowerCase(), team, score: '25.90', win, record: '1-0', proj: '100.00', bar: 90 });
-  const html = nflLeagueView.render([{ own: true, sides: [side('Mine', '90%', 'https://x/a.png'), side('Theirs', '10%', 'https://x/b.png')] }], new Set(['https://x/b.png']));
+  const html = nflLeagueView.render({ cards: [{ own: true, mine: 0, sides: [side('Mine', '90%', 'https://x/a.png'), side('Theirs', '10%', 'https://x/b.png')] }], round: 7 }, null, new Set(['https://x/b.png']));
   assert.match(text(html), /@mine Mine 25\.90 90% WIN 1-0 100\.00 VS @theirs Theirs 25\.90 10% WIN/);
   assert.match(html, /<img class="avatar" src="https:\/\/x\/a\.png" alt="">/);
   assert.match(html, /<div class="avatar"><\/div>\s*<div class="mu-who">\s*<div class="sub">@theirs/);
@@ -96,11 +96,29 @@ test('NFL league cards: Sleeper\'s own numbers, broken avatars as the plain circ
 
 test("League tab cards: Sleeper's own text as read, a card with no teams yet, and win text that isn't a number", () => {
   const side = (team, win) => ({ avatar: '', owner: team.toLowerCase(), team, score: '12.30', win, record: '3-3', proj: '40.10' });
-  const out = text(nflLeagueView.render([
-    { own: true, sides: [side('Gridiron', '57%'), side('Blitz', '43%')] },
-    { own: false, sides: [] },
-    { own: false, sides: [side('Hail', '--'), side('Mary', '')] },
-  ], new Set()));
+  const out = text(nflLeagueView.render({ cards: [
+    { own: true, mine: 0, sides: [side('Gridiron', '57%'), side('Blitz', '43%')] },
+    { own: false, mine: null, sides: [] },
+    { own: false, mine: null, sides: [side('Hail', '--'), side('Mary', '')] },
+  ], round: 7 }, { settings: { league_average_match: 1 } }, new Set()));
   assert.match(out, /Gridiron 12\.30 57% WIN 3-3 40\.10 VS @blitz Blitz 12\.30 43% WIN/);
   assert.doesNotMatch(out, /NaN/);
+});
+
+test('NFL League tab: your team against the league median, only in a week that plays one', () => {
+  const side = (team, score, proj) => ({ avatar: '', owner: team.toLowerCase(), team, score, win: '50%', record: '3-3', proj });
+  const cards = [
+    { own: false, mine: null, sides: [side('Alpha', '80.00', '100.00'), side('Beta', '20.00', '60.00')] },
+    // Yours, on the right of Sleeper's card.
+    { own: true, mine: 1, sides: [side('Gamma', '-', '90.00'), side('Mine', '50.00', '120.00')] },
+  ];
+  const league = { settings: { league_average_match: 1, playoff_week_start: 15 } };
+  const html = nflLeagueView.render({ cards, round: 7 }, league, new Set());
+  // Median of 80, 20, 0 (no points yet) and 50 is 35; of the projections, 95.
+  assert.match(text(html), /^ @mine Mine 50\.00 76% WIN 3-3 120\.00 VS M Beat it for an extra win League Median 35\.00 Top 2 of 4 win 95\.00/);
+  assert.match(html, /<section class="mu-head lg-match median" aria-label="Against the league median">/);
+  assert.match(html, /<span class="avatar mark">M<\/span>/);
+  assert.doesNotMatch(nflLeagueView.render({ cards, round: 15 }, league, new Set()), /median/, 'not in the playoffs');
+  assert.doesNotMatch(nflLeagueView.render({ cards, round: 7 }, { settings: {} }, new Set()), /median/, 'not without median on');
+  assert.doesNotMatch(nflLeagueView.render({ cards: cards.map((c) => ({ ...c, mine: null })), round: 7 }, league, new Set()), /median/, 'not without a team of yours');
 });

@@ -869,6 +869,37 @@
     return [win, clamp(0.01, 0.99, 1 - win)];
   }
 
+  // ---- League median ----
+
+  // With "league median" on (settings.league_average_match), each regular-season
+  // week every team plays one more matchup, against the league's median score:
+  // the top half of the league wins it. Not in the playoffs.
+  function medianOn(league, week) {
+    const s = league?.settings || {};
+    if (!s.league_average_match) return false;
+    return !(s.playoff_week_start && week >= s.playoff_week_start);
+  }
+
+  // The middle value (the mean of the middle two for an even count); null for none.
+  function median(values) {
+    const v = values.filter(Number.isFinite).sort((a, b) => a - b);
+    if (!v.length) return null;
+    const mid = v.length >> 1;
+    return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+  }
+
+  // The week's median as an opponent, from every team's { points, proj }
+  // (points null until the team has any): its points (null until some team has
+  // any), its projection, and how many teams beat it (the top half).
+  function leagueMedian(teams) {
+    return {
+      points: teams.some((t) => t.points != null) ? median(teams.map((t) => t.points ?? 0)) : null,
+      proj: median(teams.map((t) => t.proj ?? 0)),
+      winners: Math.floor(teams.length / 2),
+      teams: teams.length,
+    };
+  }
+
   // roster_id -> rank. Uses Sleeper's roster_standings when it has rows; before
   // any games it falls back to the standings order (record, points, then waiver order).
   function standingsRanks(rosters, standings) {
@@ -1019,7 +1050,7 @@
     taxiEligible, taxiOpen, reserveEligible,
     lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
-    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks,
+    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, standingsRanks, medianOn, median, leagueMedian,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
   };
 })();

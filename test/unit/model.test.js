@@ -829,3 +829,19 @@ test('next team: through the order, a team or a matchup at a time, stopping at t
   assert.equal(model.nextTeam(teams, 9, 1), null, 'not in the order');
   assert.equal(model.nextTeam([[r(1), r(4)], [r(2), null]], 4, 1), 2, 'matchups by their left team');
 });
+
+test('league median: played only in regular-season weeks of leagues that have it, the middle score as an opponent', () => {
+  const league = (settings) => ({ settings });
+  assert.equal(model.medianOn(league({ league_average_match: 1, playoff_week_start: 15 }), 14), true);
+  assert.equal(model.medianOn(league({ league_average_match: 1, playoff_week_start: 15 }), 15), false, 'not in the playoffs');
+  assert.equal(model.medianOn(league({ league_average_match: 1 }), 30), true, 'no playoff week set');
+  assert.equal(model.medianOn(league({ league_average_match: 0 }), 1), false);
+  assert.equal(model.medianOn(null, 1), false);
+  assert.equal(model.median([3, 1, 2]), 2);
+  assert.equal(model.median([4, 1, 3, 2]), 2.5, 'an even count: the mean of the middle two');
+  assert.equal(model.median([NaN, null, 5]), 5, 'only numbers count');
+  assert.equal(model.median([]), null);
+  assert.deepEqual(plain(model.leagueMedian([{ points: 10, proj: 40 }, { points: null, proj: 20 }, { points: 30, proj: 30 }, { points: 20, proj: 10 }])),
+    { points: 15, proj: 25, winners: 2, teams: 4 }, 'a team without points yet counts as 0');
+  assert.equal(model.leagueMedian([{ points: null, proj: 20 }, { points: null, proj: 10 }]).points, null, 'no team has points yet');
+});

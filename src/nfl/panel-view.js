@@ -3,8 +3,8 @@
 // player, any team or matchup from the picker. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflPanelView = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
-    shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
-  const { scoreTier, spotRefs, swapTargets, winProbability, gameState } = globalThis.SNP.model;
+    shell, pageTitle, teamCard, teamSideOf, matchupPair, medianPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
+  const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian } = globalThis.SNP.model;
   const { slotBadge, headshot, injury } = globalThis.SNP.nflUi;
   // Sleeper's apps list bench players by position in this order.
   const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
@@ -112,6 +112,14 @@
     return { points: any ? points : null, proj: live.reduce((sum, x) => sum + x.now, 0), toPlay: live.filter((x) => x.g.state === 'left').length };
   }
 
+  // The shown week's league median (model.leagueMedian) over every team with a
+  // matchup that week; null when the league plays no median that week.
+  function median(s) {
+    if (!medianOn(s.league, s.week)) return null;
+    const teams = (s.rosters || []).map((r) => lineup(s, r.roster_id)).filter((l) => (l?.leg ?? l?.matchup)?.matchup_id != null).map((l) => totals(s, l));
+    return teams.length ? leagueMedian(teams) : null;
+  }
+
   // Points once the game kicks off (– until then), a finished game's in its score color.
   function points(s, p, { g, actual }) {
     const tier = g.state === 'done' && actual != null ? scoreTier(actual, s.tiers, p.positions?.[0] || p.position) : '';
@@ -202,7 +210,9 @@
     const settings = s.league.settings || {};
     const row = (slot, idA, idB) => muRow(side(s, idA, 'mine'), slotBadge(slot), theirs ? side(s, idB, 'theirs') : null);
     const section = (title, slot, x, y, count) => muSection(title, x, y || [], count, (idA, idB) => row(slot, idA, idB));
+    const med = median(s);
     return `${matchupPair(team(mine, a, p1), theirs && team(theirs, b, p2), { cls: 'lg-match nfl-mu-head', failed: s.failedAvatars })}
+      ${med ? medianPair(team(mine, a, null), med, { failed: s.failedAvatars }) : ''}
       ${muStarters(`${a.toPlay} yet to play${b ? ` · ${b.toPlay} for them` : ''}`, weekNav(s, mine.week))}
       ${mine.slots.map((slot, i) => row(slot, mine.starters[i], theirs?.starters[i])).join('')}
       ${section('Bench', 'BN', mine.bench, theirs?.bench)}
