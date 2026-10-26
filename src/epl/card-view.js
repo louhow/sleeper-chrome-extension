@@ -204,10 +204,19 @@
         return `<li><span class="kind">${esc(kind)}</span><span>${esc(what)}</span><span class="sub">${esc(when(t.status_updated || t.created))}${t.status !== 'complete' ? ` · ${esc(t.status)}` : ''}</span></li>`;
       }).join('')}</ul>`;
     const career = c.career == null ? loading() : `<table class="career">
-      <thead><tr><th>Season</th><th class="num">GP</th><th class="num">MIN</th><th class="num">G</th><th class="num">AST</th><th class="num">FPTS</th><th class="num">Rank</th></tr></thead>
-      <tbody>${c.career.map((r) => `<tr><td>${r.season}</td><td class="num">${num(r.stats?.gp)}</td><td class="num">${num(r.stats?.min)}</td><td class="num">${num(r.stats?.g)}</td><td class="num">${num(r.stats?.at)}</td><td class="num">${r.stats ? f1(scoreStats(s.league.scoring_settings || {}, r.stats)) : '-'}</td><td class="num">${num(r.stats?.rank_std)}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Season</th><th>Club</th><th class="num">GP</th><th class="num">MIN</th><th class="num">G</th><th class="num">AST</th><th class="num">FPTS</th><th class="num">Rank</th></tr></thead>
+      <tbody>${c.career.map((r) => `<tr><td>${r.season}</td><td class="clubs">${clubs(s, r.clubs)}</td><td class="num">${num(r.stats?.gp)}</td><td class="num">${num(r.stats?.min)}</td><td class="num">${num(r.stats?.g)}</td><td class="num">${num(r.stats?.at)}</td><td class="num">${r.stats ? f1(scoreStats(s.league.scoring_settings || {}, r.stats)) : '-'}</td><td class="num">${num(r.stats?.rank_std)}</td></tr>`).join('')}</tbody>
     </table>`;
     return `<h3>Transaction history</h3>${history}<h3>Career <span class="sub">fantasy points with this league's scoring</span></h3>${career}`;
+  }
+
+  // A season's clubs, logo and abbreviation, in the order the player played for them.
+  function clubs(s, teams) {
+    if (!teams?.length) return '-';
+    return teams.map((team) => {
+      const club = s.teams?.[team];
+      return `<span class="club" title="${esc(club?.name || club?.abbr || '')}"><img src="${teamLogo(team)}" alt="">${esc(club?.abbr || '')}</span>`;
+    }).join('<span class="sep">→</span>');
   }
 
   return { render };

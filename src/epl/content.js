@@ -626,11 +626,16 @@
         })
         .finally(schedule);
       part(api.get(`/players/${SPORT}/${id}`), (bio) => { c.bio = bio; });
-      part(Promise.all(years.map((season) => api.get(`/stats/${SPORT}/player/${id}?season_type=${type}&season=${season}`)
-        .then((row) => ({ season, team: row?.team, stats: row?.stats || null }))
-        .catch(() => ({ season, stats: null })))), (rows) => {
+      const query = (season) => `/stats/${SPORT}/player/${id}?season_type=${type}&season=${season}`;
+      part(Promise.all(years.map((season) => Promise.all([
+        api.get(query(season)),
+        api.get(`${query(season)}&grouping=week`).catch(() => ({})),
+      ])
+        .then(([row, weekly]) => ({ season, clubs: model.seasonClubs(weekly), stats: row?.stats || null }))
+        .catch(() => ({ season, clubs: [], stats: null })))), (rows) => {
         c.career = rows.filter((r) => r.season === current || r.stats?.gp);
         c.seasons = [current, ...c.career.filter((r) => r.season !== current).map((r) => r.season)];
+        for (const r of c.career) if (r.clubs.some((team) => !state.teams[team])) loadClubs(r.season);
       }, () => { c.career = []; c.seasons = [current]; });
       loadCardLog(playerId, current);
       part(api.graphql('get_player_news', `query get_player_news {
@@ -645,6 +650,21 @@
       } else {
         c.historyError = true;
       }
+    }
+
+    // Names a past season's clubs (one since relegated is in no player's or this season's schedule), once a season.
+    const clubSeasons = new Set();
+    function loadClubs(season) {
+      if (clubSeasons.has(season)) return;
+      clubSeasons.add(season);
+      api.get(`/schedule/${SPORT}/regular/${Number(season)}`)
+        .then((rows) => {
+          for (const g of rows || []) {
+            for (const side of [g.home, g.away]) if (side?.team) state.teams[side.team] ||= { abbr: side.abbr, name: side.name };
+          }
+        })
+        .catch(() => {})
+        .finally(schedule);
     }
 
     function loadCardLog(playerId, season) {

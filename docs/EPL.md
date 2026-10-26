@@ -17,7 +17,7 @@ The extension fills that page with the mobile app's tabs.
   The gameweeks run through the one on now once a match in it has kicked off.
   Score colors are the thirds of the rostered players' gameweeks over the same five, per position (Sleeper's public matchups, which NBA and NFL take them from, answer 404 for EPL).
 - **League**: every matchup this week, the standings table and the week's transactions.
-- **Player card**: bio, next match, projections for the coming gameweeks, news, a per-match game log with heat-shaded stats, career totals and the player's transaction history in your league.
+- **Player card**: bio, next match, projections for the coming gameweeks, news, a per-match game log with heat-shaded stats, career totals with the club (or clubs, in order) each season and the player's transaction history in your league.
 - **API**: a log of every call the extension makes, with timing, size and a JSON preview.
 
 The panel replaces the "not supported on web yet" placeholder and only mounts for `clubsoccer:epl` leagues.
@@ -73,7 +73,7 @@ Any player a flex slot accepts can be moved into it; the formation changes with 
 | `GET /players/clubsoccer:epl/research/regular/<season>/<week>` | Rostered and start percentages |
 | `GET /v1/players/clubsoccer:epl/trending/add`, `/drop` | Trending players |
 | `GET /stats/clubsoccer:epl/<season>` | Season totals for Leaders and the FPTS column |
-| `GET /players/clubsoccer:epl/<id>`, `/stats/clubsoccer:epl/player/<id>?grouping=week`, `/projections/...` | Player card: bio, game log, career |
+| `GET /players/clubsoccer:epl/<id>`, `/stats/clubsoccer:epl/player/<id>?grouping=week`, `/projections/...` | Player card: bio, game log, career (a season's total carries no club, so each season's clubs come from its per-week rows; a past season's `/schedule` names a club since relegated) |
 | `POST sleeper.com/graphql` `scores`, `roster_standings`, `get_player_news` | Kickoff times and match status, standings rank, news |
 | `POST sleeper.com/graphql` (logged in) `me`, `league_rosters`, `matchup_legs`, `league_transactions_filtered`, `league_transactions_by_player` | Who you are, live rosters, matchup pairings and Sleeper's own points, pending claims, player history |
 | `POST sleeper.com/graphql` (logged in) `update_matchup_leg`, `roster_update_starters`, `roster_update_reserve` | Saving a lineup (in season it lives on the week's matchup leg) and IR moves |
@@ -92,7 +92,7 @@ Logged out, the Match and League tabs show lineups but no pairings.
 
 ## Development
 
-Unit tests: `test/unit/epl-model.test.js`, `test/unit/epl-ui.test.js` and `test/unit/epl-players-view.test.js` (run with `npm test`), loaded by `loadSep` in `test/unit/load.js`.
+Unit tests: `test/unit/epl-model.test.js`, `test/unit/epl-ui.test.js`, `test/unit/epl-players-view.test.js` and `test/unit/epl-card-view.test.js` (run with `npm test`), loaded by `loadSep` in `test/unit/load.js`.
 The end-to-end suite checks that the panel never mounts on an NBA league page; there is no end-to-end test of the panel itself yet.
 
 `test/epl/harness.html` is a stand-in for Sleeper's EPL league page.

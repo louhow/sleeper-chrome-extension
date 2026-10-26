@@ -57,7 +57,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Lineup swaps with formations, IR moves, Optimize lineup.
 - Free-agent adds, waiver bids and drops.
 - Players tab: a Last 5 column (the last five gameweeks, a mark each in its score's color, opponent and points on hover; sorts by points per match).
-- Player card with next match, projections, game log, career and history.
+- Player card with next match, projections, game log, career (each season's club) and history.
 
 **All sports**
 - Score colors (green, yellow, red) from the league's own games: the thirds of its starters' recent scores, per position in NFL.

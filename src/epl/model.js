@@ -362,6 +362,15 @@
   }
 
 
+  // The clubs a player played for in a season, in order, from their per-week
+  // stat rows ({ [week]: row or [rows] }, as grouping=week answers): a season's
+  // own total carries no club.
+  function seasonClubs(weekly) {
+    const rows = Object.values(weekly || {}).flat().filter((r) => r?.team);
+    rows.sort((a, b) => (a.week ?? 0) - (b.week ?? 0) || String(a.date).localeCompare(String(b.date)));
+    return [...new Set(rows.map((r) => String(r.team)))];
+  }
+
   // The Players tab's Last 5. The gameweeks it covers: the five through the one
   // on now once a match in it has kicked off, else through the one before.
   function recentWeeks(current, start, games, now = Date.now()) {
@@ -428,7 +437,7 @@
   }
 
   return {
-    clubForms, recentWeeks, recentForm, recentMarks,
+    clubForms, seasonClubs, recentWeeks, recentForm, recentMarks,
     gamesFromScores, gamesByTeam, pointsByGame, playerGames, weekTotals, started, finished,
     slotAccepts, fits, reserveEligible, spotOf, spotRefs, swapTargets, applyMove, describeMove,
     parseFormation, savedFormation, slotLabels, formationOf, FORMATION_ORDER,

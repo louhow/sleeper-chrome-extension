@@ -325,3 +325,16 @@ test('last 5: a mark per gameweek, with its matches', () => {
   const done = model.recentForm({ ...recent, actual: [{}, {}, {}], games: recent.games.map((list) => list.map((g) => ({ ...g, status: 'complete' }))), rostered: [], positionOf: () => 'M' });
   assert.equal(model.recentMarks(done, 'm1', '1', 'M', Date.parse('2026-10-28T12:00:00Z'))[2].kind, 'dnp');
 });
+
+test('season clubs: in the order played, from the per-week rows', () => {
+  const weekly = {
+    20: [{ week: 20, date: '2025-01-04', team: '1040' }],
+    3: { week: 3, date: '2024-08-31', team: '1030' },
+    1: [{ week: 1, date: '2024-08-17', team: '1030' }],
+    2: null,
+    4: [{ week: 4, team: null }],
+  };
+  assert.deepEqual(plain(model.seasonClubs(weekly)), ['1030', '1040'], 'a January move');
+  assert.deepEqual(plain(model.seasonClubs({})), []);
+  assert.deepEqual(plain(model.seasonClubs(null)), []);
+});
