@@ -56,7 +56,7 @@
 }`, { auth: true });
             if (data?.league_rosters?.length) return data.league_rosters;
           } catch (err) {
-            console.warn(`[${tag}] league_rosters unavailable, using the public endpoint`, err);
+            globalThis.SNP.shared.report('warn', `[${tag}] league_rosters unavailable, using the public endpoint`, err);
           }
         }
         return api.get(`/v1/league/${leagueId}/rosters`);
@@ -69,7 +69,7 @@
           const data = await api.graphql('me', 'query me { me { user_id } }', { auth: true });
           return data?.me?.user_id ?? null;
         } catch (err) {
-          console.warn(`[${tag}] could not identify the logged-in user`, err);
+          globalThis.SNP.shared.report('warn', `[${tag}] could not identify the logged-in user`, err);
           return null;
         }
       },
@@ -92,7 +92,7 @@
             : await api.graphql(label, query(fields), { auth: true });
           return data?.matchup_legs ?? null;
         } catch (err) {
-          console.warn(`[${tag}] matchup_legs unavailable`, err);
+          globalThis.SNP.shared.report('warn', `[${tag}] matchup_legs unavailable`, err);
           return null;
         }
       },

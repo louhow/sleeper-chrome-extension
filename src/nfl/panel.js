@@ -37,7 +37,7 @@
 
   function fail(err) {
     if (destroyed) return;
-    console.error('[sleeper-nfl]', err);
+    shared.report('error', '[sleeper-nfl]', err);
     state.error = String(err.message || err);
     state.ready = true;
     schedule();

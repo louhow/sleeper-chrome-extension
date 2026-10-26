@@ -245,7 +245,7 @@
 
   function fail(err) {
     if (destroyed) return;
-    console.error('[sleeper-nba-panel]', err);
+    shared.report('error', '[sleeper-nba-panel]', err);
     state.error = String(err.message || err);
     schedule();
   }
@@ -310,7 +310,7 @@
     const oldWeeks = Array.from({ length: Math.max(0, state.currentWeek - state.minWeek) }, (_, i) => `lineups:${leagueId}:${state.minWeek + i}`);
     if (oldWeeks.length) chrome.storage.local.remove(oldWeeks);
     const tiers = loaders.loadTiers(api, league, state.currentWeek).catch((err) => {
-      console.warn('[sleeper-nba-panel] score colors unavailable', err);
+      shared.report('warn', '[sleeper-nba-panel] score colors unavailable', err);
       return null;
     });
     await loadWeek(state.week);
@@ -456,7 +456,7 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
       const core = await nbaWeek.load(api, state.league, week, ui.scoringOf(state));
       if (state.weeks[week]) Object.assign(state.weeks[week], core);
     } catch (err) {
-      console.warn('[sleeper-nba-panel] live read failed', err);
+      shared.report('warn', '[sleeper-nba-panel] live read failed', err);
     }
     planLiveRead();
     schedule();

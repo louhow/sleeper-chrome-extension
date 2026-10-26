@@ -30,7 +30,7 @@
     const now = await api.get('/v1/state/nfl');
     info.currentWeek = Number(now.display_week || now.week || 1);
     info.tiers = await loaders.loadTiers(api, league, info.currentWeek).catch((err) => {
-      console.warn('[sleeper-nfl] score colors unavailable', err);
+      globalThis.SNP.shared.report('warn', '[sleeper-nfl] score colors unavailable', err);
       return null;
     });
     if (destroyed) return;

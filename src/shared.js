@@ -175,5 +175,14 @@
     tabs.find((t) => new RegExp(`^${page}$`, 'i').test(t.textContent.trim()))?.click();
   }
 
-  return { stylesheet, shadowHost, hideSleeper, flasher, activateOnKey, markMissingImages, safeStore, arrowStep, teamOrder, movedText, listen, openSleeperTab, nflPlayerCard };
+  // Report a failed call. A dropped connection (offline, asleep, a request
+  // cut off by navigation) says nothing about the extension, so it stays in the
+  // console's debug level instead of Chrome's list of extension errors.
+  const NETWORK_FAILURE = /^(Failed to fetch|Load failed|NetworkError|network error)/i;
+  function report(level, label, err) {
+    const dropped = err instanceof TypeError && NETWORK_FAILURE.test(err.message);
+    console[dropped ? 'debug' : level](label, err);
+  }
+
+  return { report, stylesheet, shadowHost, hideSleeper, flasher, activateOnKey, markMissingImages, safeStore, arrowStep, teamOrder, movedText, listen, openSleeperTab, nflPlayerCard };
 })();

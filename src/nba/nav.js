@@ -133,7 +133,7 @@
       // The league's session may have started meanwhile; its numbers win.
       if (!leagues.get(leagueId)?.own) leagues.set(leagueId, { state: () => state, loadedAt: Date.now() });
     } catch (err) {
-      console.warn('[sleeper-nba-nav] matchup unavailable', err);
+      shared.report('warn', '[sleeper-nba-nav] matchup unavailable', err);
       if (!leagues.get(leagueId)?.own) leagues.set(leagueId, { ...entry, loading: false, failed: true, loadedAt: Date.now() });
     }
     attach(active);
