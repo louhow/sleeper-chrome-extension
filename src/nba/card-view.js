@@ -111,7 +111,6 @@
                 ${item('Age', age(bio) ?? '-')}
                 ${item('Height', height(bio?.height))}
                 ${item('Weight', bio?.weight ? `${esc(bio.weight)}<small>lbs</small>` : '-', true)}
-                ${item('Exp', bio?.years_exp ?? p.years_exp ?? '-')}
                 ${item('College', `<span title="${esc(bio?.college || '')}">${esc(bio?.college || '-')}</span>`, true, 'college')}
               </div>
               <div class="pc-rows">
@@ -124,11 +123,17 @@
                     <span><b>${share(research?.started)}</b>Started</span>
                   </div>
                 </div>
-                <div class="pc-draft">
+              </div>
+              <div class="pc-career">
+                <div class="pc-exp">
+                  <div class="pc-label">Exp</div>
+                  <div class="pc-ranks">${expValue(bio?.years_exp ?? p.years_exp)}</div>
+                </div>
+                <div class="pc-draft" data-tone="${esc(c.draft?.tone || '')}">
                   <div class="pc-label">Draft</div>
                   <div class="pc-ranks">${espnValue(c.draft, 'draft')}</div>
                 </div>
-                <div class="pc-contract">
+                <div class="pc-contract" data-tone="${esc(c.contract?.tone || '')}">
                   <div class="pc-label">Contract</div>
                   <div class="pc-ranks">${espnValue(c.contract, 'contract')}</div>
                 </div>
@@ -151,16 +156,26 @@
     </div>`;
   }
 
-  // The real-life draft and contract (espn-client.js), beside the rankings and
-  // in their style: a placeholder while ESPN answers, then "2016" with
-  // "Rd 2 · Pk 45 · TEN" (or "Undrafted"), "FA 2028" with "2 yrs left · $11M ·
-  // since 2025"; without one, or with ESPN slow or down, a quiet "–".
+  // Experience, then the real-life draft and contract (espn-client.js), one
+  // strip so the pick sits by the years that tell how much it still says, in the
+  // rankings' style: a placeholder while ESPN answers, then "Rd 2 · Pk 45" with
+  // "TEN · 2016" (or "Undrafted"), "FA 2028" with "2 yrs left · $11M · since
+  // 2025"; without one, or with ESPN slow or down, a quiet "–". Each carries its
+  // tone (data-tone, from espn.js): a pick fades as the years pass, and a deal
+  // in its last year gets a flag, since that is when it matters most.
+  function expValue(years) {
+    if (years == null || years === '') return '<span class="pc-val"><b>–</b></span>';
+    return Number(years) === 0 ? '<span class="pc-val"><b>Rookie</b></span>' : `<span class="pc-val" title="${esc(years)} seasons in the league"><b>${esc(years)}</b>${Number(years) === 1 ? 'yr' : 'yrs'}</span>`;
+  }
   const ESPN_WHAT = { draft: ['Real-life draft', 'No draft found on ESPN'], contract: ['Contract', 'No contract found on ESPN'] };
   function espnValue(d, kind) {
     const [what, none] = ESPN_WHAT[kind];
-    if (!d || d.status === 'loading') return `<span><i class="pc-loading" aria-label="Loading ${kind}"></i></span>`;
-    if (!d.text) return `<span title="${esc(d.status === 'error' ? "ESPN didn't answer" : none)}"><b>–</b></span>`;
-    return `<span title="${what}, from ESPN: ${esc(d.text)}"><b>${esc(d.main)}</b>${esc(d.detail)}</span>`;
+    if (!d || d.status === 'loading') return `<span class="pc-val"><i class="pc-loading" aria-label="Loading ${kind}"></i></span>`;
+    if (!d.text) return `<span class="pc-val" title="${esc(d.status === 'error' ? "ESPN didn't answer" : none)}"><b>–</b></span>`;
+    const ago = kind === 'draft' && d.age > 0 ? ` (${d.age} ${d.age === 1 ? 'year' : 'years'} ago)` : '';
+    const title = `${what}, from ESPN: ${esc(d.text)}${ago}`;
+    const flag = d.flag ? `<em class="pc-flag">${esc(d.flag)}</em>` : '';
+    return `<span class="pc-val" title="${title}"><b>${esc(d.main)}</b>${flag}</span>${d.detail ? `<span class="pc-sub" title="${title}">${esc(d.detail)}</span>` : ''}`;
   }
 
   function item(label, value, raw = false, cls = '') {

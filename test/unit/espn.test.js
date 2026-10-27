@@ -28,6 +28,7 @@ test('queries: the full name, then the last name alone', () => {
   assert.deepEqual(plain(espn.queries({})), []);
 });
 
+const NOW = Date.UTC(2026, 9, 27);
 test('draftOf and draftText: round, pick and team, Undrafted, or nothing', () => {
   const athlete = { draft: { year: 2018, round: 1, selection: 1, team: { $ref: 'http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2018/teams/5' } } };
   assert.deepEqual(plain(espn.draftOf(athlete)), { year: 2018, round: 1, pick: 1, teamRef: 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2018/teams/5' });
@@ -38,8 +39,8 @@ test('draftOf and draftText: round, pick and team, Undrafted, or nothing', () =>
   assert.equal(espn.draftText({ status: 'undrafted' }), 'Undrafted');
   for (const status of ['none', 'error']) assert.equal(espn.draftText({ status }), null);
   assert.equal(espn.draftText(null), null);
-  assert.deepEqual(plain(espn.draftParts({ status: 'found', draft: { year: 2018, round: 1, pick: 1, team: 'CLE' } })), { main: 'Rd 1 · Pk 1', detail: 'CLE · 2018' });
-  assert.deepEqual(plain(espn.draftParts({ status: 'undrafted' })), { main: 'Undrafted', detail: '' });
+  assert.deepEqual(plain(espn.draftParts({ status: 'found', draft: { year: 2018, round: 1, pick: 1, team: 'CLE' } }, NOW)), { main: 'Rd 1 · Pk 1', detail: 'CLE · 2018', age: 8, tone: 'dated' });
+  assert.deepEqual(plain(espn.draftParts({ status: 'undrafted' })), { main: 'Undrafted', detail: '', age: null, tone: 'recent' });
   assert.equal(espn.draftParts({ status: 'none' }), null);
 });
 
@@ -76,8 +77,12 @@ test('contractOf: when he\'s a free agent and seasons left, from ESPN\'s records
 
 test('contractParts: "FA 2028" with years left, pay and since when', () => {
   const found = (contract) => ({ status: 'found', contract });
-  assert.deepEqual(plain(espn.contractParts(found({ fa: 2028, years: 2, pay: 11000000, since: '2025' }))), { main: 'FA 2028', detail: '2 yrs left · $11M · since 2025' });
-  assert.deepEqual(plain(espn.contractParts(found({ fa: 2027, years: 1, pay: 50105628, since: '2024-25' }))), { main: 'FA 2027', detail: 'Final year · $50.1M · since 2024-25' });
+  assert.deepEqual(plain(espn.contractParts(found({ fa: 2028, years: 2, pay: 11000000, since: '2025' }))), { main: 'FA 2028', flag: '', detail: '2 yrs left · $11M · since 2025', tone: 'soon' });
+  // The last year is a flag, not a detail: the thing to see at a glance.
+  assert.deepEqual(plain(espn.contractParts(found({ fa: 2027, years: 1, pay: 50105628, since: '2024-25' }))), { main: 'FA 2027', flag: 'Contract year', detail: '$50.1M · since 2024-25', tone: 'expiring' });
+  assert.equal(espn.contractText(found({ fa: 2027, years: 1, pay: 50105628, since: '2024-25' })), 'FA 2027 · Contract year · $50.1M · since 2024-25');
+  assert.equal(espn.contractParts(found({ fa: 2029, years: 3, pay: null, since: null })).tone, 'settled');
+  assert.equal(espn.contractParts(found({ fa: 2031, years: 5, pay: null, since: null })).tone, 'settled');
   assert.equal(espn.contractText(found({ fa: 2029, years: 3, pay: null, since: null })), 'FA 2029 · 3 yrs left');
   for (const status of ['none', 'error']) assert.equal(espn.contractParts({ status }), null);
   assert.deepEqual([12000000, 50105628, 950000, 125000000, 0].map(espn.money), ['$12M', '$50.1M', '$950K', '$125M', '']);
@@ -93,4 +98,14 @@ test('sameContract: the same end year with the same team; a new team\'s deal end
   assert.equal(espn.sameContract(espn.contractOf('nfl', 2025, { signedThrough: 2027, team: team(33) }), espn.contractOf('nfl', 2026, { signedThrough: 2028, team: team(33) })), false, 'an extension');
   assert.equal(espn.sameContract(espn.contractOf('nba', 2026, { yearsRemaining: 3 }), espn.contractOf('nba', 2027, { yearsRemaining: 2 })), true, 'no team on record: the end year decides');
   assert.equal(espn.sameContract(null, raiders), false);
+});
+
+test('draftAge and draftTone: a pick fades as the years since the draft pass', () => {
+  // A season turns over in July: the 2026 class is a rookie (0) through next June.
+  assert.deepEqual([[2026, 9], [2025, 9], [2016, 9], [2016, 0], [2016, 5], [2026, 0]].map(([y, m]) => espn.draftAge(y, Date.UTC(2026, m, 27))), [0, 1, 10, 9, 9, 0]);
+  assert.equal(espn.draftAge(2030, NOW), 0, 'never negative');
+  assert.deepEqual([0, 2, 3, 5, 6, 9, 10, 19].map(espn.draftTone), ['fresh', 'fresh', 'recent', 'recent', 'dated', 'dated', 'old', 'old']);
+  assert.equal(espn.draftParts({ status: 'found', draft: { year: 2016, round: 2, pick: 45, team: 'TEN' } }, NOW).tone, 'old');
+  assert.equal(espn.draftParts({ status: 'found', draft: { year: 2025, round: 1, pick: 1, team: 'DAL' } }, NOW).tone, 'fresh');
+  assert.equal(espn.draftParts({ status: 'found', draft: { year: 2017, round: null, pick: null, team: 'DEN' } }, NOW).main, '2017', 'no round or pick: the year leads');
 });

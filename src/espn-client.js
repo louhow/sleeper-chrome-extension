@@ -3,7 +3,7 @@
 // or without a match comes back as a status the card shows quietly. The
 // worker's calls go in the API tab's log.
 //   draft(api, player) / contract(api, player), player: { sport, playerId, name, lastName, birthDate, espnId }
-//     -> { status: 'found' | 'undrafted' | 'none' | 'error', text, main, detail }
+//     -> { status: 'found' | 'undrafted' | 'none' | 'error', text, main, flag, detail, tone, age }
 //        (espn.draftParts / contractParts; text null without one)
 (globalThis.SNP ||= {}).espnClient = (() => {
   const { espn } = globalThis.SNP;
@@ -19,7 +19,7 @@
     for (const call of result?.calls || []) api?.external(call);
     if (result?.cached) api?.external({ label: `espn ${kind} ${player.sport} ${player.playerId}`, url: 'chrome.storage.local', status: 'cache', ms: 0 });
     const parts = PARTS[kind](result);
-    return { status: result?.status || 'error', text: parts && [parts.main, parts.detail].filter(Boolean).join(' · '), main: parts?.main ?? null, detail: parts?.detail ?? '' };
+    return { status: result?.status || 'error', text: parts && [parts.main, parts.flag, parts.detail].filter(Boolean).join(' · '), main: parts?.main ?? null, flag: parts?.flag ?? '', detail: parts?.detail ?? '', tone: parts?.tone ?? null, age: parts?.age ?? null };
   }
 
   return { draft: (api, player) => ask('draft', api, player), contract: (api, player) => ask('contract', api, player) };

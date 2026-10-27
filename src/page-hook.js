@@ -1209,7 +1209,13 @@
     .snp-espn .rank-value, .snp-espn .rank-label { white-space: nowrap; }
     /* As the NBA card draws them: a smaller value than the rankings, its detail on the same baseline. */
     .snp-espn .rank-item { display: flex; align-items: baseline; gap: 4px; }
-    .snp-espn .rank-value { font-size: 17px; line-height: 1.2; }
+    .snp-espn .rank-value { font-size: 17px; line-height: 1.2; text-transform: uppercase; }
+    /* As on the NBA card (panel.css): a pick fades with the years, a last year is flagged, a long deal recedes. */
+    .snp-espn[data-kind="draft"][data-tone="recent"] .rank-item { opacity: 0.86; }
+    .snp-espn[data-kind="draft"][data-tone="dated"] .rank-item { opacity: 0.68; }
+    .snp-espn[data-kind="draft"][data-tone="old"] .rank-item { opacity: 0.52; }
+    .snp-espn[data-kind="contract"][data-tone="settled"] .rank-item { opacity: 0.72; }
+    .snp-espn-flag { align-self: center; margin: 0 4px 0 2px; padding: 2px 7px; border-radius: 999px; background: #ffc53d; color: #2b1d00; font-size: 10px; font-weight: 900; letter-spacing: 0.8px; text-transform: uppercase; }
     .snp-espn .rank-label { margin: 0; padding: 0; line-height: 1.2; }
     /* A block's placeholder while ESPN answers. */
     .snp-espn-loading { display: inline-block; width: 90px; height: 0.8em; border-radius: 6px; background: rgba(255, 255, 255, 0.3); vertical-align: middle; animation: snp-espn-fade 1.2s ease-in-out infinite; }
@@ -1359,8 +1365,10 @@
         Promise.race([bridge.call('snp:espn', { kind, ...ask }), new Promise((resolve) => setTimeout(resolve, ESPN_WAIT_MS, null))]).then((reply) => {
           if (block.dataset.player !== id) return;
           item.replaceChildren(Object.assign(document.createElement('div'), { className: 'rank-value', textContent: reply?.main || '-' }));
+          if (reply?.tone) block.dataset.tone = reply.tone;
+          if (reply?.flag) item.append(Object.assign(document.createElement('div'), { className: 'snp-espn-flag', textContent: reply.flag }));
           if (reply?.detail) item.append(Object.assign(document.createElement('div'), { className: 'rank-label', textContent: reply.detail.toUpperCase() }));
-          item.title = reply?.text ? `${what}, from ESPN: ${reply.text}` : reply?.status === 'error' || !reply ? "ESPN didn't answer" : none;
+          item.title = reply?.text ? `${what}, from ESPN: ${reply.text}${kind === 'draft' && reply.age > 0 ? ` (${reply.age} ${reply.age === 1 ? 'year' : 'years'} ago)` : ''}` : reply?.status === 'error' || !reply ? "ESPN didn't answer" : none;
           fitEspn(rankings);
         });
       }

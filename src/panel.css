@@ -2328,12 +2328,26 @@ h2.pc-name {
   font-size: 14px;
   opacity: 0.8;
 }
-/* Player rankings, then the real-life draft beside them (under them on a narrow card). */
+/* Player rankings, then the career strip under them: Exp, draft and contract side by side
+   (wrapping onto a second line on a narrow card). */
 .pc-rows {
   display: flex;
   flex-wrap: wrap;
   column-gap: 32px;
+}
+.pc-career {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 2px;
   padding-bottom: 14px;
+}
+.pc-career > div {
+  padding: 0 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+.pc-career > div:first-child {
+  padding-left: 0;
+  border-left: 0;
 }
 /* The real-life draft while ESPN answers: a soft bar the size of the value it waits for. */
 .pc-loading {
@@ -2375,9 +2389,37 @@ h2.pc-name {
   font-size: 22px;
   letter-spacing: 0;
 }
-.pc-draft .pc-ranks b,
-.pc-contract .pc-ranks b {
-  font-size: 17px;
+.pc-career .pc-ranks {
+  flex-direction: column;
+  gap: 1px;
+}
+.pc-career .pc-ranks b {
+  font-size: 18px;
+}
+/* The context line under a value: team and year, or years left, pay and since when. */
+.pc-career .pc-sub {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+/* A pick says less the longer ago it was (Exp, beside it, is the clock): it fades with the
+   years, the label staying put so the block still reads. A deal says more the nearer its end:
+   a last year is flagged, and one with years left recedes. */
+.pc-draft[data-tone="recent"] .pc-ranks { opacity: 0.86; }
+.pc-draft[data-tone="dated"] .pc-ranks { opacity: 0.68; }
+.pc-draft[data-tone="old"] .pc-ranks { opacity: 0.52; }
+.pc-contract[data-tone="settled"] .pc-ranks { opacity: 0.72; }
+.pc-flag {
+  align-self: center;
+  margin-left: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #ffc53d;
+  color: #2b1d00;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.8px;
 }
 .pc-body {
   display: grid;

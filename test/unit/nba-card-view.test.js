@@ -96,19 +96,34 @@ test('while loading, every section holds the shape of what it will show', () => 
 
 test('draft: beside the rankings, a placeholder while ESPN answers, then the real-life draft, Undrafted, or a quiet "–"', () => {
   const html = (draft) => card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } }, cards: { p1: { draft } } });
-  const value = (draft) => html(draft).match(/<div class="pc-draft">\s*<div class="pc-label">Draft<\/div>\s*<div class="pc-ranks">(.*?)<\/div>/)[1];
+  const value = (draft) => html(draft).match(/<div class="pc-draft"[^>]*>\s*<div class="pc-label">Draft<\/div>\s*<div class="pc-ranks">(.*?)<\/div>/)[1];
   assert.match(value({ status: 'loading' }), /class="pc-loading"/);
-  assert.match(value({ status: 'found', text: 'Rd 1 · Pk 13 · DEN · 2017', main: 'Rd 1 · Pk 13', detail: 'DEN · 2017' }), /<b>Rd 1 · Pk 13<\/b>DEN · 2017<\/span>/);
+  assert.match(value({ status: 'found', text: 'Rd 1 · Pk 13 · DEN · 2017', main: 'Rd 1 · Pk 13', detail: 'DEN · 2017' }), /<b>Rd 1 · Pk 13<\/b><\/span><span class="pc-sub"[^>]*>DEN · 2017<\/span>/);
   assert.match(value({ status: 'undrafted', text: 'Undrafted', main: 'Undrafted', detail: '' }), /<b>Undrafted<\/b><\/span>/);
   assert.match(value({ status: 'none', text: null }), /title="No draft found on ESPN"><b>–<\/b>/);
   assert.match(value({ status: 'error', text: null }), /title="ESPN didn&#39;t answer"><b>–<\/b>/);
-  assert.doesNotMatch(html({ status: 'loading' }), /pc-item[^"]*">\s*<div class="pc-item-label">Draft/, 'not in the AGE ... COLLEGE row');
+  assert.doesNotMatch(html({ status: 'loading' }), /pc-item[^"]*">\s*<div class="pc-item-label">(Draft|Exp)/, 'in the career strip, not the AGE ... COLLEGE row');
 });
 
 test('contract: beside the draft, "FA 2028" with years left, pay and since when, or a quiet "–"', () => {
   const html = (contract) => card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } }, cards: { p1: { contract } } });
-  const value = (contract) => html(contract).match(/<div class="pc-contract">\s*<div class="pc-label">Contract<\/div>\s*<div class="pc-ranks">(.*?)<\/div>/)[1];
+  const value = (contract) => html(contract).match(/<div class="pc-contract"[^>]*>\s*<div class="pc-label">Contract<\/div>\s*<div class="pc-ranks">(.*?)<\/div>/)[1];
   assert.match(value({ status: 'loading' }), /class="pc-loading" aria-label="Loading contract"/);
-  assert.match(value({ status: 'found', text: 'FA 2028 · 2 yrs left · $50.1M · since 2025-26', main: 'FA 2028', detail: '2 yrs left · $50.1M · since 2025-26' }), /title="Contract, from ESPN: FA 2028 · 2 yrs left · \$50.1M · since 2025-26"><b>FA 2028<\/b>2 yrs left · \$50.1M · since 2025-26<\/span>/);
+  assert.match(value({ status: 'found', text: 'FA 2028 · 2 yrs left · $50.1M · since 2025-26', main: 'FA 2028', detail: '2 yrs left · $50.1M · since 2025-26' }), /title="Contract, from ESPN: FA 2028 · 2 yrs left · \$50.1M · since 2025-26"><b>FA 2028<\/b><\/span><span class="pc-sub"[^>]*>2 yrs left · \$50.1M · since 2025-26<\/span>/);
   assert.match(value({ status: 'none', text: null }), /title="No contract found on ESPN"><b>–<\/b>/);
+});
+
+test('career strip: Exp beside the draft, the pick fading with its age, a contract year flagged', () => {
+  const html = (c, bio = { years_exp: 10 }) => card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } }, cards: { p1: { bio, ...c } } });
+  const strip = (h) => h.match(/<div class="pc-career">([\s\S]*?)<\/div>\s*<\/div>\s*<\/header>/)[1];
+  const order = (h) => [...strip(h).matchAll(/<div class="pc-label">(\w+)<\/div>/g)].map((m) => m[1]);
+  assert.deepEqual(order(html({})), ['Exp', 'Draft', 'Contract']);
+  assert.match(html({}), /<div class="pc-exp">\s*<div class="pc-label">Exp<\/div>\s*<div class="pc-ranks"><span class="pc-val" title="10 seasons in the league"><b>10<\/b>yrs<\/span>/);
+  assert.match(html({}, { years_exp: 0 }), /<b>Rookie<\/b>/);
+  assert.match(html({}, { years_exp: 1 }), /<b>1<\/b>yr</);
+  const draft = { status: 'found', text: 'Rd 2 · Pk 45 · TEN · 2016', main: 'Rd 2 · Pk 45', detail: 'TEN · 2016', tone: 'old', age: 10 };
+  assert.match(html({ draft }), /<div class="pc-draft" data-tone="old">/);
+  assert.match(html({ draft }), /title="Real-life draft, from ESPN: Rd 2 · Pk 45 · TEN · 2016 \(10 years ago\)"/);
+  const flagged = { status: 'found', text: 'FA 2027 · Contract year · $33M', main: 'FA 2027', flag: 'Contract year', detail: '$33M', tone: 'expiring' };
+  assert.match(html({ contract: flagged }), /<div class="pc-contract" data-tone="expiring">[\s\S]*<b>FA 2027<\/b><em class="pc-flag">Contract year<\/em><\/span><span class="pc-sub"[^>]*>\$33M<\/span>/);
 });

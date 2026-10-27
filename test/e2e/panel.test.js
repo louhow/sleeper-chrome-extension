@@ -1442,17 +1442,23 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
   assert.equal(await page.locator(dialog('h2.pc-name')).textContent(), playerName);
   await page.locator(dialog('.pc-item-value')).first().filter({ hasText: /^\d+$/ }).waitFor({ timeout: 15000 });
   const bio = await page.locator(dialog('.pc-bio')).textContent();
-  assert.match(bio, /Age\s*\d+\s*Height\s*\d'\d+"\s*Weight\s*\d+\s*lbs\s*Exp\s*\d+\s*College/);
+  assert.match(bio, /Age\s*\d+\s*Height\s*\d'\d+"\s*Weight\s*\d+\s*lbs\s*College/);
+  // Exp sits in the career strip, right before the draft it dates.
+  assert.deepEqual(await page.locator(dialog('.pc-career .pc-label')).allTextContents(), ['Exp', 'Draft', 'Contract']);
+  assert.match(await page.locator(dialog('.pc-exp .pc-ranks')).textContent(), /^(Rookie|\d+ ?yrs?)$/);
   // The real-life draft, from ESPN through the service worker: a placeholder, then the pick (or "Undrafted").
   const draft = page.locator(dialog('.pc-draft .pc-ranks'));
   await page.waitForFunction(() => {
     const block = document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('.pc-draft');
     return block && !block.querySelector('.pc-loading');
   }, null, { timeout: 30000 });
-  assert.match((await draft.textContent()).trim(), /^(Rd \d+ · Pk \d+(([A-Z]+)? · )?\d{4}|Undrafted)$/, 'ESPN matched the player');
+  assert.match((await draft.textContent()).trim(), /^(Rd \d+ · Pk \d+([A-Z]+ · )?\d{4}|\d{4}[A-Z]*|Undrafted)$/, 'ESPN matched the player');
+  assert.match(await page.locator(dialog('.pc-draft')).getAttribute('data-tone'), /^(fresh|recent|dated|old)$/);
   // And the contract beside it: when he's a free agent, years left, pay, since when.
   await page.waitForFunction(() => !document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('.pc-contract .pc-loading'), null, { timeout: 30000 });
-  assert.match((await page.locator(dialog('.pc-contract .pc-ranks')).textContent()).trim(), /^FA 20\d\d(\d yrs left|Final year)( · \$[\d.]+[MK])?( · since 20\d\d-\d\d)?$/);
+  assert.match((await page.locator(dialog('.pc-contract .pc-val')).textContent()).trim(), /^FA 20\d\d(Contract year)?$/);
+  assert.match((await page.locator(dialog('.pc-contract .pc-sub')).textContent()).trim(), /^(\d yrs left)?( · )?(\$[\d.]+[MK])?( · )?(since 20\d\d-\d\d)?$/);
+  assert.match(await page.locator(dialog('.pc-contract')).getAttribute('data-tone'), /^(expiring|soon|settled)$/);
   // Inside the card, the small line under the year included, not past its edge,
   // even beside a long college (which gives way with an ellipsis).
   const edge = await page.locator(dialog('.pc-hero')).boundingBox();
@@ -2884,7 +2890,7 @@ test('NFL player card: DRAFT and CONTRACT blocks under PLAYER RANKINGS, from ESP
   assert.equal(await block('draft').locator('.rank-label').textContent(), 'TEN · 2016');
   // His deal runs through the 2027 season: a free agent in 2028.
   assert.equal(await block('contract').locator('.rank-value').textContent(), 'FA 2028');
-  assert.match(await block('contract').locator('.rank-label').textContent(), /^(\d YRS LEFT|FINAL YEAR) · \$[\d.]+M · SINCE 20\d\d$/);
+  assert.match(await block('contract').locator('.rank-label').textContent(), /^(\d YRS LEFT · )?\$[\d.]+M · SINCE 20\d\d$/);
   // As on the NBA card: the two side by side in a row of their own under the rankings, even on a wide card.
   const tops = await page.locator('.player-ranking-container > .profile-item-label, .player-ranking-container .snp-espn > .profile-item-label').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
   assert.ok(tops[1] === tops[2] && tops[1] > tops[0], `draft and contract level, under the rankings: ${tops}`);

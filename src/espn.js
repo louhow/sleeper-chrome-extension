@@ -43,18 +43,34 @@
     return { year: d.year, round: d.round ?? null, pick: d.selection ?? null, teamRef: d.team?.$ref ? https(d.team.$ref) : null };
   }
 
+  // Seasons since a draft class, as the cards count them: the class plays its
+  // rookie season as 0, and a season turns over in July, so January to June still
+  // belongs to the one before.
+  function draftAge(year, now = Date.now()) {
+    const d = new Date(now);
+    return Math.max(0, d.getUTCFullYear() - year - (d.getUTCMonth() < 6 ? 1 : 0));
+  }
+  // How much a pick still says about a player, by how long ago it was: it fades.
+  // A first-rounder three years in is still the story; one ten years in has long
+  // since been replaced by what he's done.
+  const draftTone = (age) => (age <= 2 ? 'fresh' : age <= 5 ? 'recent' : age <= 9 ? 'dated' : 'old');
+
   // A lookup's result as the cards show it, the pick large and the rest small
   // beside it (as "#7 RB" in the rankings): { main: 'Rd 1 · Pk 1', detail: 'CLE · 2018' }.
-  // The round and pick carry the value; the year is context (Exp already says how
-  // long ago), so it rides last. Without a round or pick the year leads. Or
-  // { main: 'Undrafted' }; null without one (no match, or ESPN didn't answer).
-  function draftParts(result) {
-    if (result?.status === 'undrafted') return { main: 'Undrafted', detail: '' };
+  // The round and pick carry the value; the year is context that rides last (Exp,
+  // beside it on the card, already says how long ago). Without a round or pick the
+  // year leads. Or { main: 'Undrafted' }; null without one (no match, or ESPN
+  // didn't answer). `age` and `tone` say how long ago, for the card to fade it.
+  // (Undrafted has no pick to weigh, so it neither shouts nor fades.)
+  function draftParts(result, now = Date.now()) {
+    if (result?.status === 'undrafted') return { main: 'Undrafted', detail: '', age: null, tone: 'recent' };
     const d = result?.status === 'found' ? result.draft : null;
     if (!d?.year) return null;
+    const age = draftAge(d.year, now);
     const pick = [d.round != null && `Rd ${d.round}`, d.pick != null && `Pk ${d.pick}`].filter(Boolean).join(' · ');
-    if (!pick) return { main: String(d.year), detail: d.team || '' };
-    return { main: pick, detail: [d.team, d.year].filter(Boolean).join(' · ') };
+    const tone = draftTone(age);
+    if (!pick) return { main: String(d.year), detail: d.team || '', age, tone };
+    return { main: pick, detail: [d.team, d.year].filter(Boolean).join(' · '), age, tone };
   }
 
   // The same in a line: "Rd 1 · Pk 1 · CLE · 2018", "Undrafted", or null.
@@ -111,21 +127,30 @@
     return `$${Math.round(n / 1e3)}K`;
   }
 
-  // A contract lookup as the cards show it: { main: 'FA 2028', detail: '2 yrs left · $11M · since 2025' },
-  // "Final year" in its last; null without one (no contract on ESPN, or ESPN didn't answer).
+  // A contract lookup as the cards show it: { main: 'FA 2028', detail: '2 yrs left · $11M · since 2025', tone: 'soon' }.
+  // The last year is a flag instead ("Contract year"), the thing to see at a glance:
+  // { main: 'FA 2027', flag: 'Contract year', detail: '$50.1M · since 2024-25', tone: 'expiring' }.
+  // `tone` is how much the deal matters now: expiring, soon (two years left), settled (three or more).
+  // Null without one (no contract on ESPN, or ESPN didn't answer).
   function contractParts(result) {
     const c = result?.status === 'found' ? result.contract : null;
     if (!c?.fa) return null;
-    const left = c.years === 1 ? 'Final year' : `${c.years} yrs left`;
-    return { main: `FA ${c.fa}`, detail: [left, money(c.pay), c.since && `since ${c.since}`].filter(Boolean).join(' · ') };
+    const expiring = c.years <= 1;
+    const left = expiring ? null : `${c.years} yrs left`;
+    return {
+      main: `FA ${c.fa}`,
+      flag: expiring ? 'Contract year' : '',
+      detail: [left, money(c.pay), c.since && `since ${c.since}`].filter(Boolean).join(' · '),
+      tone: expiring ? 'expiring' : c.years === 2 ? 'soon' : 'settled',
+    };
   }
   const contractText = (result) => {
     const parts = contractParts(result);
-    return parts && `${parts.main} · ${parts.detail}`;
+    return parts && [parts.main, parts.flag, parts.detail].filter(Boolean).join(' · ');
   };
 
   return {
-    LEAGUES, MAX_CANDIDATES, searchUrl, athleteUrl, https, candidates, sameBirthday, queries, draftOf, draftParts, draftText,
+    LEAGUES, MAX_CANDIDATES, searchUrl, athleteUrl, https, candidates, sameBirthday, queries, draftOf, draftAge, draftTone, draftParts, draftText,
     contractSeason, contractUrl, seasonLabel, contractOf, sameContract, money, contractParts, contractText,
   };
 })();
