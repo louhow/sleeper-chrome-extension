@@ -47,7 +47,7 @@
 
   const score = (t) => `<div class="chop-score"><b>${t.points == null ? '–' : f2(t.points)}</b><span>${f2(t.proj)}</span></div>`;
 
-  // The teams still alive, worst first, under their zone's header.
+  // The teams still alive, worst first, under their zone's header: safe chance, starters played, FAAB left, points and projection.
   function blockView(s, block) {
     let zone = null;
     const rows = block.map((t) => {
@@ -60,12 +60,13 @@
         <div class="who"><div class="team-name">${esc(teamName(s, t.roster))}</div><div class="sub">@${esc(ownerName(s, t.roster) || 'unknown')}</div></div>
         <div class="chop-safe">${bar(t.safe, t.zone)}<span>${safeText(t.safe)}</span></div>
         <span class="chop-played">${t.played}/${t.starters}</span>
+        <span class="chop-faab">$${esc(chopTeamStats(s.league, t.roster).faab)}</span>
         ${score(t)}
       </div>`;
     }).join('');
     return `<section class="chop-card">
       <div class="lg-head"><h3>Chopping Block</h3><span class="sub">Week ${esc(s.week)}</span></div>
-      <div class="chop-row chop-cols"><span>Rank</span><span></span><span>Team</span><span>Safe %</span><span>Played</span><span>Pts · Proj</span></div>
+      <div class="chop-row chop-cols"><span>Rank</span><span></span><span>Team</span><span>Safe %</span><span>Played</span><span>FAAB</span><span>Pts · Proj</span></div>
       ${rows}
     </section>`;
   }

@@ -1101,7 +1101,7 @@ b.safe {
 .chop-row,
 .grave-row {
   display: grid;
-  grid-template-columns: 26px 30px minmax(0, 1fr) 96px 46px 64px;
+  grid-template-columns: 26px 30px minmax(0, 1fr) 96px 46px 52px 64px;
   align-items: center;
   gap: 10px;
   padding: 6px 4px;
@@ -1161,6 +1161,10 @@ b.safe {
   display: grid;
   gap: 3px;
   font-size: 11px;
+  text-align: center;
+}
+.chop-faab {
+  font-size: 12px;
   text-align: center;
 }
 .chop-played {

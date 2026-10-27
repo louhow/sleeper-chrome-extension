@@ -28,7 +28,9 @@ test('chopping block: worst first under its zone, played starters and points ove
   const out = text(nflChopView.render(chopped()));
   assert.match(out, /Chopping Block Week 7/);
   // Blitz: Allen's game is over and Barkley's on, Smith's and Kittle's still to come.
-  assert.match(out, /Chop zone 2 Blitz @rival 10% 2\/4 12\.00 34\.70 Safe 1 Gridiron &lt;Gang&gt; @louhow 90% 2\/3 30\.50 50\.40/);
+  // FAAB left beside the starters played: Blitz has spent nothing of the 1000, Gridiron <Gang> 939.
+  assert.match(out, /Chop zone 2 Blitz @rival 10% 2\/4 \$1000 12\.00 34\.70 Safe 1 Gridiron &lt;Gang&gt; @louhow 90% 2\/3 \$61 30\.50 50\.40/);
+  assert.match(out, /Rank Team Safe % Played FAAB Pts · Proj/);
   assert.doesNotMatch(out.split('Graveyard')[0], /Gone Team.*Chop zone/, 'chopped teams are not on the block');
 });
 

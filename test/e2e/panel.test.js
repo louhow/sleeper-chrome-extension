@@ -2810,7 +2810,8 @@ test('chopped league tab: your safe status, the chopping block and the graveyard
   const ranks = await tab('.chop-row[data-open-team] .chop-rank').allTextContents();
   assert.deepEqual(ranks.map(Number), alive.map((_, i) => alive.length - i));
   assert.deepEqual(await tab('.chop-zone').allTextContents(), ['Chop zone', 'Danger', 'Safe']);
-  for (const row of await tab('.chop-row[data-open-team]').all()) assert.match(await row.innerText(), /\d+%\s+\d+\/\d+\s+(–|\d+\.\d\d)\s+\d+\.\d\d$/);
+  // Each: safe chance, starters played, FAAB left, points and projection.
+  for (const row of await tab('.chop-row[data-open-team]').all()) assert.match(await row.innerText(), /\d+%\s+\d+\/\d+\s+\$\d+\s+(–|\d+\.\d\d)\s+\d+\.\d\d$/);
   // Yours: rank among the teams alive, points per week, FAAB left and its safe chance; its row marked.
   assert.match(await tab('.chop-me').innerText(), new RegExp(`\\d+(st|nd|rd|th) of ${alive.length} · \\d+\\.\\d\\d avg fpts · \\$\\d+ faab[\\s\\S]*\\d+% safe`, 'i'));
   assert.equal(await tab('.chop-row.own').count(), 1);
