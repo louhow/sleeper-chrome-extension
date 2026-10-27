@@ -1,7 +1,7 @@
 // The NBA panel: its shell around the tab shown, and the Team tab itself (the
 // Matchup and League tabs are in matchup-view.js). Pure: (state, api log) -> HTML.
 (globalThis.SNP ||= {}).nbaPanelView = (() => {
-  const { playerDays, lockInDefault, lockState, spotRefs, swapTargets, lockedGameId, scoreTier, gameState } = globalThis.SNP.model;
+  const { playerDays, lockInDefault, statLine, lockState, spotRefs, swapTargets, lockedGameId, scoreTier, gameState } = globalThis.SNP.model;
   const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule,
     whatIfOn, playerOf, teamTag, researchLine, padTo, real, loading, errorMsg, shell, teamCard, rowHead, swapHint, swapClass, emptyCard, apiView, sessionExpired } = globalThis.SNP.ui;
 
@@ -102,6 +102,15 @@
     });
   }
 
+  // Their latest finished game this week, as the box score under the name:
+  // "@ NYK · 26 PTS, 4 REB, ..." (the whole line is the tooltip when it's cut short).
+  function lastGameLine(s, week, id, done) {
+    const stats = done && statLine(week.statRows?.find((r) => String(r.player_id) === String(id) && String(r.game_id) === String(done.game.id))?.stats);
+    if (!stats) return '';
+    const text = `${done.home ? 'vs' : '@'} ${done.opponent} · ${stats}`;
+    return `<div class="line3" title="${esc(`${weekday(done.date)} ${text}`)}">${esc(text)}</div>`;
+  }
+
   function playerCard(ctx, slot, id, spot) {
     const { s, week, points, locks, editable, movable, lockRoster, started, targets } = ctx;
     const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
@@ -123,6 +132,7 @@
       <div class="info">
         <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${teamTag(p, { chips: true })}${injuryTag(p)}</div>
         ${researchLine(week.research[id])}
+        ${lastGameLine(s, week, id, lastDone)}
       </div>
       <div class="days">${days.map((d) => {
         const m = mark(d);

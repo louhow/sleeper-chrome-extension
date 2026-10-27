@@ -431,6 +431,13 @@ test('best lineup: a lock shuts the slot to the bench too, so a bench player who
   assert.deepEqual(plain(model.bestLineup(c, OPT_NOW).locks.map((k) => [k.id, k.openBy])), [['tre', null]]);
 });
 
+test('stat line: the box score as Sleeper shows it, steals and fouls only when there are some', () => {
+  assert.equal(model.statLine({ gp: 1, pts: 26, reb: 4, ast: 4, fgm: 9, fga: 22, tpm: 4, tpa: 9, ftm: 4, fta: 4, to: 3, pf: 2 }), '26 PTS, 4 REB, 4 AST, 9/22 FG, 4/9 3PM, 4/4 FT, 3 TO, 2 PF');
+  assert.equal(model.statLine({ gp: 1, pts: 8, reb: 4, stl: 1, fgm: 2, fga: 7, tpm: 2, tpa: 5, ftm: 2, fta: 2 }), '8 PTS, 4 REB, 0 AST, 2/7 FG, 2/5 3PM, 2/2 FT, 1 STL, 0 TO');
+  assert.equal(model.statLine({}), null);
+  assert.equal(model.statLine(undefined), null);
+});
+
 test('best lineup: a player about to be locked takes the most specific slot, leaving the flexible one open', () => {
   const games = {
     yax: [['y1', '2026-10-20', 'complete', 10, 30], ['y2', '2026-10-23', 'pre_game', 9]],

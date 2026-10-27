@@ -48,6 +48,21 @@
     return out;
   }
 
+  // A game's box score as Sleeper's app shows it under a player: "26 PTS, 4 REB,
+  // 4 AST, 9/22 FG, 4/9 3PM, 4/4 FT, 3 TO, 2 PF". Steals, blocks and fouls only
+  // when there are some; null when the stats say nothing was played.
+  function statLine(stats) {
+    if (!stats || !(stats.gp > 0 || stats.pts != null || stats.fga != null)) return null;
+    const n = (k) => stats[k] ?? 0;
+    return [
+      `${n('pts')} PTS`, `${n('reb')} REB`, `${n('ast')} AST`,
+      `${n('fgm')}/${n('fga')} FG`, `${n('tpm')}/${n('tpa')} 3PM`, `${n('ftm')}/${n('fta')} FT`,
+      ...[['stl', 'STL'], ['blk', 'BLK']].filter(([k]) => n(k) > 0).map(([k, label]) => `${n(k)} ${label}`),
+      `${n('to')} TO`,
+      ...(n('pf') > 0 ? [`${n('pf')} PF`] : []),
+    ].join(', ');
+  }
+
   // One cell per day of the week for a player's NBA team.
   function playerDays(week, team, playerId) {
     const games = week.gamesByTeam[team] || {};
@@ -1200,7 +1215,7 @@
 
   return {
     ranks, rankShift, shiftTint, adminDeltas,
-    weekDays, sideTeam, gameState, gamesByTeam, pointsByGame, playerDays, lockInDefault, ownedPicks, pickSeasons, PICK_SEASONS, lastWeek,
+    weekDays, sideTeam, gameState, gamesByTeam, pointsByGame, statLine, playerDays, lockInDefault, ownedPicks, pickSeasons, PICK_SEASONS, lastWeek,
     spotRefs, swapTargets, applyMove, describeMove, lineupOnLeg, nextTeam,
     taxiEligible, taxiOpen, reserveEligible,
     lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,

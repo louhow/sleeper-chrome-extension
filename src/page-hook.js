@@ -1190,10 +1190,10 @@
       min-width: 28px; padding: 2px 6px; border-radius: 4px; box-sizing: border-box;
       font-size: 12px; font-weight: 700; text-align: center; color: rgba(255, 255, 255, 0.45); font-variant-numeric: tabular-nums;
     }
-    /* Sleeper's NFL player card's DRAFT and CONTRACT blocks (cardEspn): columns beside PLAYER RANKINGS
-       (Sleeper's label over its row, each of ours likewise); under them side by side, or one under
-       another, when the card is too narrow (fitEspn). */
-    .player-ranking-container:has(> .snp-espn) { display: grid; justify-content: start; justify-items: start; column-gap: 28px; grid-template-columns: repeat(3, max-content); grid-template-areas: "rl dl cl" "rr dr cr"; }
+    /* Sleeper's NFL player card's DRAFT and CONTRACT blocks (cardEspn): in a row of their own under
+       PLAYER RANKINGS, as on the NBA card (Sleeper's label over its row, each of ours likewise);
+       one under another when the card is too narrow (fitEspn). */
+    .player-ranking-container:has(> .snp-espn) { display: grid; justify-content: start; justify-items: start; column-gap: 28px; }
     .player-ranking-container:has(> .snp-espn) > .profile-item-label { grid-area: rl; }
     .player-ranking-container:has(> .snp-espn) > .player-ranking-row { grid-area: rr; }
     .snp-espn { display: contents; }
@@ -1207,6 +1207,10 @@
     .player-ranking-container.snp-espn-stack { grid-template-columns: max-content; grid-template-areas: "rl" "rr" "dl" "dr" "cl" "cr"; }
     .player-ranking-container:is(.snp-espn-below, .snp-espn-stack) > .snp-espn > .profile-item-label { margin-top: 14px; }
     .snp-espn .rank-value, .snp-espn .rank-label { white-space: nowrap; }
+    /* As the NBA card draws them: a smaller value than the rankings, its detail on the same baseline. */
+    .snp-espn .rank-item { display: flex; align-items: baseline; gap: 4px; }
+    .snp-espn .rank-value { font-size: 17px; line-height: 1.2; }
+    .snp-espn .rank-label { margin: 0; padding: 0; line-height: 1.2; }
     /* A block's placeholder while ESPN answers. */
     .snp-espn-loading { display: inline-block; width: 90px; height: 0.8em; border-radius: 6px; background: rgba(255, 255, 255, 0.3); vertical-align: middle; animation: snp-espn-fade 1.2s ease-in-out infinite; }
     @keyframes snp-espn-fade { 50% { opacity: 0.45; } }
@@ -1316,14 +1320,13 @@
     open({ ...card, key: null, props: { ...card.props, playerIds: [playerId], selectedPlayerId: playerId, playersMap: { ...caught.playersMap, [playerId]: player } } });
   });
 
-  // Sleeper's NFL player card: DRAFT and CONTRACT blocks beside its PLAYER
+  // Sleeper's NFL player card: DRAFT and CONTRACT blocks under its PLAYER
   // RANKINGS, the player's real-life draft and contract from ESPN (the
   // extension's espn-client.js answers 'snp:espn'): "2016" with "RD 2 · PK 45 ·
   // TEN", "FA 2028" with "2 YRS LEFT · $11M · SINCE 2025", in the rankings' own
   // style. They're built from Sleeper's own classes, so they look like the row
-  // beside them, and leave Sleeper's AGE ... COLLEGE row as it is. A card too
-  // narrow for all three gets them under the rankings, side by side, or one under
-  // another (fitEspn). While ESPN answers each shows a shimmer, and a quiet "-"
+  // beside them, and leave Sleeper's AGE ... COLLEGE row as it is. They sit side by side
+  // under the rankings, or one under another on a card too narrow (fitEspn). While ESPN answers each shows a shimmer, and a quiet "-"
   // if it doesn't (no match, ESPN down, or no answer in ESPN_WAIT_MS), so the
   // card never waits on them. One set per player shown (the card can page through players).
   const CARD_RANKINGS = '.player-card-header .player-ranking-container';
@@ -1332,7 +1335,7 @@
     { kind: 'draft', label: 'DRAFT', what: 'Real-life draft', none: 'No draft found on ESPN' },
     { kind: 'contract', label: 'CONTRACT', what: 'Contract', none: 'No contract found on ESPN' },
   ];
-  const ESPN_LAYOUTS = ['', 'snp-espn-below', 'snp-espn-stack'];
+  const ESPN_LAYOUTS = ['snp-espn-below', 'snp-espn-stack'];
   function cardEspn() {
     for (const rankings of document.querySelectorAll(CARD_RANKINGS)) {
       const card = props(rankings, (x) => x.playerId && x.sport && 'player' in x);
@@ -1364,8 +1367,8 @@
       fitEspn(rankings);
     }
   }
-  // The first layout that keeps the blocks inside what the card shows: beside
-  // the rankings, under them side by side, or one under another. Measured
+  // The first layout that keeps the blocks inside what the card shows: under
+  // the rankings side by side, or one under another. Measured
   // against the card's content box, which scrolls sideways, since the info
   // column inside it grows with whatever it holds (ours included).
   function fitEspn(rankings) {

@@ -20,6 +20,7 @@ const week = {
   games: games.map((g) => ({ start: g.start_time, status: g.status })),
   proj: model.pointsByGame([{ player_id: 'a', game_id: 'g1', stats: { pts: 30.79 } }, { player_id: 'a', game_id: 'g2', stats: { pts: 39.83 } }], { pts: 1 }, scoring.scoreStats),
   actual: model.pointsByGame([{ player_id: 'a', game_id: 'g2', stats: { pts: 12.5 } }], { pts: 1 }, scoring.scoreStats),
+  statRows: [{ player_id: 'a', game_id: 'g2', stats: { gp: 1, pts: 26, reb: 4, ast: 4, fgm: 9, fga: 22, tpm: 4, tpa: 9, ftm: 4, fta: 4, to: 3, pf: 2 } }],
   research: { a: { owned: 99.7, started: 97.0 }, b: { owned: 94.3, started: 22.8 } },
 };
 const state = (overrides = {}) => ({
@@ -75,6 +76,12 @@ test('day strip shows projections before games and actual points after', () => {
   assert.match(out, /Starters M 19 T 20 W 21 T 22 F 23 S 24 S 25 Pts/, 'day labels print once per section');
   assert.match(out, /vs GSW 30\.79 10:00pm/);
   assert.match(out, /@UTA 12\.50 Final/);
+});
+
+test('a third line under a player: their latest finished game as a box score', () => {
+  const out = text(render(state(), []));
+  assert.match(out, /97% Start \| 100% Rostered @ UTA · 26 PTS, 4 REB, 4 AST, 9\/22 FG, 4\/9 3PM, 4\/4 FT, 3 TO, 2 PF/);
+  assert.doesNotMatch(out, /23% Start \| 95% Rostered @/, 'no finished game, no line');
 });
 
 test('reserve and taxi pad to the league slot counts; picks credit the original team', () => {

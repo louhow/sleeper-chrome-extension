@@ -344,6 +344,14 @@ h3 {
   color: var(--text);
   font-weight: 900;
 }
+.line3 {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .line2 .bar {
   margin: 0 5px;
   opacity: 0.5;
@@ -1801,12 +1809,12 @@ button.optimize:hover:not(:disabled) {
 /* NBA Optimize lineup: one row per starting slot, in lineup order. A change
    shows who goes out beside who comes in; a slot that stays is dimmed. */
 .dialog:has(.os-row) {
-  width: min(780px, 100%);
+  width: min(820px, 100%);
 }
 .os-head,
 .os-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 44px 40px 100px;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 44px 40px 132px;
   align-items: center;
   column-gap: 10px;
 }
@@ -1825,7 +1833,7 @@ button.optimize:hover:not(:disabled) {
 /* NFL: one number (this week's projection). */
 .os-head.nfl,
 .os-row.nfl {
-  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px 100px;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px 132px;
 }
 .os-row.nfl .slot {
   width: 44px;
@@ -1902,8 +1910,9 @@ button.optimize:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 5px 0;
+  gap: 5px;
+  padding: 8px 12px;
+  white-space: nowrap;
   border: 1px solid color-mix(in srgb, var(--lock) 60%, transparent);
   border-radius: 8px;
   background: none;
@@ -2007,8 +2016,9 @@ button.optimize:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 7px 0;
+  gap: 5px;
+  padding: 10px 12px;
+  white-space: nowrap;
   background: var(--primary);
   color: #fff;
   font-size: 11px;
@@ -2355,6 +2365,10 @@ h2.pc-name {
   color: #fff;
   font-size: 22px;
   letter-spacing: 0;
+}
+.pc-draft .pc-ranks b,
+.pc-contract .pc-ranks b {
+  font-size: 17px;
 }
 .pc-body {
   display: grid;

@@ -2868,7 +2868,7 @@ ${[['#4', 'QB'], ['#7', 'OVERALL'], ['91%', 'ROSTERED'], ['57%', 'STARTED']].map
   document.querySelector('.player-ranking-container').__reactInternalInstance$test = { memoizedProps: { className: 'player-ranking-container' }, return: { memoizedProps: {}, return: { memoizedProps: { sport: 'nfl', playerId: '${playerId}', player: ${JSON.stringify(player)} } } } };
 </script>`;
 
-test('NFL player card: DRAFT and CONTRACT blocks beside PLAYER RANKINGS, from ESPN, matched on the birth date', async () => {
+test('NFL player card: DRAFT and CONTRACT blocks under PLAYER RANKINGS, from ESPN, matched on the birth date', async () => {
   // Derrick Henry, without Sleeper's ESPN id: ESPN's search, accepted on the birthday.
   const henry = { first_name: 'Derrick', last_name: 'Henry', birth_date: '1994-01-04' };
   documentBody = nflCard(henry, { playerId: '3198', width: 1500 });
@@ -2882,9 +2882,9 @@ test('NFL player card: DRAFT and CONTRACT blocks beside PLAYER RANKINGS, from ES
   // His deal runs through the 2027 season: a free agent in 2028.
   assert.equal(await block('contract').locator('.rank-value').textContent(), 'FA 2028');
   assert.match(await block('contract').locator('.rank-label').textContent(), /^(\d YRS LEFT|FINAL YEAR) · \$[\d.]+M · SINCE 20\d\d$/);
-  // A wide card: both beside the rankings, labels level with PLAYER RANKINGS, inside the card's info column.
-  const labelsTop = await page.locator('.player-ranking-container .profile-item-label').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
-  assert.equal(new Set(labelsTop).size, 1, `level: ${labelsTop}`);
+  // As on the NBA card: the two side by side in a row of their own under the rankings, even on a wide card.
+  const tops = await page.locator('.player-ranking-container > .profile-item-label, .player-ranking-container .snp-espn > .profile-item-label').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+  assert.ok(tops[1] === tops[2] && tops[1] > tops[0], `draft and contract level, under the rankings: ${tops}`);
   // Inside what the card shows: its content scrolls sideways rather than grow, so nothing may need scrolling.
   const inside = () => page.evaluate(() => {
     const box = document.querySelector('.player-card-content-container');
@@ -2897,8 +2897,8 @@ test('NFL player card: DRAFT and CONTRACT blocks beside PLAYER RANKINGS, from ES
   // Sleeper's AGE ... COLLEGE row is left as it was.
   assert.equal(await page.locator('.profile-items-container .profile-item-label').evaluateAll((els) => els.map((el) => el.textContent).join(' ')), 'AGE HEIGHT WEIGHT EXP COLLEGE');
   await page.locator('.player-card-header').screenshot({ path: `${OUT}nfl-card-espn.png` });
-  // Narrower cards (Sleeper's is about 980px): under the rankings side by side, then one under another; always inside the card.
-  for (const [width, layout] of [[980, 'snp-espn-below'], [720, 'snp-espn-stack']]) {
+  // Narrower cards: still under the rankings side by side, then one under another when too narrow; always inside the card.
+  for (const [width, layout] of [[980, 'snp-espn-below'], [700, 'snp-espn-stack']]) {
     documentBody = nflCard(henry, { playerId: '3198', width });
     await page.goto(NFL_TEAM_URL);
     await block('contract').locator('.rank-label').waitFor({ timeout: 30000 });
