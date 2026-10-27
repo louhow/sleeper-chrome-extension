@@ -34,6 +34,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - League median, in leagues that play one: the week's median score (now and projected) at the top of the League tab, and a medallion on every team over it now, solid once it's likely to stay over and gold once it's won.
 - Points and projections follow the games: the week's stats are read again while a game is on.
 - Sidebar: each NBA league shows your matchup this week under its name (both teams, points and projections), as Sleeper does for NFL.
+- Sidebar win bars: every NBA and NFL league's line gets your chance to win under the scores, green ahead and red behind, as on the mobile app's home screen; a chopped league shows your rank and safe %.
 - Team picker: every team with its avatar, A to Z, a "My team" shortcut, and team links from the Matchup and League tabs; on the Matchup tab it picks a matchup (both teams).
 - Optimize lineup: recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.

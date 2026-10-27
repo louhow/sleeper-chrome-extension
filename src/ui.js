@@ -23,6 +23,11 @@
   const padTo = (ids, count) => [...ids, ...Array(Math.max(0, (count || 0) - ids.length)).fill('0')];
   // A share of leagues, as Sleeper rounds it (up).
   const pct = (n) => (n == null ? '–' : `${Math.ceil(n)}%`);
+  // 1st, 2nd, 3rd, 4th ... 11th, 12th, 13th ... 21st.
+  function ordinal(n) {
+    const teen = n % 100 >= 11 && n % 100 <= 13;
+    return `${n}${(!teen && { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10]) || 'th'}`;
+  }
 
   const headshot = (id) => `${CDN}/content/nba/players/thumb/${encodeURIComponent(id)}.jpg`;
   const teamLogo = (team) => `${CDN}/images/team_logos/nba/${encodeURIComponent(String(team).toLowerCase())}.webp`;
@@ -727,7 +732,7 @@
     reserveRule, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
     esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
-    lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, researchLine,
+    lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, ordinal, researchLine,
     dash, num, height, ago, newsSource, heat, scaler, tierClass,
     avatarImg, teamCard, teamSideOf, teamSide, matchupPair, medal, medianBanner, rowHead, swapHint, swapClass, emptyCard,
     muRow, muEmpty, muStarters, muSection,

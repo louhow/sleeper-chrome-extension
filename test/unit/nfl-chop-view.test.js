@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
 import { state } from './nfl-fixture.js';
 
-const { nflChopView, nflPanelView } = loadSnp();
+const { nflChopView, nflPanelView, ui } = loadSnp();
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 // The NFL fixture as a chopped league: a third team chopped in week 5.
@@ -44,7 +44,7 @@ test('a chopped team of yours says so instead of a safe chance', () => {
 
 test('loading until the week is in; ordinals', () => {
   assert.match(nflChopView.render(null), /chop-tab/);
-  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 112].map(nflChopView.ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '112th']);
+  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 112].map(ui.ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '112th']);
 });
 
 test('team tab card: points per week and FAAB left in place of the record, and the safe chance for the week on now', () => {

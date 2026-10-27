@@ -10,7 +10,7 @@
 //   week reads live, e.g. a chopped league's League tab), onUpdate() (after
 //   any change to the panel's data) }
 (globalThis.SNP ||= {}).nflPanel = ({ leagueId, api, league, info, lineup, nflSave, openDialog, dialogOpen, livePages = [], onUpdate }) => {
-  const { model, scoring, ui, nflPanelView, loaders, shared, bridge } = globalThis.SNP;
+  const { model, ui, nflPanelView, nflWeek, loaders, shared, bridge } = globalThis.SNP;
   const SLEEPER_VIEW = 'snp:nfl-sleeper-view';
   const BACK_ID = 'snp-nfl-back';
   const PAGES = new Set(['team', 'matchup']);
@@ -18,7 +18,6 @@
   const WEEKS = 18;
   // While a game is on, the week's stats and games are read again this often (tab visible).
   const LIVE_READ_MS = 90e3;
-  const LEG_FIELDS = 'leg matchup_id roster_id round starters points proj_points custom_points';
 
   const state = {
     page: null, tab: 'page', now: Date.now(), league, usersById: null, rosters: null, me: null, rosterId: null,
@@ -136,28 +135,13 @@
     schedule();
   }
 
-  // A week: who's starting (the logged-in legs, else the public matchups),
-  // Sleeper's projections and stats scored with the league's settings, each
-  // team's game, and rostered and started percentages. Players' names,
-  // positions, teams and injuries come with the projection and stat rows.
+  // A week, as nflWeek.load reads it; players met in it join the panel's.
   async function loadWeek(week, force = false) {
     if (state.weeks[week] && !force) return;
-    const season = league.season;
-    const type = league.settings?.type ?? 0;
-    const [matchups, projRows, statRows, scores, research, legs] = await Promise.all([
-      api.get(`/v1/league/${leagueId}/matchups/${week}`),
-      api.get(`/projections/nfl/${season}/${week}?season_type=regular`),
-      week <= info.currentWeek ? api.get(`/stats/nfl/${season}/${week}?season_type=regular`) : [],
-      api.graphql(`scores (week ${week})`, loaders.scoresQuery('nfl', 'regular', season, week, 'game_id metadata status start_time'))
-        .then((d) => d?.scores || []).catch(() => []),
-      api.get(`/players/nfl/research/regular/${season}/${week}?league_type=${type}`).catch(() => ({})),
-      data.legs(week, LEG_FIELDS),
-    ]);
+    const loaded = await nflWeek.load(api, data, league, week, info.currentWeek);
     if (destroyed) return;
-    const { players, teamOf, proj, actual, stats } = model.nflWeekPoints(projRows || [], statRows || [], league.scoring_settings || {}, scoring.scoreStats);
-    for (const [id, p] of Object.entries(players)) state.players[id] ??= p;
-    const { games, days } = model.nflGames(scores);
-    state.weeks[week] = { matchups: matchups || [], legs, teamOf, proj, actual, stats, games, days, research: research || {} };
+    for (const [id, p] of Object.entries(loaded.players)) state.players[id] ??= p;
+    state.weeks[week] = loaded.week;
     planLiveRead();
     schedule();
   }

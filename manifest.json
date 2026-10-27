@@ -60,6 +60,7 @@
         "src/nba/nav.js",
         "src/nba/session.js",
         "src/nfl/ui.js",
+        "src/nfl/week.js",
         "src/nfl/panel-view.js",
         "src/nfl/optimize-view.js",
         "src/nfl/league-view.js",

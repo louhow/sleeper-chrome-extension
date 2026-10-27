@@ -159,7 +159,10 @@
     if (!league) return [];
     if (link.dataset.snpLeague !== league.league_id) link.dataset.snpLeague = league.league_id;
     if (link.dataset.snpSport !== league.sport) link.dataset.snpSport = league.sport;
-    return [{ leagueId: league.league_id, sport: league.sport }];
+    // A chopped league (settings.type 3) draws its sidebar line its own way (nav.js).
+    const chopped = league.sport === 'nfl' && league.settings?.type === 3;
+    if (link.hasAttribute('data-snp-chopped') !== chopped) link.toggleAttribute('data-snp-chopped', chopped);
+    return [{ leagueId: league.league_id, sport: league.sport, chopped }];
   }));
 
   // NBA Players tab. It opens on Projection for the current week (Sleeper's

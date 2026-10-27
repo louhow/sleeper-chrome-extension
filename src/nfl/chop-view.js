@@ -2,18 +2,13 @@
 // Sleeper's app draws it: your own safe status, the week's chopping block
 // (chop zone, danger, safe) and the graveyard of chopped teams. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflChopView = (() => {
-  const { esc, f2, avatar, avatarImg, teamName, ownerName, owns, loading } = globalThis.SNP.ui;
+  const { esc, f2, avatar, avatarImg, teamName, ownerName, owns, loading, ordinal } = globalThis.SNP.ui;
   const { chopTeamStats, graveyard } = globalThis.SNP.model;
   const { chopBlockOf, chopBar: bar } = globalThis.SNP.nflPanelView;
   const { LOCK, ZONE_ICONS, chopAvatar } = globalThis.SNP.nflUi;
   // Sleeper's app's wording.
   const ZONES = { chop: 'Chop zone', danger: 'Danger', safe: 'Safe' };
 
-  // 1st, 2nd, 3rd, 4th ... 11th, 12th, 13th ... 21st.
-  function ordinal(n) {
-    const teen = n % 100 >= 11 && n % 100 <= 13;
-    return `${n}${(!teen && { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10]) || 'th'}`;
-  }
   const safeText = (safe) => `${Math.round(safe * 100)}%`;
 
   //   s: the NFL panel's data for the week on now (nflPanel.weekView).
@@ -92,5 +87,5 @@
     </section>`;
   }
 
-  return { render, ordinal };
+  return { render };
 })();

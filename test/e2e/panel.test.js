@@ -261,23 +261,52 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
 // item component's props (league, selectLeague) and the router's sit a few
 // fibers up from the link, and Sleeper's own handler sends every league to /leagues/<id>.
 const NFL_LEAGUE = '1354521766382292992';
+// A chopped NFL league (settings.type 3), live; Sleeper's sidebar line shows only your team there.
+const CHOP_LEAGUE = '1397415652704129024';
 const leagueNav = `<!doctype html><title>Sleeper</title>
+<style>
+  /* Sleeper's own rules for a sidebar league's matchup line (its CSS bundle, 2026-10-26). */
+  body { margin: 0; background: #181e2b; color: #fff; font-family: Inter, Arial, sans-serif; } #nav { width: 300px; padding: 12px; }
+  .nav-league-item-wrapper { display: flex; flex-direction: column; min-height: 80px; margin: 8px 0; white-space: nowrap; color: #fff; text-decoration: none; }
+  .nav-league-item-wrapper .row { display: flex; flex-direction: row; align-items: center; margin-top: 3px; }
+  .nav-league-item-wrapper .row.flip { justify-content: flex-end; flex: 1; }
+  .nav-league-item { display: flex; padding: 16px 16px 4px 12px; }
+  .nav-info-container { flex: 1; } .league-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .nav-league-matchup { position: relative; display: flex; flex: 1; flex-direction: column; max-width: 150px; }
+  .nav-league-matchup .team-name-container { position: relative; display: flex; flex-direction: row; flex: 1; justify-content: space-between; align-items: center; }
+  .nav-league-matchup .small-text { display: inline-block; font-size: 10px; line-height: 12px; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #a3bbd3; width: 60px; }
+  .nav-league-matchup .right { text-align: right; justify-content: flex-end; }
+  .nav-league-matchup .vs { font-size: 10px; letter-spacing: 0.2px; color: #a3bbd3; width: 30px; text-align: center; }
+  .nav-league-matchup .score-container { display: flex; flex: 1; flex-direction: row; justify-content: space-between; align-items: center; height: 10px; }
+  .nav-league-matchup .score-container .left-score { display: flex; flex: 1; }
+  .nav-league-matchup .score-container .right-score { display: flex; flex: 1; align-items: flex-end; }
+  .nav-league-matchup .win-bar-wrapper { width: 60px; margin-bottom: 6px; }
+  .roster-score-and-projection-matchup { font-size: 14px; font-weight: bold; color: #fff; display: flex; flex-direction: column; align-items: center; margin-right: 6px; }
+  .roster-score-and-projection-matchup.flip { flex-direction: row-reverse; margin-right: auto; margin-left: 6px; }
+  .roster-score-and-projection-matchup.row { flex-direction: row; }
+  .roster-score-and-projection-matchup .projections { display: flex; font-size: 10px; font-weight: normal; color: #a3bbd3; margin: 0 3px; margin-top: 1px; }
+  .nav-league-item-wrapper .nav-league-item .nav-info-container .score-container .roster-score-and-projection-matchup { margin: 0; }
+  .nav-league-item-wrapper .nav-league-item .nav-info-container .score-container .score { font-size: 10px; opacity: 0.7; }
+</style>
 <div id="nav"></div>
 <script>
   window.__sleeperNav = [];
   window.__selected = [];
   const router = { push: (path) => history.pushState({}, '', path) };
   const fiber = (props, depth, rest) => (depth ? { memoizedProps: {}, return: fiber(props, depth - 1, rest) } : { memoizedProps: props, return: rest });
-  for (const [id, sport] of [['${NFL_LEAGUE}', 'nfl'], ['${LEAGUE}', 'nba']]) {
+  const line = (left, right, [a, b], [c, d]) => '<div class="nav-league-matchup"><div class="team-name-container"><div class="small-text">' + left + '</div><div class="vs">vs.</div><div class="small-text right">' + right + '</div></div><div class="score-container"><div class="left-score"><div class="roster-score-and-projection-matchup row"><div class="score">' + a + '</div><div class="projections">' + b + '</div></div></div><div class="win-bar-wrapper"></div><div class="right-score"><div class="roster-score-and-projection-matchup flip row"><div class="score">' + c + '</div><div class="projections">' + d + '</div></div></div></div></div>';
+  // [id, data-sport (the chopped league's stands apart from the plain NFL one), Sleeper's sport, settings]
+  for (const [id, sport, real, settings] of [['${NFL_LEAGUE}', 'nfl', 'nfl', {}], ['${LEAGUE}', 'nba', 'nba', {}], ['${CHOP_LEAGUE}', 'chop', 'nfl', { type: 3 }]]) {
     const link = document.createElement('a');
     link.className = 'link-button nav-league-item-wrapper';
     link.href = '/';
     link.dataset.sport = sport;
-    const below = sport === 'nfl'
-      ? '<div class="nav-league-matchup"><div class="team-name-container"><div class="small-text">Lou Point Conversion</div><div class="vs">vs.</div><div class="small-text right">Tank you</div></div><div class="score-container"><div class="left-score"><div class="roster-score-and-projection-matchup row"><div class="score">86.98</div><div class="projections">100.21</div></div></div><div class="win-bar-wrapper"></div><div class="right-score"><div class="roster-score-and-projection-matchup flip row"><div class="score">69.94</div><div class="projections">77.97</div></div></div></div></div>'
+    // Sleeper's own lines: an NFL matchup; a chopped league's, your team alone; an NBA league's format.
+    const below = sport === 'nfl' ? line('Lou Point Conversion', 'Tank you', ['86.98', '100.21'], ['54.10', '92.40'])
+      : sport === 'chop' ? line('badonkeyds', '', ['128.92', '128.92'], ['-', '0.00'])
       : '<div class="format-container"><div class="team">2026 14-Team Dynasty Standard</div></div>';
     link.innerHTML = '<div class="nav-league-item"><div class="avatar-league"></div><div class="nav-info-container"><div class="league-title">' + sport + '</div><div>' + below + '</div></div></div>';
-    const item = { league: { league_id: id, sport }, selectLeague: (x) => window.__selected.push(x), closeNavbar: () => {} };
+    const item = { league: { league_id: id, sport: real, settings }, selectLeague: (x) => window.__selected.push(x), closeNavbar: () => {} };
     link.__reactInternalInstance$test = fiber(item, 2, fiber({ router, params: {} }, 5));
     document.getElementById('nav').append(link);
   }
@@ -340,7 +369,6 @@ ${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchu
 // A chopped NFL league (settings.type 3, teams chopped already) and Sleeper's
 // own League tab in one (from its web bundle, 2026-10-26): no matchups, the
 // standings (all 0-0 in a chopped league), then Recent Activity.
-const CHOP_LEAGUE = '1397415652704129024';
 const chopLeagueTab = () => `<!doctype html><title>Sleeper</title>
 <script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>
 <style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .league-tab-container { width: 820px; margin: 40px 0 0 260px; padding: 24px; background: rgb(36, 45, 60); border-radius: 12px; } .league-standings-container, .league-activity-card { padding: 16px; margin-bottom: 16px; background: rgb(44, 54, 72); border-radius: 12px; }</style>
@@ -1545,12 +1573,42 @@ test('sidebar: an NBA league shows your matchup this week under its name, as Sle
   assert.notEqual(shown[4], '157.23', "added up, never the leg's frozen projection");
   assert.equal(await page.locator('[data-sport=nfl] [data-snp]').count(), 0, "an NFL league keeps Sleeper's own");
   assert.equal(await page.locator('[data-sport=nfl] .nav-league-matchup').isVisible(), true);
+  // Every line gets the win bar under its scores, as on the mobile app's home screen: Sleeper's own
+  // NFL line from the numbers on it (86.98 of 100.21 against 54.10 of 92.40: ahead, so green), and ours.
+  const nflBar = page.locator('[data-sport=nfl] .nav-league-matchup .snp-win');
+  await nflBar.waitFor();
+  assert.match(await nflBar.textContent(), /^\d+%$/);
+  assert.match(await nflBar.getAttribute('class'), /\bup\b/);
+  const nbaBar = nba.locator('.nav-league-matchup .snp-win');
+  assert.match(await nbaBar.textContent(), /^\d+%$/);
+  const pct = parseInt(await nbaBar.textContent(), 10);
+  assert.match(await nbaBar.getAttribute('class'), pct >= 50 ? /\bup\b/ : /\bdown\b/, 'green ahead, red behind');
+  assert.equal(await nbaBar.locator('b').evaluate((el) => el.style.width), `${pct}%`);
   // Its league opened: the session's numbers, the same.
   await page.goto(`https://sleeper.com/leagues/${LEAGUE}/matchup`);
   await page.locator(panel('.mu-head')).waitFor({ timeout: 30000 });
   await ours.waitFor();
   assert.deepEqual(await read(), shown);
   sleeper.midWeek = false;
+  documentBody = LOGGED_OUT;
+});
+
+test('sidebar: a chopped league shows your rank and safe chance where an opponent would be', async () => {
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${CHOP_LEAGUE}/rosters`)).json();
+  const alive = rosters.filter((r) => !r.settings?.eliminated);
+  sleeper.me = alive[0].owner_id;
+  documentBody = leagueNav.replace('<title>Sleeper</title>', `<title>Sleeper</title><script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>`);
+  // From another league's page: loaded for the sidebar alone.
+  await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/trend`);
+  const chop = page.locator('[data-sport=chop]');
+  await chop.locator('.snp-chop-rank').waitFor({ timeout: 30000 });
+  assert.match(await chop.locator('.snp-chop-rank').textContent(), new RegExp(`^\\d+(st|nd|rd|th) / ${alive.length}$`));
+  assert.match(await chop.locator('.nav-league-matchup .snp-win').textContent(), /^\d+% safe$/);
+  // Sleeper's empty opponent side ("vs." and "- 0.00") makes way; your own points stay.
+  assert.equal(await chop.locator('.right-score').isVisible(), false);
+  assert.equal(await chop.locator('.vs').isVisible(), false);
+  assert.equal(await chop.locator('.left-score .score').textContent(), '128.92');
+  await page.locator('#nav').screenshot({ path: `${OUT}sidebar.png` });
   documentBody = LOGGED_OUT;
 });
 

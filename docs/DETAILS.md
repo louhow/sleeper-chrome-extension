@@ -162,6 +162,11 @@ The extension gives every NBA league there the same lines for your matchup this 
   Any other NBA league is loaded once for the sidebar (the league, its rosters and users, the week's matchups, projections, stats and games, and your matchup legs), then again only after a game has tipped off since, at most every 10 minutes while the tab is visible.
 - Logged out, or without a team in the league, the sidebar stays as Sleeper has it.
 
+Every league's line, NBA and NFL, also gets a win bar under its scores, as on the mobile app's home screen: your chance to win (the formula below) as a percent and a bar, green when you're ahead and red when you're behind.
+Sleeper's own NFL lines get it from the points and projections already on them (Sleeper works the chance out there too but draws nothing), so it costs no calls.
+A chopped league's line shows your team alone, so its bar is your safe chance (see Chopped leagues; yellow in danger, red in the chop zone) and your rank goes where the opponent's score would be ("3rd / 12"); a chopped team's says the week it went.
+Its numbers are the open league's when its NFL tabs are on, else loaded for the sidebar as its Team tab would (`nfl/week.js`), and read again the same way as an NBA league's.
+
 Win probability is Sleeper's own formula, ported from its web app: each side is a normal distribution centred on its projection, narrowing as the score approaches it.
 Once both sides are settled (score equals projection) the score decides it, and a tie is 50% each, where Sleeper's formula gives 0% to both.
 Rank comes from `roster_standings`; before any games are played, it falls back to the standings order (record, points, then waiver order), which is what Sleeper shows then.

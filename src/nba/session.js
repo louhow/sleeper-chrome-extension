@@ -261,7 +261,7 @@
       teardown();
       await settings?.ready;
       // The NFL pages are the extension's unless the settings turned them off.
-      if (league.sport === 'nfl' && !destroyed && (settings?.values().nflUi ?? true)) nflSession = globalThis.SNP.nflSession(leagueId, lastPage, api, league);
+      if (league.sport === 'nfl' && !destroyed && (settings?.values().nflUi ?? true)) nflSession = globalThis.SNP.nflSession(leagueId, lastPage, api, league, nav);
       else console.info('[sleeper-nba-panel] not an NBA league, staying hidden');
       return;
     }

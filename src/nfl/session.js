@@ -4,8 +4,9 @@
 // chopping block (chop.js), Optimize lineup (optimize.js) and the Players
 // tab's Last 5 column (players.js). Sleeper's own Team
 // component reads and saves the lineup (page-hook.js).
-//   nflSession(leagueId, page, api, league) -> { attach, show, destroy, refresh }
-(globalThis.SNP ||= {}).nflSession = (leagueId, initialPage, api, league) => {
+//   nflSession(leagueId, page, api, league, nav) -> { attach, show, destroy, refresh }
+// A chopped league gives the sidebar (nav.js) its numbers for the week on now.
+(globalThis.SNP ||= {}).nflSession = (leagueId, initialPage, api, league, nav = null) => {
   const { bridge, loaders, model, nflPanel, nflOptimize, nflLeague, nflChop, nflPlayers } = globalThis.SNP;
   const info = { currentWeek: null, tiers: null }; // the week on now and the league's score colors
   // The Team tab's lineup as Sleeper's Team component holds it; without `full`, only whether it's yours to edit.
@@ -19,6 +20,7 @@
     livePages: chopped ? ['league'] : [], onUpdate: () => chop?.refresh(),
   });
   const chop = chopped ? nflChop({ info, panel }) : null;
+  if (chopped) nav?.feed(leagueId, () => (info.currentWeek == null ? null : panel.weekView(info.currentWeek)));
   const optimizer = nflOptimize({ lineup, nflSave, notify: (text) => panel.notify(text) });
   const leagueCards = nflLeague(league);
   const playersTab = nflPlayers({ api, league, info });
