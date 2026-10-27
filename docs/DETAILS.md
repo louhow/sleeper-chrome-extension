@@ -60,6 +60,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
     Their headshots carry substitution marks, as soccer apps show them: a green arrow up coming in, a red arrow down going out (the NFL dialog too).
     Its two options are spelled out: "Apply change", and, when the one going out has a finished game that could still be locked, "Lock current", which keeps them in the lineup and locks it (its tooltip names the score, and says when it depends on them having started); the dialog stays open on the plan around the lock.
   - A finished game worth locking shows its score, the open value and when the window closes, with a Lock button.
+  - A lock is final and pins the player to their slot, so the one being locked takes the most specific slot they fit (SF before F, PG before G) and whoever was there moves to the flexible slot they leave; the row of the player coming in says "Then locks", and Apply all saves the move and the lock together.
   - A slot that stays is dimmed and says why: "No change", "Locked" (with the locked score), "Playing" or "Empty".
 - Applying one row saves just that slot and keeps the dialog open on the plan from the new lineup, with a note saying what saved.
   When moves tie slots together (the player coming in leaves another starting slot, or the one going out takes one), they apply together, and the button says which ("with SF").

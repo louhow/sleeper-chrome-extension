@@ -431,6 +431,20 @@ test('best lineup: a lock shuts the slot to the bench too, so a bench player who
   assert.deepEqual(plain(model.bestLineup(c, OPT_NOW).locks.map((k) => [k.id, k.openBy])), [['tre', null]]);
 });
 
+test('best lineup: a player about to be locked takes the most specific slot, leaving the flexible one open', () => {
+  const games = {
+    yax: [['y1', '2026-10-20', 'complete', 10, 30], ['y2', '2026-10-23', 'pre_game', 9]],
+    dort: [['d1', '2026-10-22', 'pre_game', 5]],
+    mpj: [['m1', '2026-10-22', 'pre_game', 30]],
+  };
+  const l = optimizerLineup(['SF', 'F'], ['dort', 'yax'], ['mpj'], { dort: ['SF'], yax: ['PF', 'SF'], mpj: ['PF', 'SF'] }, games);
+  const plan = model.bestLineup(l, OPT_NOW);
+  assert.deepEqual(plain(plan.locks.map((k) => [k.id, k.on])), [['yax', true]]);
+  assert.equal(plan.starters[0], 'yax', 'locked at SF, not F');
+  assert.equal(plan.starters[1], 'mpj', 'F stays for whoever is not locked');
+  assert.deepEqual(plain(plan.changes.map((c) => [c.id, c.from, c.to])), [['yax', 'F', 'SF'], ['mpj', 'BN', 'F'], ['dort', 'SF', 'BN']]);
+});
+
 test('lineup history: who was starting at a time, from the lineups seen', () => {
   const t = (n) => n * 1e6; // about 17 minutes a step, so 100 steps is over a day
   let h = model.seeLineup([], ['a', 'b'], t(100));

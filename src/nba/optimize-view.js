@@ -85,6 +85,8 @@
       const risky = blocked && plan.changes.some((c) => c.goodScore && !starters.includes(c.id));
       const others = slots.filter((k) => k !== i).map((k) => plan.slots[k]);
       const drops = change?.drops;
+      // Someone about to be locked moves to a specific slot first; Apply all does both.
+      const nextLock = plan.locks?.find((k) => k.id === next && k.on);
       const tone = change?.goodScore ? 'lose' : change?.lost ? 'warn' : '';
       const outToday = plan.info[cur]?.today;
       const outWhy = !real(cur) ? '' : ` · ${outToday == null ? `no game ${esc(day(plan))}` : `${esc(day(plan))} ${f2(outToday)}`} · ${f2(plan.info[cur]?.perGame ?? 0)}/g`;
@@ -92,7 +94,7 @@
         ? `<span class="sub drops ${tone}"${change.dropsUnsure ? ' title="If they were starting when it tipped off; the extension didn\'t see your lineup then"' : ''}>${change.dropsUnsure ? 'May drop' : 'Drops'} lock-in ${score(s, drops.actual)} ${esc(gameLabel(drops))}</span>` : ''}`;
       return `<div class="os-row swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
         <span class="os-slot">${slotBadge(slot)}</span>
-        ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>`)}
+        ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>${nextLock ? `<span class="sub">${lockIcon()}Then locks ${score(s, nextLock.actual)} ${esc(gameLabel(nextLock.game))} · ${openText(s, nextLock)}</span>` : ''}`)}
         ${player(s, cur, 'out', outSub)}
         ${numbers(plan, next)}
         <span class="os-act">

@@ -652,7 +652,7 @@
   // one thing Sleeper's own lineup screens flag as a mistake.
   function solveLineup({
     slots, starters: current, bench, players, worth, plays = () => false, later = () => 0, fixedReason = () => null,
-    fits: fitsSlot = fits, specificity = slotSpecificity, openSlot = 'UTIL',
+    fits: fitsSlot = fits, specificity = slotSpecificity, openSlot = 'UTIL', shift = new Set(),
   }) {
     const real = (id) => id && id !== '0';
     const fixed = [];
@@ -694,6 +694,32 @@
       });
     }
 
+    // A player about to be locked can't change slots afterwards, so they take
+    // the most specific slot they fit now, and whoever was there moves up to
+    // the flexible slot they leave (G, F, UTIL stay open for as long as possible).
+    // Only players free to move trade places; another locker is a last resort.
+    for (let moved = true, guard = 0; moved && guard < 50; guard++) {
+      moved = false;
+      for (let i = 0; i < starters.length && !moved; i++) {
+        const id = starters[i];
+        if (!shift.has(id)) continue;
+        let best = -1;
+        const rank = (j) => specificity(slotOf(j)) * 2 + (shift.has(starters[j]) ? 0 : 1);
+        for (let j = 0; j < starters.length; j++) {
+          const other = starters[j];
+          if (j === i || specificity(slotOf(j)) <= specificity(slotOf(i))) continue;
+          if (!fitsSlot(slotOf(j), players[id] || {})) continue;
+          if (real(other) && !(open.includes(j) || shift.has(other))) continue;
+          if (real(other) && !fitsSlot(slotOf(i), players[other] || {})) continue;
+          if (best < 0 || rank(j) > rank(best)) best = j;
+        }
+        if (best >= 0) {
+          [starters[i], starters[best]] = [starters[best], starters[i]];
+          moved = true;
+        }
+      }
+    }
+
     const where = (list, id) => {
       const i = list.indexOf(id);
       return i < 0 ? 'BN' : slotOf(i);
@@ -733,6 +759,7 @@
       plays: (id) => look[id].left.some((d) => d.date === date),
       later: (id) => look[id].value,
       fixedReason: (id) => look[id].fixed || (locking.has(id) ? 'locking' : null),
+      shift: locking,
     });
     // Locks go to starters worth keeping that the best lineup keeps, and who
     // still have a game left (with none, the last game counts anyway). A lock
