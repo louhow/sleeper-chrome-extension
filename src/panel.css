@@ -1809,12 +1809,21 @@ button.optimize:hover:not(:disabled) {
 /* NBA Optimize lineup: one row per starting slot, in lineup order. A change
    shows who goes out beside who comes in; a slot that stays is dimmed. */
 .dialog:has(.os-row) {
-  width: min(820px, 100%);
+  width: min(900px, 100%);
+  max-height: calc(100vh - 48px);
+}
+/* The rows flex into the height there is: they tighten before the list scrolls. */
+.dialog:has(.os-row) .dialog-body {
+  display: flex;
+  flex-direction: column;
+}
+.dialog:has(.os-row) .dialog-body > * {
+  flex: none;
 }
 .os-head,
 .os-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 44px 40px 132px;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 44px 40px 224px;
   align-items: center;
   column-gap: 10px;
 }
@@ -1825,15 +1834,15 @@ button.optimize:hover:not(:disabled) {
   text-transform: uppercase;
 }
 .os-row {
-  margin-bottom: 3px;
-  padding: 5px 10px;
+  margin-bottom: clamp(1px, 0.4vh, 3px);
+  padding: clamp(2px, 0.6vh, 5px) 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
 }
 /* NFL: one number (this week's projection). */
 .os-head.nfl,
 .os-row.nfl {
-  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px 132px;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px 224px;
 }
 .os-row.nfl .slot {
   width: 44px;
@@ -1904,27 +1913,6 @@ button.optimize:hover:not(:disabled) {
 .os-arrow.out svg { fill: var(--danger); }
 .os-p.out .os-arrow {
   opacity: 1;
-}
-/* A swap's other option, under Apply change: keep the starter, lock their score. */
-.os-act .os-lock-current {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 8px 12px;
-  white-space: nowrap;
-  border: 1px solid color-mix(in srgb, var(--lock) 60%, transparent);
-  border-radius: 8px;
-  background: none;
-  color: var(--lock);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.os-act .os-lock-current:hover:not(:disabled) {
-  border-color: var(--lock);
-  background: color-mix(in srgb, var(--lock) 10%, transparent);
 }
 /* A change: who comes in first, then who they replace (faded, past a divider). */
 .os-p.in .dp-name button.name,
@@ -2007,45 +1995,66 @@ button.optimize:hover:not(:disabled) {
 }
 .os-act {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 3px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   text-align: center;
 }
-.os-apply {
+/* Two states each. Apply change: teal trim, solid under the pointer; once nothing is left to change, "No change" is the solid one.
+   Lock: gold trim with an open padlock, shut under the pointer; once locked, solid gold. */
+.os-apply,
+.os-lock,
+.os-status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 10px 12px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   white-space: nowrap;
-  background: var(--primary);
-  color: #fff;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-button.os-apply:hover:not(:disabled) {
-  background: var(--primary-hover);
+.os-apply {
+  min-width: 128px;
+  border-color: var(--primary);
+  background: none;
+  color: var(--primary);
 }
-.os-with {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
+button.os-apply:hover:not(:disabled) {
+  background: var(--primary);
+  color: var(--ink);
+}
+.os-lock {
+  border-color: color-mix(in srgb, var(--lock) 70%, transparent);
+  background: none;
+  color: var(--lock);
+}
+button.os-lock:hover:not(:disabled) {
+  border-color: var(--lock);
+  background: color-mix(in srgb, var(--lock) 14%, transparent);
+}
+.os-lock .ico {
+  display: inline-flex;
+}
+.os-lock .ico.shut,
+.os-lock:hover:not(:disabled) .ico.open {
+  display: none;
+}
+.os-lock:hover:not(:disabled) .ico.shut {
+  display: inline-flex;
 }
 .os-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  min-width: 100px;
+  background: rgba(255, 255, 255, 0.1);
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
 }
 .os-row.locked .os-status {
-  color: var(--warn);
+  background: var(--lock);
+  color: var(--ink);
 }
 .op-done {
   margin: 0 0 10px;

@@ -99,9 +99,11 @@
         ${numbers(plan, next)}
         <span class="os-act">
           ${applyChange(m, i, others, { held: risky, title: risky ? BLOCKED : '' })}
-          ${drops && plan.lockable ? `<button class="os-lock-current" data-op-lock-out="${esc(cur)}" ${m.saving ? 'disabled' : ''}
-            title="${esc(`Or keep ${s.players[cur]?.name || 'them'} and lock ${f2(drops.actual)} (${gameLabel(drops)}) instead. Locking is final${change.dropsUnsure ? '; Sleeper only allows it if they were starting at tip-off and haven\'t been benched since' : ''}.`)}">${m.busy === `lockout:${cur}` ? 'Locking…'
-              : `${lockIcon()}Lock current`}</button>` : ''}
+          ${plan.lockable && nextLock
+            ? lockButton(`data-op-lock-move="${i}"`, m, m.busy === `lockmove:${i}`,
+              `Apply this change and lock ${s.players[next]?.name || 'them'}'s ${f2(nextLock.actual)} (${gameLabel(nextLock.game)}). Locking is final.`)
+            : drops && plan.lockable ? lockButton(`data-op-lock-out="${esc(cur)}"`, m, m.busy === `lockout:${cur}`,
+              `Or keep ${s.players[cur]?.name || 'them'} and lock ${f2(drops.actual)} (${gameLabel(drops)}) instead. Locking is final${change.dropsUnsure ? '; Sleeper only allows it if they were starting at tip-off and haven\'t been benched since' : ''}.`) : ''}
         </span>
       </div>`;
     }
@@ -126,6 +128,12 @@
     </div>`;
   }
 
+  // The lock button: gold trim with an open padlock, a shut one under the pointer.
+  function lockButton(attr, m, busy, title) {
+    return `<button class="os-lock" ${attr} ${m.saving ? 'disabled' : ''} title="${esc(title)}">${busy ? 'Saving…'
+      : `<span class="ico open">${lockIcon(true)}</span><span class="ico shut">${lockIcon()}</span>Lock`}</button>`;
+  }
+
   // A finished game worth locking in. "Keep open" leaves it out and plans
   // around it; it stays listed so it can come back.
   function lockRow(s, m, plan, slot, k) {
@@ -141,7 +149,7 @@
       ${player(s, k.id, 'keep', sub)}
       ${numbers(plan, k.id)}
       <span class="os-act">${k.on
-        ? `<button class="os-apply lock" data-op-lock-row="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>${busy ? 'Saving…' : `${lockIcon()}Lock`}</button>`
+        ? lockButton(`data-op-lock-row="${esc(k.id)}"`, m, busy, `Lock ${f2(k.actual)} (${gameLabel(k.game)}). Locking is final.`)
         : '<span class="os-status">Open</span>'}</span>
     </div>`;
   }

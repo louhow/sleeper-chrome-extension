@@ -59,12 +59,13 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
     The player going out says where and why ("To bench · no game Sat · 31.91/g") and, when they have a finished game that could still be locked, the score they drop ("Drops lock-in 16.50 Wed vs GSW").
     The one coming in says where from and their next game ("From bench · Sat @ CHI 7:00pm").
     Their headshots carry substitution marks, as soccer apps show them: a green arrow up coming in, a red arrow down going out (the NFL dialog too).
-    Its two options are spelled out: "Apply change", and, when the one going out has a finished game that could still be locked, "Lock current", which keeps them in the lineup and locks it (its tooltip names the score, and says when it depends on them having started); the dialog stays open on the plan around the lock.
+    Its two options are spelled out: "Apply change", and, when the one going out has a finished game that could still be locked, "Lock", which keeps them in the lineup and locks it (its tooltip names the score, and says when it depends on them having started); the dialog stays open on the plan around the lock.
   - A finished game worth locking shows its score, the open value and when the window closes, with a Lock button.
-  - A lock is final and pins the player to their slot, so the one being locked takes the most specific slot they fit (SF before F, PG before G) and whoever was there moves to the flexible slot they leave; the row of the player coming in says "Then locks", and Apply all saves the move and the lock together.
+  - A lock is final and pins the player to their slot, so the one being locked takes the most specific slot they fit (SF before F, PG before G) and whoever was there moves to the flexible slot they leave; the row of the player coming in says "Then locks", its Lock button saves the move and the lock together, and so does Apply all.
   - A slot that stays is dimmed and says why: "No change", "Locked" (with the locked score), "Playing" or "Empty".
+- Buttons have two states each, so what's done reads apart from what's left: Apply change (teal trim, solid under the pointer) and a solid "No change"; Lock (gold trim with an open padlock, a shut one under the pointer) and a solid gold "Locked". Apply change and Lock sit side by side, and the dialog takes the height of the window, its rows tightening before the list scrolls.
 - Applying one row saves just that slot and keeps the dialog open on the plan from the new lineup, with a note saying what saved.
-  When moves tie slots together (the player coming in leaves another starting slot, or the one going out takes one), they apply together, and the button says which ("with SF").
+  When moves tie slots together (the player coming in leaves another starting slot, or the one going out takes one), they apply together; the button's tooltip says which slots ("Also changes F").
   Lock saves only that lock, on the lineup as it stands.
 
 - It picks for the next day of games, since Lock-In lineups can change daily: a starter with no game that day can sit for someone who plays, and come back for their next game.

@@ -703,8 +703,7 @@
   // A changed slot's own Apply button (slots tied to it, `others`, apply with it).
   function applyChange(m, i, others, { held = false, title = '' } = {}) {
     const why = title || (others.length ? `Also changes ${others.join(', ')}` : '');
-    return `<button class="os-apply" data-op-row="${i}" ${m.saving || held ? 'disabled' : ''}${why ? ` title="${esc(why)}"` : ''}>${m.busy === `row:${i}` ? 'Saving…' : 'Apply change'}</button>
-          ${others.length ? `<span class="os-with">with ${esc(others.join(', '))}</span>` : ''}`;
+    return `<button class="os-apply" data-op-row="${i}" ${m.saving || held ? 'disabled' : ''}${why ? ` title="${esc(why)}"` : ''}>${m.busy === `row:${i}` ? 'Saving…' : 'Apply change'}</button>`;
   }
 
   // One player in a slot row: headshot (`photo`), name, `tags` (position, team,

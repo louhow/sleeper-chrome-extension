@@ -1697,8 +1697,8 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.equal(await victimRow.locator('.os-p.out .os-arrow.out').getAttribute('aria-label'), 'Going out');
   // Two clear options: apply the change, or keep them and lock their score.
   assert.equal(await victimRow.locator('button.os-apply').innerText(), 'APPLY CHANGE');
-  assert.equal(await victimRow.locator('.os-lock-current').innerText(), 'LOCK CURRENT');
-  assert.match(await victimRow.locator('.os-lock-current').getAttribute('title'), /^Or keep .+ and lock 3\.00 \(\w{3} (vs|@) \w+\) instead\. Locking is final/);
+  assert.equal(await victimRow.locator('[data-op-lock-out]').innerText(), 'LOCK');
+  assert.match(await victimRow.locator('[data-op-lock-out]').getAttribute('title'), /^Or keep .+ and lock 3\.00 \(\w{3} (vs|@) \w+\) instead\. Locking is final/);
   assert.match(await page.locator(dialog('.warn-banner')).textContent(), new RegExp(`${players[victim].full_name} 3\\.00.* finished games? you could still lock in`));
   assert.equal(await page.locator(dialog('.lose-banner')).count(), 0, 'no hard stop for a red score');
   assert.equal(await page.locator(dialog('[data-action="apply-lineup"]')).isDisabled(), false);
@@ -1779,15 +1779,15 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const victimNow = page.locator(dialog('.os-row.swap')).filter({ has: page.locator(`.os-p.out [data-player="${victim}"]`) });
   await victimNow.waitFor();
   if (!rowSaved.includes(victim)) {
-    assert.equal(await victimNow.locator('.os-lock-current').count(), 0, 'nothing to lock: benched since tip-off');
+    assert.equal(await victimNow.locator('[data-op-lock-out]').count(), 0, 'nothing to lock: benched since tip-off');
     assert.equal(await victimNow.locator('.sub.drops').count(), 0);
   }
   await page.keyboard.press('Escape');
-  // A fresh game for them, started and never benched: Lock current keeps them and locks it, nothing else moves.
+  // A fresh game for them, started and never benched: Lock keeps them and locks it, nothing else moves.
   sleeper.tipAt = Date.now();
   await page.reload();
   await page.locator(panel('button.optimize')).click();
-  await victimNow.locator('.os-lock-current').click();
+  await victimNow.locator('[data-op-lock-out]').click();
   await victimNow.waitFor({ state: 'detached' });
   const lockOut = sleeper.mutations.at(-1);
   assert.deepEqual(Object.keys(JSON.parse(lockOut.variables.starters_games)).filter((id) => !(id in existing)), [victim], 'just that lock');

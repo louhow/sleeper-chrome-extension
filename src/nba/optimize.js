@@ -112,6 +112,22 @@
     return lockNow(lineup, id, st.current.game.id, `Locked ${shortOf(id)} ${ui.f2(st.current.actual ?? 0)}`);
   }
 
+  // A swap that brings in a player about to be locked: the move and the lock in one save.
+  function lockMove(i) {
+    const fresh = freshPlan();
+    if (!fresh) return;
+    const { m, lineup, plan } = fresh;
+    const id = plan.starters[i];
+    const k = plan.locks.find((x) => x.id === id && x.on);
+    if (!k || !lineup.lockable) return;
+    const { starters, slots } = model.applySlot(plan.current, plan.starters, i);
+    if (plan.changes.some((c) => c.goodScore && !starters.includes(c.id)) && !m.ack) return;
+    const ids = new Set(slots.flatMap((j) => [plan.current[j], plan.starters[j]]));
+    m.busy = `lockmove:${i}`;
+    return modalSave(() => saveLeg('lock_in', lineup.roster.roster_id, starters, { ...lineup.locks, [id]: k.game.game.id }),
+      `Locked ${shortOf(id)} ${ui.f2(k.actual)} · Saved: ${movedText(plan.changes.filter((c) => ids.has(c.id)))}`, replan);
+  }
+
   // Locks one recommended game now.
   function lockRow(id) {
     const fresh = freshPlan();
@@ -131,12 +147,14 @@
     if (row) applyRow(Number(row.dataset.opRow));
     const out = target.closest('[data-op-lock-out]');
     if (out) lockOut(out.dataset.opLockOut);
+    const move = target.closest('[data-op-lock-move]');
+    if (move) lockMove(Number(move.dataset.opLockMove));
     const lock = target.closest('[data-op-lock-row]');
     if (lock) lockRow(lock.dataset.opLockRow);
     const keep = target.closest('[data-op-keep], [data-op-relock]');
     if (keep) toggleLock(keep.dataset.opKeep ?? keep.dataset.opRelock, keep.dataset.opRelock != null);
     if (target.closest('[data-action="apply-lineup"]')) apply();
-    return Boolean(row || out || lock || keep);
+    return Boolean(row || out || move || lock || keep);
   }
 
   return { open, click };
