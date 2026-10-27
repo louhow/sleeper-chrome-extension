@@ -43,17 +43,21 @@
     return { year: d.year, round: d.round ?? null, pick: d.selection ?? null, teamRef: d.team?.$ref ? https(d.team.$ref) : null };
   }
 
-  // A lookup's result as the cards show it, the year large and the rest small
-  // beside it (as "#7 RB" in the rankings): { main: '2018', detail: 'Rd 1 · Pk 1 · CLE' },
-  // or { main: 'Undrafted' }; null without one (no match, or ESPN didn't answer).
+  // A lookup's result as the cards show it, the pick large and the rest small
+  // beside it (as "#7 RB" in the rankings): { main: 'Rd 1 · Pk 1', detail: 'CLE · 2018' }.
+  // The round and pick carry the value; the year is context (Exp already says how
+  // long ago), so it rides last. Without a round or pick the year leads. Or
+  // { main: 'Undrafted' }; null without one (no match, or ESPN didn't answer).
   function draftParts(result) {
     if (result?.status === 'undrafted') return { main: 'Undrafted', detail: '' };
     const d = result?.status === 'found' ? result.draft : null;
     if (!d?.year) return null;
-    return { main: String(d.year), detail: [d.round != null && `Rd ${d.round}`, d.pick != null && `Pk ${d.pick}`, d.team].filter(Boolean).join(' · ') };
+    const pick = [d.round != null && `Rd ${d.round}`, d.pick != null && `Pk ${d.pick}`].filter(Boolean).join(' · ');
+    if (!pick) return { main: String(d.year), detail: d.team || '' };
+    return { main: pick, detail: [d.team, d.year].filter(Boolean).join(' · ') };
   }
 
-  // The same in a line: "2018 · Rd 1 · Pk 1 · CLE", "Undrafted", or null.
+  // The same in a line: "Rd 1 · Pk 1 · CLE · 2018", "Undrafted", or null.
   function draftText(result) {
     const parts = draftParts(result);
     return parts && [parts.main, parts.detail].filter(Boolean).join(' · ');

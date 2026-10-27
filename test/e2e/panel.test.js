@@ -1449,7 +1449,7 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
     const block = document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('.pc-draft');
     return block && !block.querySelector('.pc-loading');
   }, null, { timeout: 30000 });
-  assert.match((await draft.textContent()).trim(), /^(\d{4}Rd \d+ · Pk \d+( · [A-Z]+)?|Undrafted)$/, 'ESPN matched the player');
+  assert.match((await draft.textContent()).trim(), /^(Rd \d+ · Pk \d+(([A-Z]+)? · )?\d{4}|Undrafted)$/, 'ESPN matched the player');
   // And the contract beside it: when he's a free agent, years left, pay, since when.
   await page.waitForFunction(() => !document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('.pc-contract .pc-loading'), null, { timeout: 30000 });
   assert.match((await page.locator(dialog('.pc-contract .pc-ranks')).textContent()).trim(), /^FA 20\d\d(\d yrs left|Final year)( · \$[\d.]+[MK])?( · since 20\d\d-\d\d)?$/);
@@ -2880,8 +2880,8 @@ test('NFL player card: DRAFT and CONTRACT blocks under PLAYER RANKINGS, from ESP
   for (const kind of ['draft', 'contract']) await block(kind).locator('.rank-label').waitFor({ timeout: 30000 });
   assert.deepEqual(await page.locator('.snp-espn > .profile-item-label').allTextContents(), ['DRAFT', 'CONTRACT']);
   // In the rankings' own style: the large value, the rest small beside it.
-  assert.equal(await block('draft').locator('.rank-value').textContent(), '2016');
-  assert.equal(await block('draft').locator('.rank-label').textContent(), 'RD 2 · PK 45 · TEN');
+  assert.equal(await block('draft').locator('.rank-value').textContent(), 'Rd 2 · Pk 45');
+  assert.equal(await block('draft').locator('.rank-label').textContent(), 'TEN · 2016');
   // His deal runs through the 2027 season: a free agent in 2028.
   assert.equal(await block('contract').locator('.rank-value').textContent(), 'FA 2028');
   assert.match(await block('contract').locator('.rank-label').textContent(), /^(\d YRS LEFT|FINAL YEAR) · \$[\d.]+M · SINCE 20\d\d$/);

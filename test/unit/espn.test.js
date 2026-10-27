@@ -32,12 +32,13 @@ test('draftOf and draftText: round, pick and team, Undrafted, or nothing', () =>
   const athlete = { draft: { year: 2018, round: 1, selection: 1, team: { $ref: 'http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2018/teams/5' } } };
   assert.deepEqual(plain(espn.draftOf(athlete)), { year: 2018, round: 1, pick: 1, teamRef: 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2018/teams/5' });
   assert.equal(espn.draftOf({}), null);
-  assert.equal(espn.draftText({ status: 'found', draft: { year: 2018, round: 1, pick: 1, team: 'CLE' } }), '2018 · Rd 1 · Pk 1 · CLE');
-  assert.equal(espn.draftText({ status: 'found', draft: { year: 2017, round: 1, pick: 13, team: null } }), '2017 · Rd 1 · Pk 13');
+  assert.equal(espn.draftText({ status: 'found', draft: { year: 2018, round: 1, pick: 1, team: 'CLE' } }), 'Rd 1 · Pk 1 · CLE · 2018');
+  assert.equal(espn.draftText({ status: 'found', draft: { year: 2017, round: 1, pick: 13, team: null } }), 'Rd 1 · Pk 13 · 2017');
+  assert.equal(espn.draftText({ status: 'found', draft: { year: 2017, round: null, pick: null, team: 'DEN' } }), '2017 · DEN');
   assert.equal(espn.draftText({ status: 'undrafted' }), 'Undrafted');
   for (const status of ['none', 'error']) assert.equal(espn.draftText({ status }), null);
   assert.equal(espn.draftText(null), null);
-  assert.deepEqual(plain(espn.draftParts({ status: 'found', draft: { year: 2018, round: 1, pick: 1, team: 'CLE' } })), { main: '2018', detail: 'Rd 1 · Pk 1 · CLE' });
+  assert.deepEqual(plain(espn.draftParts({ status: 'found', draft: { year: 2018, round: 1, pick: 1, team: 'CLE' } })), { main: 'Rd 1 · Pk 1', detail: 'CLE · 2018' });
   assert.deepEqual(plain(espn.draftParts({ status: 'undrafted' })), { main: 'Undrafted', detail: '' });
   assert.equal(espn.draftParts({ status: 'none' }), null);
 });
