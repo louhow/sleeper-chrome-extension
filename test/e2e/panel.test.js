@@ -1448,10 +1448,14 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
   assert.match(await page.locator(dialog('.pc-exp .pc-ranks')).textContent(), /^(Rookie|\d+ ?yrs?)$/);
   // The real-life draft, from ESPN through the service worker: a placeholder, then the pick (or "Undrafted").
   const draft = page.locator(dialog('.pc-draft .pc-ranks'));
+  // Nothing moves when ESPN answers: the body below and the blocks beside keep their place.
+  const places = () => page.evaluate(() => { const r = document.querySelector('#sleeper-nba-dialog').shadowRoot; return ['.pc-hero', '.pc-body', '.pc-exp', '.pc-draft', '.pc-contract'].map((s) => { const b = r.querySelector(s).getBoundingClientRect(); return [s, b.x, b.y, b.width, b.height]; }); });
+  const before = await places();
   await page.waitForFunction(() => {
     const block = document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('.pc-draft');
     return block && !block.querySelector('.pc-loading');
   }, null, { timeout: 30000 });
+  assert.deepEqual(await places(), before, 'the card does not shift when ESPN answers');
   assert.match((await draft.textContent()).trim(), /^(Rd \d+ · Pk \d+([A-Z]+ · )?\d{4}|\d{4}[A-Z]*|Undrafted)$/, 'ESPN matched the player');
   assert.match(await page.locator(dialog('.pc-draft')).getAttribute('data-tone'), /^(fresh|recent|dated|old)$/);
   // And the contract beside it: when he's a free agent, years left, pay, since when.
@@ -2883,7 +2887,12 @@ test('NFL player card: DRAFT and CONTRACT blocks under PLAYER RANKINGS, from ESP
   documentBody = nflCard(henry, { playerId: '3198', width: 1500 });
   await page.goto(NFL_TEAM_URL);
   const block = (kind) => page.locator(`.player-ranking-container > .snp-espn[data-kind="${kind}"]`);
+  // Nothing moves when ESPN answers: the blocks keep their place and size, and so does the card around them.
+  const places = () => page.evaluate(() => ['.player-card-header', '.snp-espn[data-kind="draft"] > .player-ranking-row', '.snp-espn[data-kind="contract"] > .player-ranking-row'].map((s) => { const b = document.querySelector(s).getBoundingClientRect(); return [s, b.x, b.y, b.width, b.height]; }));
+  await block('contract').waitFor();
+  const before = await places();
   for (const kind of ['draft', 'contract']) await block(kind).locator('.rank-label').waitFor({ timeout: 30000 });
+  assert.deepEqual(await places(), before, 'the NFL card does not shift when ESPN answers');
   assert.deepEqual(await page.locator('.snp-espn > .profile-item-label').allTextContents(), ['DRAFT', 'CONTRACT']);
   // In the rankings' own style: the large value, the rest small beside it.
   assert.equal(await block('draft').locator('.rank-value').textContent(), 'Rd 2 · Pk 45');

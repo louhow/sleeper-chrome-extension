@@ -1209,6 +1209,10 @@
     .snp-espn .rank-value, .snp-espn .rank-label { white-space: nowrap; }
     /* As the NBA card draws them: a smaller value than the rankings, its detail on the same baseline. */
     .snp-espn .rank-item { display: flex; align-items: baseline; gap: 4px; }
+    /* Each block holds the width of what it usually shows and one line's height, so nothing moves when ESPN answers. */
+    .snp-espn[data-kind="draft"] > .player-ranking-row { min-width: 240px; }
+    .snp-espn[data-kind="contract"] > .player-ranking-row { min-width: 340px; }
+    .snp-espn .rank-item { min-height: 21px; }
     .snp-espn .rank-value { font-size: 17px; line-height: 1.2; text-transform: uppercase; }
     /* As on the NBA card (panel.css): a pick fades with the years, a last year is flagged, a long deal recedes. */
     .snp-espn[data-kind="draft"][data-tone="recent"] .rank-item { opacity: 0.86; }

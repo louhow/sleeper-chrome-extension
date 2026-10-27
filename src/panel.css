@@ -2396,6 +2396,41 @@ h2.pc-name {
 .pc-career .pc-ranks b {
   font-size: 18px;
 }
+/* Nothing here changes size when ESPN answers: each value and context line has a fixed height
+   (a loading bar, a value, a dash or nothing all fill it), and the draft and contract blocks hold
+   the width of the widest thing they usually show, so the next block and everything below stay put. */
+.pc-career .pc-val {
+  height: 22px;
+  line-height: 22px;
+}
+.pc-career .pc-sub {
+  height: 13px;
+  line-height: 13px;
+}
+.pc-exp,
+.pc-draft,
+.pc-contract {
+  box-sizing: border-box;
+}
+.pc-exp {
+  min-width: 78px;
+}
+.pc-draft {
+  min-width: 158px;
+}
+.pc-contract {
+  min-width: 300px;
+}
+.pc-career .pc-loading {
+  width: 100px;
+  height: 18px;
+  margin-top: 2px;
+}
+.pc-career .pc-loading.sub {
+  width: 110px;
+  height: 9px;
+  margin-top: 3px;
+}
 /* The context line under a value: team and year, or years left, pay and since when. */
 .pc-career .pc-sub {
   font-size: 11px;

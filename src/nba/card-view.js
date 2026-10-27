@@ -168,14 +168,17 @@
     return Number(years) === 0 ? '<span class="pc-val"><b>Rookie</b></span>' : `<span class="pc-val" title="${esc(years)} seasons in the league"><b>${esc(years)}</b>${Number(years) === 1 ? 'yr' : 'yrs'}</span>`;
   }
   const ESPN_WHAT = { draft: ['Real-life draft', 'No draft found on ESPN'], contract: ['Contract', 'No contract found on ESPN'] };
+  // Every state (loading, found, undrafted, nothing) fills the same two lines, so the
+  // card never moves when ESPN answers (panel.css sizes them and the blocks' widths).
+  const NO_SUB = '<span class="pc-sub">&nbsp;</span>';
   function espnValue(d, kind) {
     const [what, none] = ESPN_WHAT[kind];
-    if (!d || d.status === 'loading') return `<span class="pc-val"><i class="pc-loading" aria-label="Loading ${kind}"></i></span>`;
-    if (!d.text) return `<span class="pc-val" title="${esc(d.status === 'error' ? "ESPN didn't answer" : none)}"><b>–</b></span>`;
+    if (!d || d.status === 'loading') return `<span class="pc-val"><i class="pc-loading" aria-label="Loading ${kind}"></i></span><span class="pc-sub"><i class="pc-loading sub"></i></span>`;
+    if (!d.text) return `<span class="pc-val" title="${esc(d.status === 'error' ? "ESPN didn't answer" : none)}"><b>–</b></span>${NO_SUB}`;
     const ago = kind === 'draft' && d.age > 0 ? ` (${d.age} ${d.age === 1 ? 'year' : 'years'} ago)` : '';
     const title = `${what}, from ESPN: ${esc(d.text)}${ago}`;
     const flag = d.flag ? `<em class="pc-flag">${esc(d.flag)}</em>` : '';
-    return `<span class="pc-val" title="${title}"><b>${esc(d.main)}</b>${flag}</span>${d.detail ? `<span class="pc-sub" title="${title}">${esc(d.detail)}</span>` : ''}`;
+    return `<span class="pc-val" title="${title}"><b>${esc(d.main)}</b>${flag}</span>${d.detail ? `<span class="pc-sub" title="${title}">${esc(d.detail)}</span>` : NO_SUB}`;
   }
 
   function item(label, value, raw = false, cls = '') {

@@ -113,6 +113,16 @@ test('contract: beside the draft, "FA 2028" with years left, pay and since when,
   assert.match(value({ status: 'none', text: null }), /title="No contract found on ESPN"><b>–<\/b>/);
 });
 
+test('career strip: loading, found, undrafted and nothing all fill the same two lines, so nothing shifts when ESPN answers', () => {
+  const html = (draft) => card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } }, cards: { p1: { draft } } });
+  const shape = (draft) => html(draft).match(/<div class="pc-draft"[^>]*>[\s\S]*?<div class="pc-ranks">([\s\S]*?)<\/div>\s*<\/div>/)[1].match(/<span class="pc-(val|sub)"/g).join();
+  const two = 'class="pc-val",class="pc-sub"';
+  const found = { status: 'found', text: 'Rd 1 · Pk 13 · DEN · 2017', main: 'Rd 1 · Pk 13', detail: 'DEN · 2017', tone: 'old', age: 9 };
+  for (const draft of [{ status: 'loading' }, found, { status: 'undrafted', text: 'Undrafted', main: 'Undrafted', detail: '' }, { status: 'none', text: null }, { status: 'error', text: null }]) {
+    assert.equal(shape(draft).replaceAll('<span ', ''), two, draft.status);
+  }
+});
+
 test('career strip: Exp beside the draft, the pick fading with its age, a contract year flagged', () => {
   const html = (c, bio = { years_exp: 10 }) => card.render({ modal: { kind: 'player', playerId: 'p1' }, league: { season: '2026' }, players: { p1: { name: 'Test Player', positions: ['PG'], team: 'LAL' } }, cards: { p1: { bio, ...c } } });
   const strip = (h) => h.match(/<div class="pc-career">([\s\S]*?)<\/div>\s*<\/div>\s*<\/header>/)[1];
