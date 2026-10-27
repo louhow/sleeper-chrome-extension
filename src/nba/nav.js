@@ -232,7 +232,7 @@
         data.rosters(),
         data.me(),
       ]);
-      const week = Number(nflState.display_week || nflState.week || 1);
+      const week = Math.max(Number(nflState.week) || 0, Number(nflState.display_week) || 0) || 1;
       const loaded = await nflWeek.load(api, data, league, week, week, { research: false });
       const state = { league, usersById: loaders.usersById(users), rosters, players: loaded.players, me, week, currentWeek: week, weeks: { [week]: loaded.week } };
       if (!leagues.get(leagueId)?.own) leagues.set(leagueId, { state: () => state, loadedAt: Date.now() });

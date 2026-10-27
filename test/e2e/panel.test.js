@@ -2565,6 +2565,7 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
 const nflPanel = (sel = '') => `#sleeper-nfl-panel ${sel}`;
 
 test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from the picker, and Sleeper\'s own view a click away', async () => {
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
   documentBody = nflTeamTab({ wrapped: true });
   await page.goto(NFL_TEAM_URL);
   // Out of sight as soon as the league is known to be NFL, while ours is still loading, so nothing shifts.
@@ -2617,7 +2618,7 @@ test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from
   await page.locator('#snp-nfl-back').click();
   await page.locator(nflPanel('.team-card')).waitFor();
   assert.equal(await page.locator('.postdraft-panel > .scrollbar-container').isVisible(), false);
-  documentBody = LOGGED_OUT;
+  documentBody = LOGGED_OUT;  await context.unroute('https://api.sleeper.app/v1/state/nfl');
 });
 
 test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimize lineup sits in the toolbar, as on NBA', async () => {
@@ -2673,6 +2674,7 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
 });
 
 test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup, rows slot by slot', async () => {
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
   documentBody = nflTeamTab({ wrapped: true });
   await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/matchup`);
   const head = page.locator(nflPanel('.lg-match.nfl-mu-head'));
@@ -2706,6 +2708,7 @@ test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup
   await page.waitForURL(`**/leagues/${NFL_LEAGUE}/team`);
   await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: b }).waitFor({ timeout: 30000 });
   documentBody = LOGGED_OUT;
+  await context.unroute('https://api.sleeper.app/v1/state/nfl');
 });
 
 test('settings: the sidebar gear opens the extension\'s dialog, the NFL pages switch off and on, account settings stay a button away', async () => {

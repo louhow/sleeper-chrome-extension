@@ -30,7 +30,9 @@
 
   async function load() {
     const now = await api.get('/v1/state/nfl');
-    info.currentWeek = Number(now.display_week || now.week || 1);
+    // Sleeper's `week` moves on once the last game is over (Tuesday), while `display_week` still
+    // shows the finished one; its Team tab edits the later, so the panel opens there too.
+    info.currentWeek = Math.max(Number(now.week) || 0, Number(now.display_week) || 0) || 1;
     info.tiers = await loaders.loadTiers(api, league, info.currentWeek).catch((err) => {
       globalThis.SNP.shared.report('warn', '[sleeper-nfl] score colors unavailable', err);
       return null;
