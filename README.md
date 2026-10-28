@@ -36,7 +36,8 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Sidebar: each NBA league shows your matchup this week under its name (both teams, points and projections), as Sleeper does for NFL.
 - Sidebar win bars: every NBA and NFL league's line gets your chance to win under the scores, green ahead and red behind, as on the mobile app's home screen; a chopped league shows your rank and safe %.
 - Team picker: every team with its avatar, A to Z, a "My team" shortcut, and team links from the Matchup and League tabs; on the Matchup tab it picks a matchup (both teams).
-- Healthy player stuck on IR: lineup moves and Optimize lineup stay off (Sleeper's API doesn't enforce this, its apps do) until they come off IR.
+- Healthy player stuck on IR: a red banner says so, and the only moves left take them off IR (to an open bench spot or swapped with an IR-eligible player); Optimize lineup stays off until they're out (Sleeper's API doesn't enforce this, its apps do).
+- NFL Team tab: IR and open bench spots are editable like on NBA.
 - Optimize lineup: recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.
 - Players tab: remembers your last view; a week strip per player (games played in their score's color, games left, scores on hover); a team picker to scan any roster; team avatars on rostered players; in Stats, a week's Avg (with games played) / Best / Worst game and an optional Shooting group (FGM, FGA, 3PA, FTM, FTA).

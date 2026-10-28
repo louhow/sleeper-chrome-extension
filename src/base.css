@@ -175,6 +175,22 @@ button.slot:hover {
   .card.target .slot { animation: none; }
 }
 
+/* Players stuck on IR who no longer qualify: the banner, and their rows */
+.ir-alert {
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 700;
+}
+.card.ir-bad {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, var(--card));
+}
+
 /* Save notices */
 .notice {
   position: absolute;

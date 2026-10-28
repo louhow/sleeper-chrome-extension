@@ -219,10 +219,53 @@
       state.swap = ref;
       return schedule();
     }
-    const { starters } = model.applyMove(state.swap, ref, ml);
-    const moves = model.describeMove({ ...ml, starters: l.starters }, { ...ml, starters });
+    const next = model.applyMove(state.swap, ref, ml);
+    const moves = model.describeMove(ml, next);
     state.swap = null;
-    saveStarters(l, starters, `Saved: ${shared.movedText(moves, (id) => ui.playerName(state.players, id))}`);
+    saveMove(l, next, `Saved: ${shared.movedText(moves, (id) => ui.playerName(state.players, id))}`);
+  }
+
+  // Saves a move's starters and IR. As in Sleeper's apps, no save ever has a player both
+  // starting and on IR: starters going to IR leave the lineup, then IR saves, then the final lineup.
+  async function saveMove(l, next, okText) {
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const reserveChanged = !same(next.reserve, l.reserve);
+    const toReserve = new Set(next.reserve.filter((id) => !l.reserve.includes(id)));
+    const benched = l.starters.map((id) => (toReserve.has(id) ? '0' : id));
+    const startersChanged = !same(next.starters, l.starters.map((id) => id || '0'));
+    if (!reserveChanged) return saveStarters(l, next.starters, okText);
+    state.saving = true;
+    state.notice = null;
+    schedule();
+    try {
+      if (!same(benched, l.starters)) await saveOrThrow(l, benched);
+      await saveReserve(l.roster.roster_id, next.reserve);
+      if (startersChanged && !same(benched, next.starters)) await saveOrThrow(l, next.starters);
+      setStarters(l.roster.roster_id, next.starters);
+      if (!destroyed) flash(okText);
+    } catch (err) {
+      shared.report('error', '[sleeper-nfl] save failed', err);
+      if (!destroyed) flash(String(err.message || err), 'error');
+    } finally {
+      state.saving = false;
+      schedule();
+    }
+  }
+
+  async function saveOrThrow(l, starters) {
+    const result = await nflSave({ rosterId: l.roster.roster_id, round: state.week, starters });
+    if (!result.ok) throw new Error(result.error);
+    setStarters(l.roster.roster_id, starters);
+  }
+
+  // Saves a roster's IR the way Sleeper's web app does.
+  async function saveReserve(rosterId, reserve) {
+    const res = await api.graphql('roster_update_reserve', `mutation roster_update_reserve {
+roster_update_reserve(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, reserve: ${JSON.stringify(reserve)}) {
+  roster_id starters players reserve taxi
+}
+}`, { auth: true });
+    Object.assign(state.rosters.find((r) => r.roster_id === rosterId), res.roster_update_reserve);
   }
 
   async function saveStarters(l, starters, okText) {

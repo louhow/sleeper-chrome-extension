@@ -460,6 +460,7 @@ const sleeper = {
   me: null, // user id of the roster under test
   legs: {}, // round -> matchup legs
   mutations: [],
+  nflReserve: {}, // league -> roster id -> IR, for the NFL leagues
   failNextMutation: false,
   rosters: null, // league rosters as the mock's Sleeper currently has them
   rostersLoading: null,
@@ -580,7 +581,7 @@ async function answerGraphql(route) {
     if (/query league_rosters\b/.test(query) && query.includes(nfl)) {
       // The live league can have a healthy player on IR, which freezes the lineup; these tests need it editable.
       const live = await (await fetch(`https://api.sleeper.app/v1/league/${nfl}/rosters`)).json();
-      for (const r of live) r.reserve = [];
+      for (const r of live) r.reserve = sleeper.nflReserve?.[nfl]?.[r.roster_id] || [];
       return json({ data: { league_rosters: live } });
     }
     if (/query matchup_legs\b/.test(query) && query.includes(nfl)) return json({ data: { matchup_legs: null } });
@@ -611,6 +612,14 @@ async function answerGraphql(route) {
     if (/update_waiver_claim/.test(query)) claim.settings = pairs(variables.k_settings, variables.v_settings);
     else claim.status = 'cancelled';
     return json({ data: { [/update/.test(query) ? 'update_waiver_claim' : 'cancel_waiver_claim']: claim } });
+  }
+  if (/mutation roster_update_reserve\b/.test(query) && query.includes(NFL_LEAGUE)) {
+    sleeper.mutations.push({ query, variables });
+    const rosterId = Number(query.match(/roster_id: (\d+)/)[1]);
+    const reserve = JSON.parse(query.match(/reserve: (\[[^\]]*\])/)[1]);
+    (sleeper.nflReserve[NFL_LEAGUE] ||= {})[rosterId] = reserve;
+    const live = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
+    return json({ data: { roster_update_reserve: { ...live.find((r) => r.roster_id === rosterId), reserve } } });
   }
   if (/mutation roster_update_reserve\b/.test(query)) {
     sleeper.mutations.push({ query, variables });
@@ -2684,6 +2693,54 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
   await context.unroute('https://api.sleeper.app/v1/state/nfl');
   sleeper.me = null;
   documentBody = LOGGED_OUT;
+});
+
+test('NFL team tab: a healthy player stuck on IR gets a red banner, and swapping him with an IR-eligible player is the way out', async () => {
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
+  const me = users.find((u) => u.display_name === 'louhow');
+  const mine = rosters.find((r) => r.owner_id === me.user_id);
+  sleeper.me = me.user_id;
+  // A healthy bench player on IR, which the league no longer allows.
+  const all = await (await fetch('https://api.sleeper.app/v1/players/nfl')).json();
+  const healthy = mine.players.find((id) => !mine.starters.includes(id) && !all[id]?.injury_status && all[id]?.status === 'Active');
+  assert.ok(healthy, 'a healthy bench player to put on IR');
+  sleeper.nflReserve[NFL_LEAGUE] = { [mine.roster_id]: [healthy] };
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
+  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: 8, token: true });
+  try {
+    await page.goto(NFL_TEAM_URL);
+    await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+    await page.locator(nflPanel('.week-nav [data-action="next"]')).click();
+    await page.locator(nflPanel('.week-label b')).filter({ hasText: 'Week 8' }).waitFor();
+    await page.locator(nflPanel('.ir-alert')).waitFor({ timeout: 30000 });
+    assert.match(await page.locator(nflPanel('.ir-alert')).textContent(), /^You have 1 player no longer eligible in IR \(.+\)\. Please move them out of IR\.$/);
+    assert.equal(await page.locator(nflPanel('.card.ir-bad')).count(), 1);
+    assert.ok(await page.locator(nflPanel('.tools button.optimize[disabled]')).count(), 'Optimize lineup waits');
+    await page.screenshot({ path: `${OUT}nfl-ir-blocked.png` });
+    // Only the stuck player's badge moves; starters have nowhere to go.
+    const spots = await page.locator(nflPanel('button.slot')).evaluateAll((els) => els.map((e) => e.dataset.spot));
+    assert.ok(spots.includes(`r:${healthy}`), 'he can be picked');
+    assert.ok(!spots.some((x) => x.startsWith('s:')), 'no starter moves while he is stuck');
+    assert.ok(spots.every((x) => x.startsWith('b:') || x.startsWith('be:') || x === `r:${healthy}`), 'only bench spots trade with him');
+    await page.locator(nflPanel('.card.ir-bad button.slot')).click();
+    await page.locator(nflPanel('.card.nfl.target')).first().waitFor();
+    assert.match(await page.locator(nflPanel('.rhead .hint')).first().textContent(), /Pick a player to swap with .+ · Esc to cancel/);
+    await page.screenshot({ path: `${OUT}nfl-ir-blocked-pick.png` });
+    // An IR-eligible bench player (or an open bench spot) trades places with him.
+    const before = sleeper.mutations.length;
+    await page.locator(nflPanel('.card.nfl.target button.slot')).first().click();
+    await page.locator(nflPanel('.notice.ok')).waitFor({ timeout: 30000 });
+    assert.equal(await page.locator(nflPanel('.ir-alert')).count(), 0, 'the banner goes once he is off IR');
+    assert.deepEqual(sleeper.mutations.slice(before).map((m) => m.query.match(/mutation (\w+)/)[1]), ['roster_update_reserve']);
+    assert.ok(!sleeper.nflReserve[NFL_LEAGUE][mine.roster_id].includes(healthy), 'off IR');
+    await page.screenshot({ path: `${OUT}nfl-ir-blocked-done.png` });
+  } finally {
+    delete sleeper.nflReserve[NFL_LEAGUE];
+    await context.unroute('https://api.sleeper.app/v1/state/nfl');
+    sleeper.me = null;
+    documentBody = LOGGED_OUT;
+  }
 });
 
 test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup, rows slot by slot', async () => {

@@ -3,7 +3,7 @@
 // player, any team or matchup from the picker. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflPanelView = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
-    shell, irBlockNames, irBlockTip, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
+    shell, irBlockNames, irBlockTip, irBanner, reserveRule, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
   const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian, medianStanding, isChopped, chopBlock, chopTeamStats, graveyard } = globalThis.SNP.model;
   const { slotBadge, headshot, injury, chopAvatar } = globalThis.SNP.nflUi;
   // Sleeper's apps list bench players by position in this order.
@@ -29,8 +29,16 @@
     const parts = s.weeks?.[s.week] ? rosterParts(s, rosterId, POSITION_ORDER) : null;
     if (!parts) return null;
     const mine = owns(s, parts.roster);
-    return { ...parts, mine, players: s.players, editable: mine && s.editableWeek === s.week,
-      irBlocked: globalThis.SNP.model.illegalReserve(parts.reserve, s.players, s.league.settings) };
+    const settings = s.league.settings || {};
+    const editable = mine && s.editableWeek === s.week;
+    // Active roster = everyone not on IR or taxi; it holds one player per roster position.
+    const active = (parts.roster.players || []).length - parts.reserve.length - parts.taxi.length;
+    return { ...parts, mine, players: s.players, editable,
+      // IR belongs to the roster, so like Sleeper it's edited from the week that's on.
+      reserveEditable: editable && (settings.reserve_slots || 0) > 0,
+      reserveRoom: Math.max(0, (settings.reserve_slots || 0) - parts.reserve.length),
+      benchRoom: Math.max(0, (s.league.roster_positions || []).length - active),
+      irBlocked: globalThis.SNP.model.illegalReserve(parts.reserve, s.players, settings) };
   }
 
   // The player's game this week and where it stands: 'bye', else model.gameState's 'left', 'live' or 'done'.
@@ -169,8 +177,8 @@
     if (!l) return loading();
     const t = totals(s, l);
     const oppId = opponentOf(l);
-    // Lineup moves wait until an ineligible player comes off IR (Sleeper's own Team tab does that).
-    const editable = l.editable && !s.saving && !l.irBlocked.length;
+    // While an ineligible player sits on IR, the only moves are ones that take them off (model.canMove).
+    const editable = l.editable && !s.saving;
     const ml = editable ? moveLineup(s, l) : null;
     const targets = new Set(ml && s.swap ? targetsOf(s.swap, ml) : []);
     // Only spots with somewhere to go get a button, so nothing is a dead click.
@@ -178,14 +186,21 @@
     const ctx = { s, editable, targets, movable };
     const picked = s.swap && spotPlayer(s.swap, l);
     const settings = s.league.settings || {};
-    const row = (slot, id, spot) => playerRow(ctx, slot, id, spot);
+    const row = (slot, id, spot) => playerRow(ctx, slot, id, spot, l.irBlocked.includes(id));
+    // Open bench spots only show while IR can be edited: they're where a player coming off IR can go.
+    const open = (prefix, n, slot) => Array.from({ length: n }, (_, k) => row(slot, '0', `${prefix}:${k}`)).join('');
+    const bench = l.bench.map((id) => row('BN', id, `b:${id}`)).join('') + (l.reserveEditable ? open('be', l.benchRoom, 'BN') : '');
+    const reserve = l.reserveEditable
+      ? l.reserve.map((id) => row('IR', id, `r:${id}`)).join('') + open('re', l.reserveRoom, 'IR')
+      : padTo(l.reserve, settings.reserve_slots).map((id) => row('IR', id)).join('');
     const head = (title, hint = '') => rowHead(title, { hint, cls: 'nfl', middle: '<div class="nfl-game-h">Game</div>' });
     // IR and taxi keep the league's slots, open ones included, so the page holds its shape.
     return `${teamCard(s, l.roster, { points: t.points, proj: t.proj, opponent: oppId != null && s.rosters.find((r) => r.roster_id === oppId), week: l.week, sub: chopLine(s, l.roster), face: chopFace(s, l.roster) })}
+      ${irBanner(l)}
       ${head('Starters', swapHint(s, l.editable, real(picked) ? s.players[picked]?.name || 'them' : null, irBlockNames(l)))}
       ${l.starters.map((id, i) => row(l.slots[i] ?? 'FLEX', id, `s:${i}`)).join('')}
-      ${l.bench.length ? `${head('Bench')}${l.bench.map((id) => row('BN', id, `b:${id}`)).join('')}` : ''}
-      ${l.reserve.length || settings.reserve_slots ? `${head('Injured Reserve')}${padTo(l.reserve, settings.reserve_slots).map((id) => row('IR', id)).join('')}` : ''}
+      ${bench ? `${head('Bench')}${bench}` : ''}
+      ${l.reserve.length || settings.reserve_slots ? `${head('Injured Reserve', l.reserveEditable ? esc(reserveRule(settings)) : '')}${reserve}` : ''}
       ${l.taxi.length || settings.taxi_slots ? `${head('Taxi Squad')}${padTo(l.taxi, settings.taxi_slots).map((id) => row('TX', id)).join('')}` : ''}`;
   }
 
@@ -193,22 +208,23 @@
   // spots held by players whose game has kicked off, which Sleeper locks.
   function moveLineup(s, l) {
     const locked = (id) => real(id) && kickedOff(gameOf(s, id));
-    const players = Object.fromEntries([...l.starters, ...l.bench].filter(real).map((id) => [id, s.players[id] || { positions: [] }]));
+    const players = Object.fromEntries([...l.starters, ...l.bench, ...l.reserve].filter(real).map((id) => [id, s.players[id] || { positions: [] }]));
     const starters = l.starters.map((id) => id || '0');
     const lockedRefs = new Set([...starters.flatMap((id, i) => (locked(id) ? [`s:${i}`] : [])), ...l.bench.filter(locked).map((id) => `b:${id}`)]);
-    return { slots: l.slots, starters, bench: l.bench, players, taxi: [], reserve: [], settings: {}, lockedRefs };
+    return { slots: l.slots, starters, bench: l.bench, players, taxi: [], reserve: l.reserve, settings: s.league.settings || {}, lockedRefs,
+      reserveEditable: l.reserveEditable, reserveRoom: l.reserveRoom, benchRoom: l.benchRoom, irBlocked: l.irBlocked };
   }
   const targetsOf = (ref, ml) => swapTargets(ref, ml).filter((r) => !ml.lockedRefs.has(r));
 
   function spotPlayer(ref, l) {
     const [kind, key] = [ref.slice(0, ref.indexOf(':')), ref.slice(ref.indexOf(':') + 1)];
-    return kind === 's' ? l.starters[Number(key)] : key;
+    return kind === 's' ? l.starters[Number(key)] : kind === 'b' || kind === 'r' ? key : null;
   }
 
-  function playerRow(ctx, slot, id, spot = null) {
+  function playerRow(ctx, slot, id, spot = null, irBad = false) {
     const { s, editable, targets, movable } = ctx;
     const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
-    const cls = swapClass(s, editable, spot, targets);
+    const cls = swapClass(s, editable, spot, targets) + (irBad ? ' ir-bad' : '');
     if (!real(id)) return emptyCard(slotBadge(slot, button), cls, 'nfl');
     const p = playerOf(s.players, id);
     const week = s.weeks[s.week];

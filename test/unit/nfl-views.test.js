@@ -51,6 +51,27 @@ test('your lineup is editable: badges move players whose game has not kicked off
   assert.doesNotMatch(render({ me: 'u1', editableWeek: 8 }), /data-spot=/, 'another week');
 });
 
+test('a healthy player on IR: a red banner, and the only moves take him off IR', () => {
+  const stuck = (extra = {}) => {
+    const s = state({ me: 'u1', ...extra });
+    s.players.ir1 = { ...s.players.ir1, injury: null };
+    s.players.bn1 = { ...s.players.bn1, injury: 'Out' };
+    s.league = { ...s.league, settings: { ...s.league.settings, reserve_allow_out: 1 } };
+    return s;
+  };
+  const html = nflPanelView.render(stuck(), []);
+  assert.match(text(html), /You have 1 player no longer eligible in IR \(H\. Back\)\. Please move them out of IR\./);
+  assert.match(html, /<article class="card nfl ir-bad">/, 'his row is marked');
+  assert.match(html, /data-spot="r:ir1"/, 'he can be picked');
+  assert.doesNotMatch(html, /data-spot="s:2"/, 'a starter has nowhere to go');
+  assert.doesNotMatch(html, /data-spot="re:0"/);
+  assert.match(text(html), /Move H\. Back off IR first/);
+  const picking = nflPanelView.render(stuck({ swap: 'r:ir1' }), []);
+  assert.match(picking, /data-spot="be:0"/, 'the open bench spot is a target');
+  assert.match(picking, /data-spot="b:bn1"/, 'so is an Out bench player, who goes onto IR');
+  assert.doesNotMatch(render({ me: 'u1' }), /ir-alert/, 'nothing stuck, no banner');
+});
+
 test('matchup: both teams, win chance, rows slot by slot and empty sections held open', () => {
   const html = render({ page: 'matchup' });
   const out = text(html);

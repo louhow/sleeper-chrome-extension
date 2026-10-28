@@ -239,6 +239,12 @@
   // Names of the players stuck on IR who no longer qualify ('' when none), and the
   // Optimize button's tooltip for them.
   const irBlockNames = (l) => (l?.irBlocked || []).map((id) => shortName(playerOf(l.players, id))).join(', ');
+  // The red banner above the lineup while players who no longer qualify for IR sit there
+  // (Sleeper's apps word it the same way), or '' when there are none.
+  const irBanner = (l) => {
+    const n = l?.irBlocked?.length || 0;
+    return n ? `<p class="ir-alert" role="alert">You have ${n} player${n === 1 ? '' : 's'} no longer eligible in IR (${esc(irBlockNames(l))}). Please move them out of IR.</p>` : '';
+  };
   const irBlockTip = (names) => `Optimize is off until ${names} comes off IR (no longer injured). Make that move first.`;
 
   // Which injury statuses the league lets onto IR, e.g. "Out, DTD and DNR players can move to IR."
@@ -459,10 +465,10 @@
   // The Starters hint on an editable lineup; `picked`: the name of the player in the spot being moved.
   function swapHint(s, editable, picked, blocked = '') {
     if (!editable) return '';
-    return blocked ? `Move ${esc(blocked)} off IR first`
-      : s.saving ? 'Saving lineup…'
+    return s.saving ? 'Saving lineup…'
       : picked ? `Pick a player to swap with ${esc(picked)} · Esc to cancel`
       : s.swap ? 'Pick a player for this slot · Esc to cancel'
+      : blocked ? `Move ${esc(blocked)} off IR first`
       : 'Tap a position to update your lineup';
   }
 
@@ -736,7 +742,7 @@
   }
 
   return {
-    reserveRule, irBlockNames, irBlockTip, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
+    reserveRule, irBlockNames, irBlockTip, irBanner, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
     esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
     lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, ordinal, researchLine,

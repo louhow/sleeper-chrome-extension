@@ -2,7 +2,7 @@
 // Matchup and League tabs are in matchup-view.js). Pure: (state, api log) -> HTML.
 (globalThis.SNP ||= {}).nbaPanelView = (() => {
   const { playerDays, lockInDefault, statLine, lockState, spotRefs, swapTargets, lockedGameId, scoreTier, gameState } = globalThis.SNP.model;
-  const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule, irBlockNames, irBlockTip,
+  const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule, irBlockNames, irBlockTip, irBanner,
     whatIfOn, playerOf, teamTag, researchLine, padTo, real, loading, errorMsg, shell, teamCard, rowHead, swapHint, swapClass, emptyCard, apiView, sessionExpired } = globalThis.SNP.ui;
 
   function render(state, log) {
@@ -40,10 +40,12 @@
       started: l.started,
       editable: editable && !s.saving,
       targets,
+      irBlocked: l.irBlocked,
     };
     const picked = s.swap && s.players[spotId(s.swap, starters)];
     return `
       ${summary(s, l)}
+      ${irBanner(l)}
       ${week ? rosterSections(ctx, l, swapHint(s, editable, picked?.name, irBlockNames(l))) : loading('Loading week…')}`;
   }
 
@@ -115,7 +117,7 @@
   function playerCard(ctx, slot, id, spot) {
     const { s, week, points, locks, editable, movable, lockRoster, started, targets } = ctx;
     const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
-    const cls = swapClass(s, editable, spot, targets);
+    const cls = swapClass(s, editable, spot, targets) + (slot === 'IR' && ctx.irBlocked?.includes(id) ? ' ir-bad' : '');
     if (!real(id)) return emptyCard(slotBadge(slot, button), cls);
     const p = playerOf(s.players, id);
     const locked = lockedGameId(locks[id]);
