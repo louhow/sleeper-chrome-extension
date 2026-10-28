@@ -22,7 +22,7 @@
   const state = {
     page: null, tab: 'page', now: Date.now(), league, usersById: null, rosters: null, me: null, rosterId: null,
     week: null, currentWeek: null, minWeek: league.settings?.start_week || 1, maxWeek: WEEKS,
-    weeks: {}, players: {}, tiers: null, swap: null, saving: false, rosterMenu: false, ready: false, error: null,
+    weeks: {}, players: {}, tiers: null, swap: null, autosub: null, saving: false, rosterMenu: false, ready: false, error: null,
     sessionExpired: false, editableWeek: null, optimizable: false, failedAvatars: new Set(), openCalls: new Set(), notice: null,
   };
   const data = loaders.leagueData(api, leagueId, 'sleeper-nfl');
@@ -179,6 +179,7 @@
     if (week < state.minWeek || week > state.maxWeek || state.saving) return;
     state.week = week;
     state.swap = null;
+    state.autosub = null;
     schedule();
     loadWeek(week).catch(fail);
   }
@@ -188,6 +189,7 @@
   function setRoster(rosterId, { remember = false } = {}) {
     state.rosterMenu = false;
     state.swap = null;
+    state.autosub = null;
     if (remember) chrome.storage.local.set({ [`roster:${leagueId}`]: rosterId });
     if (rosterId === state.rosterId) return schedule();
     state.rosterId = rosterId;
@@ -206,6 +208,7 @@
   function pickSpot(ref) {
     const l = nflPanelView.lineup(state);
     if (!l?.editable || state.saving) return;
+    state.autosub = null;
     if (!state.swap) {
       state.swap = ref;
       return schedule();
@@ -242,6 +245,7 @@
       await saveReserve(l.roster.roster_id, next.reserve);
       if (startersChanged && !same(benched, next.starters)) await saveOrThrow(l, next.starters);
       setStarters(l.roster.roster_id, next.starters);
+      await keepSubs(l, next.starters, next.reserve);
       if (!destroyed) flash(okText);
     } catch (err) {
       shared.report('error', '[sleeper-nfl] save failed', err);
@@ -277,10 +281,83 @@ roster_update_reserve(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Numbe
     state.saving = false;
     if (result.ok) {
       setStarters(l.roster.roster_id, starters);
+      await keepSubs(l, starters);
       flash(okText);
     } else {
       flash(result.error, 'error');
     }
+  }
+
+  // ---- AutoSub ----
+  // A starter's AutoSub is the bench player who takes their spot if they don't play: the
+  // week's matchup leg keeps them as `subs` (starter id -> sub id), saved with the leg's lineup.
+
+  const legOf = (rosterId) => state.weeks[state.week]?.legs?.find((m) => m.roster_id === rosterId);
+
+  // Saves the leg's lineup with `subs`, and checks Sleeper's answer holds them as asked.
+  async function writeSubs(rosterId, starters, subs) {
+    const res = await api.graphql(`update_matchup_leg autosub (week ${state.week})`, `mutation update_matchup_leg($subs: Map) {
+update_matchup_leg(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, leg: ${Number(state.week)}, round: ${Number(state.week)}, starters: ${JSON.stringify(starters.map((id) => id || '0'))}, subs: $subs) {
+  leg roster_id round starters subs
+}
+}`, { auth: true, variables: { subs: JSON.stringify(subs) } });
+    const held = res?.update_matchup_leg?.subs || {};
+    const same = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+    if (!same(held, subs)) throw new Error('Sleeper did not keep the AutoSub');
+    const leg = legOf(rosterId);
+    if (leg) leg.subs = Object.keys(held).length ? held : null;
+  }
+
+  async function saveSubs(l, subs, okText) {
+    if (!l?.editable || state.saving) return;
+    state.saving = true;
+    state.notice = null;
+    state.autosub = null;
+    state.swap = null;
+    schedule();
+    try {
+      await writeSubs(l.roster.roster_id, l.starters, subs);
+      if (!destroyed) flash(okText);
+    } catch (err) {
+      shared.report('error', '[sleeper-nfl] autosub failed', err);
+      if (!destroyed) flash(String(err.message || err), 'error');
+    } finally {
+      state.saving = false;
+      schedule();
+    }
+  }
+
+  // After a lineup save, the subs that still make sense are put back: no one has to
+  // trust that Sleeper's lineup save leaves them alone.
+  async function keepSubs(l, starters, reserve = l.reserve) {
+    const had = l.leg?.subs;
+    if (!had || !Object.keys(had).length) return;
+    const bench = [...l.bench, ...l.starters].filter((id) => ui.real(id) && !starters.includes(id) && !reserve.includes(id));
+    await writeSubs(l.roster.roster_id, starters, model.liveSubs(had, starters, bench));
+  }
+
+  function startAutosub() {
+    const l = nflPanelView.lineup(state);
+    const id = l && state.swap?.startsWith('s:') ? l.starters[Number(state.swap.slice(2))] : null;
+    if (!l?.editable || state.saving || !id || !nflPanelView.autosubOptions(state, l, id).length) return;
+    state.swap = null;
+    state.autosub = id;
+    schedule();
+  }
+
+  // The bench player tapped: named AutoSub for the starter, or taken off if they already were.
+  function pickSub(id) {
+    const l = nflPanelView.lineup(state);
+    const starter = state.autosub;
+    if (!l || !starter || !nflPanelView.autosubOptions(state, l, starter).includes(id)) return;
+    const name = (x) => ui.playerName(state.players, x);
+    saveSubs(l, model.withAutosub(l.leg?.subs, starter, id), `AutoSub: ${name(id)} takes ${name(starter)}'s spot if they don't play`);
+  }
+
+  function clearSub(starter) {
+    const l = nflPanelView.lineup(state);
+    if (!l?.leg?.subs?.[starter]) return;
+    saveSubs(l, model.withAutosub(l.leg.subs, starter, null), `AutoSub removed for ${ui.playerName(state.players, starter)}`);
   }
 
   // A saved lineup shows at once (the public matchups lag minutes behind it).
@@ -305,6 +382,10 @@ roster_update_reserve(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Numbe
     if (pick) return setRoster(Number(pick.dataset.pickRoster), { remember: true });
     const team = e.target.closest('[data-open-team]');
     if (team) return openTeam(Number(team.dataset.openTeam));
+    const sub = e.target.closest('[data-sub-pick]')?.dataset.subPick;
+    if (sub) return pickSub(sub);
+    const unsub = e.target.closest('[data-autosub-clear]')?.dataset.autosubClear;
+    if (unsub) return clearSub(unsub);
     // A player's name or headshot opens Sleeper's own player card.
     const player = e.target.closest('[data-player]')?.dataset.player;
     if (player) return shared.nflPlayerCard(player, state.players[player]);
@@ -319,6 +400,7 @@ roster_update_reserve(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Numbe
       state.notice = null;
       return openDialog();
     }
+    if (action === 'autosub-start') return startAutosub();
     if (action === 'refresh') return load(true).catch(fail);
     if (action === 'sleeper-view') setSleeperView(true);
     schedule();
@@ -336,8 +418,9 @@ roster_update_reserve(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Numbe
 
   function onKey(e) {
     if (!host.isConnected || dialogOpen()) return;
-    if (e.key === 'Escape' && (state.swap || state.rosterMenu)) {
+    if (e.key === 'Escape' && (state.swap || state.autosub || state.rosterMenu)) {
       state.swap = null;
+      state.autosub = null;
       state.rosterMenu = false;
       return schedule();
     }
@@ -353,6 +436,7 @@ roster_update_reserve(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Numbe
   function show(page) {
     if (state.page !== page) {
       state.swap = null;
+      state.autosub = null;
       state.rosterMenu = false;
       schedule();
     }

@@ -4,7 +4,7 @@
 (globalThis.SNP ||= {}).nflPanelView = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
     shell, irBlockNames, irBlockTip, irBanner, reserveRule, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
-  const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian, medianStanding, isChopped, chopBlock, chopTeamStats, graveyard } = globalThis.SNP.model;
+  const { scoreTier, spotRefs, swapTargets, autosubOptions: subOptions, winProbability, gameState, medianOn, leagueMedian, medianStanding, isChopped, chopBlock, chopTeamStats, graveyard } = globalThis.SNP.model;
   const { slotBadge, headshot, injury, chopAvatar } = globalThis.SNP.nflUi;
   // Sleeper's apps list bench players by position in this order.
   const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
@@ -183,9 +183,13 @@
     const targets = new Set(ml && s.swap ? targetsOf(s.swap, ml) : []);
     // Only spots with somewhere to go get a button, so nothing is a dead click.
     const movable = new Set(ml ? spotRefs(ml).filter((ref) => !ml.lockedRefs.has(ref) && targetsOf(ref, ml).length) : []);
-    const ctx = { s, editable, targets, movable };
-    const picked = s.swap && spotPlayer(s.swap, l);
     const settings = s.league.settings || {};
+    // AutoSub: the subs set, and while one is being picked, the starter it's for and who can take their place.
+    const subs = l.leg?.subs || {};
+    const subFor = editable && s.autosub && l.starters.includes(s.autosub) ? s.autosub : null;
+    const subPicks = new Set(subFor ? autosubOptions(s, l, subFor) : []);
+    const ctx = { s, editable, targets, movable, subs, subFor, subPicks, l };
+    const picked = s.swap && spotPlayer(s.swap, l);
     const row = (slot, id, spot) => playerRow(ctx, slot, id, spot, l.irBlocked.includes(id));
     // Open bench spots only show while IR can be edited: they're where a player coming off IR can go.
     const open = (prefix, n, slot) => Array.from({ length: n }, (_, k) => row(slot, '0', `${prefix}:${k}`)).join('');
@@ -193,15 +197,52 @@
     const reserve = l.reserveEditable
       ? l.reserve.map((id) => row('IR', id, `r:${id}`)).join('') + open('re', l.reserveRoom, 'IR')
       : padTo(l.reserve, settings.reserve_slots).map((id) => row('IR', id)).join('');
+    const subName = subFor && s.players[subFor]?.name;
+    const subBar = ml && s.swap?.startsWith('s:') ? autosubBar(s, l, subs) : '';
     const head = (title, hint = '') => rowHead(title, { hint, cls: 'nfl', middle: '<div class="nfl-game-h">Game</div>' });
     // IR and taxi keep the league's slots, open ones included, so the page holds its shape.
     return `${teamCard(s, l.roster, { points: t.points, proj: t.proj, opponent: oppId != null && s.rosters.find((r) => r.roster_id === oppId), week: l.week, sub: chopLine(s, l.roster), face: chopFace(s, l.roster) })}
       ${irBanner(l)}
-      ${head('Starters', swapHint(s, l.editable, real(picked) ? s.players[picked]?.name || 'them' : null, irBlockNames(l)))}
+      ${head('Starters', subFor ? `Pick an AutoSub for ${esc(subName || 'them')}${subPicks.size ? '' : ': no one on the bench can'} · Esc to cancel` : swapHint(s, l.editable, real(picked) ? s.players[picked]?.name || 'them' : null, irBlockNames(l)))}
+      ${subBar}
       ${l.starters.map((id, i) => row(l.slots[i] ?? 'FLEX', id, `s:${i}`)).join('')}
       ${bench ? `${head('Bench')}${bench}` : ''}
       ${l.reserve.length || settings.reserve_slots ? `${head('Injured Reserve', l.reserveEditable ? esc(reserveRule(settings)) : '')}${reserve}` : ''}
       ${l.taxi.length || settings.taxi_slots ? `${head('Taxi Squad')}${padTo(l.taxi, settings.taxi_slots).map((id) => row('TX', id)).join('')}` : ''}`;
+  }
+
+  // The bench players who can be named AutoSub for a starter (model.autosubOptions).
+  function autosubOptions(s, l, starterId) {
+    if (!l.leg) return []; // AutoSubs live on the week's matchup leg
+    const game = (id) => {
+      const g = gameOf(s, id);
+      return g.state === 'bye' ? null : { start: g.start, kickedOff: kickedOff(g) };
+    };
+    const players = Object.fromEntries(l.bench.filter(real).map((id) => [id, s.players[id] || { positions: [] }]));
+    return subOptions(starterId, { slots: l.slots, starters: l.starters, bench: l.bench, players, settings: s.league.settings || {} }, l.leg?.subs, game);
+  }
+
+  // With a starter picked to move, the button that starts naming their AutoSub:
+  // "S. Barkley: Set an AutoSub · 1/1 avail" (Sleeper's wording), when one can be set.
+  function autosubBar(s, l, subs) {
+    const id = spotPlayer(s.swap, l);
+    if (!real(id) || !autosubOptions(s, l, id).length) return '';
+    const left = Math.max(0, (s.league.settings?.max_subs || 0) - Object.keys(subs).length);
+    return `<div class="autosub-bar"><button type="button" data-action="autosub-start">Set an AutoSub for ${esc(s.players[id]?.name || 'them')}</button><span>${left}/${s.league.settings?.max_subs || 0} avail</span></div>`;
+  }
+
+  // The chips on a row that has an AutoSub: a starter's names their sub (a tap takes it
+  // off, until the starter's game kicks off); the sub's names who they cover for.
+  function autosubChip(s, id, subs, editable) {
+    const sub = subs[id];
+    if (sub) {
+      const name = shortName(playerOf(s.players, sub));
+      return editable && !kickedOff(gameOf(s, id))
+        ? `<button type="button" class="autosub-chip" data-autosub-clear="${esc(id)}" title="Remove this AutoSub">AutoSub ${esc(name)} ✕</button>`
+        : `<span class="autosub-chip">AutoSub ${esc(name)}</span>`;
+    }
+    const starter = Object.keys(subs).find((k) => subs[k] === id);
+    return starter ? `<span class="autosub-chip" title="Takes the spot if the starter doesn't play">AutoSub for ${esc(shortName(playerOf(s.players, starter)))}</span>` : '';
   }
 
   // The lineup as model.swapTargets sees it (starters and bench), and the
@@ -222,18 +263,20 @@
   }
 
   function playerRow(ctx, slot, id, spot = null, irBad = false) {
-    const { s, editable, targets, movable } = ctx;
-    const button = editable && spot && (movable.has(spot) || s.swap === spot) ? spot : null;
-    const cls = swapClass(s, editable, spot, targets) + (irBad ? ' ir-bad' : '');
+    const { s, editable, targets, movable, subs, subFor, subPicks } = ctx;
+    const button = editable && spot && !subFor && (movable.has(spot) || s.swap === spot) ? spot : null;
+    // While an AutoSub is picked, the starter it's for is marked, who can take over lit and the rest dimmed.
+    const subCls = !subFor || !spot ? '' : id === subFor ? ' selected' : subPicks.has(id) ? ' target' : ' dim';
+    const cls = (subFor ? subCls : swapClass(s, editable, spot, targets)) + (irBad ? ' ir-bad' : '');
     if (!real(id)) return emptyCard(slotBadge(slot, button), cls, 'nfl');
     const p = playerOf(s.players, id);
     const week = s.weeks[s.week];
     const n = numbers(s, id);
-    return `<article class="card nfl${cls}">
+    return `<article class="card nfl${cls}"${subFor && subPicks.has(id) ? ` data-sub-pick="${esc(id)}"` : ''}>
       ${slotBadge(slot, button)}
       ${photo(id, p)}
       <div class="info">
-        <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${teamTag(p)}${injury(p)}</div>
+        <div class="line1"><button class="name" data-player="${esc(id)}">${esc(p.name)}</button>${teamTag(p)}${injury(p)}${autosubChip(s, id, subs, editable)}</div>
         ${researchLine(week.research[id])}
       </div>
       <div class="nfl-game ${n.g.state}">
@@ -297,5 +340,5 @@
     </div>`;
   }
 
-  return { render, lineup, totals, chopBlockOf, chopBar, moveLineup, targetsOf };
+  return { render, lineup, totals, chopBlockOf, chopBar, moveLineup, targetsOf, autosubOptions };
 })();

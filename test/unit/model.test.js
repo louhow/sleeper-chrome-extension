@@ -948,3 +948,40 @@ test('solveLineup: at equal worth, a player with a game takes the slot of one wi
   assert.deepEqual([...plan.starters], ['tre', 'hen']);
   assert.deepEqual([...plan.changes.map((c) => `${c.id} ${c.from}->${c.to}`)], ['tre UTIL->PG', 'hen BN->UTIL', 'luka PG->BN']);
 });
+
+test('autosub options: the slot fits, neither game has kicked off, and the sub starts no earlier', () => {
+  const players = { rb: { positions: ['RB'] }, wr: { positions: ['WR'] }, qb: { positions: ['QB'] } };
+  const games = {
+    st: { start: 100, kickedOff: false },
+    late: { start: 200, kickedOff: false },
+    early: { start: 50, kickedOff: false },
+    live: { start: 10, kickedOff: true },
+    fa: null,
+    wr: { start: 100, kickedOff: false },
+    qb: { start: 100, kickedOff: false },
+  };
+  const l = (bench, settings = {}, starterGame = 'st', slot = 'RB') => ({
+    slots: [slot], starters: ['st'], bench, players: { late: players.rb, early: players.rb, live: players.rb, fa: players.rb, wr: players.wr, qb: players.qb },
+    settings: { max_subs: 1, sub_start_time_eligibility: 1, ...settings }, game: (id) => games[id === 'st' ? starterGame : id],
+  });
+  const opts = (x, subs = {}) => plain(model.autosubOptions('st', x, subs, x.game));
+  assert.deepEqual(opts(l(['late', 'early', 'live', 'fa', 'wr'])), ['late'], 'later only: not earlier, not under way, not a bye, not a WR');
+  assert.deepEqual(opts(l(['late', 'early'], { sub_start_time_eligibility: 0 })), ['late', 'early'], 'with the rule off, any start');
+  assert.deepEqual(opts(l(['wr', 'qb'], {}, 'st', 'FLEX')), ['wr'], 'a flex takes its positions');
+  assert.deepEqual(opts(l(['early'], {}, 'fa')), ['early'], 'a starter on a bye has no start to beat');
+  assert.deepEqual(opts(l(['late'], {}, 'live')), [], 'the starter has kicked off');
+  assert.deepEqual(opts(l(['late'], { max_subs: 0 })), [], 'the league allows none');
+  assert.deepEqual(opts(l(['late']), { other: 'late' }), [], 'the limit is used up');
+  assert.deepEqual(opts(l(['late']), { st: 'early' }), ['late'], "the starter's own sub can be changed at the limit");
+  assert.deepEqual(plain(model.autosubOptions('zz', l(['late']), {}, l(['late']).game)), [], 'not a starter');
+  const two = l(['late', 'early'], { max_subs: 2, sub_start_time_eligibility: 0 });
+  assert.deepEqual(plain(model.autosubOptions('st', two, { other: 'late' }, two.game)), ['early'], "another starter's sub is taken");
+});
+
+test('autosub subs: set, cleared, and kept only while the starter starts and the sub sits', () => {
+  assert.deepEqual(plain(model.withAutosub(undefined, 'a', 'b')), { a: 'b' });
+  assert.deepEqual(plain(model.withAutosub({ a: 'b' }, 'a', null)), {});
+  assert.deepEqual(plain(model.withAutosub({ a: 'b' }, 'c', 'd')), { a: 'b', c: 'd' });
+  assert.deepEqual(plain(model.liveSubs({ a: 'b', c: 'd', e: 'f' }, ['a', 'e'], ['b', 'x'])), { a: 'b' });
+  assert.deepEqual(plain(model.liveSubs(null, ['a'], ['b'])), {});
+});

@@ -461,6 +461,8 @@ const sleeper = {
   legs: {}, // round -> matchup legs
   mutations: [],
   nflReserve: {}, // league -> roster id -> IR, for the NFL leagues
+  nflLegs: false, // answer the NFL league's matchup legs (your own, with nflSubs)
+  nflSubs: null, // the AutoSubs on that leg: starter id -> sub id
   failNextMutation: false,
   rosters: null, // league rosters as the mock's Sleeper currently has them
   rostersLoading: null,
@@ -584,7 +586,19 @@ async function answerGraphql(route) {
       for (const r of live) r.reserve = sleeper.nflReserve?.[nfl]?.[r.roster_id] || [];
       return json({ data: { league_rosters: live } });
     }
-    if (/query matchup_legs\b/.test(query) && query.includes(nfl)) return json({ data: { matchup_legs: null } });
+    if (/query matchup_legs\b/.test(query) && query.includes(nfl)) {
+      if (!sleeper.nflLegs || nfl !== NFL_LEAGUE) return json({ data: { matchup_legs: null } });
+      // Your leg for the week asked, with the AutoSubs the mock holds.
+      const live = await (await fetch(`https://api.sleeper.app/v1/league/${nfl}/rosters`)).json();
+      const mine = live.find((r) => r.owner_id === sleeper.me);
+      const round = Number(query.match(/round: (\d+)/)[1]);
+      return json({ data: { matchup_legs: [{ league_id: nfl, leg: round, round, matchup_id: 1, roster_id: mine.roster_id, starters: mine.starters, subs: sleeper.nflSubs }] } });
+    }
+    if (/mutation update_matchup_leg\b/.test(query) && query.includes(nfl)) {
+      sleeper.mutations.push({ query, variables });
+      if ('subs' in variables) sleeper.nflSubs = Object.keys(JSON.parse(variables.subs)).length ? JSON.parse(variables.subs) : null;
+      return json({ data: { update_matchup_leg: { leg: 8, round: 8, roster_id: Number(query.match(/roster_id: (\d+)/)[1]), starters: JSON.parse(query.match(/starters: (\[[^\]]*\])/)[1]), subs: sleeper.nflSubs } } });
+    }
   }
   if (/query league_rosters\b/.test(query)) return json({ data: { league_rosters: sleeper.rosters } });
   if (/query league_transactions_filtered\b/.test(query)) {
@@ -2691,6 +2705,72 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
   assert.deepEqual([leagueId, rosterId, round], [NFL_LEAGUE, mine.roster_id, 8], "through Sleeper's own updateMatchupLeg");
   assert.notDeepEqual(saves.at(-1)[4], mine.starters, 'the lineup changed');
   await context.unroute('https://api.sleeper.app/v1/state/nfl');
+  sleeper.me = null;
+  documentBody = LOGGED_OUT;
+});
+
+test('NFL team tab, logged in: an AutoSub is set from a picked starter and taken off from its chip', async () => {
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
+  const me = users.find((u) => u.display_name === 'louhow');
+  sleeper.me = me.user_id;
+  sleeper.nflLegs = true;
+  sleeper.nflSubs = null;
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
+  const mine = rosters.find((r) => r.owner_id === me.user_id);
+  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: 8, token: true });
+  await page.goto(NFL_TEAM_URL);
+  await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+  await page.locator(nflPanel('.week-nav [data-action="next"]')).click();
+  await page.locator(nflPanel('.week-label b')).filter({ hasText: 'Week 8' }).waitFor();
+  await page.locator(nflPanel('button.slot')).first().waitFor({ timeout: 30000 });
+  // Pick a starter that has an AutoSub to set (an unplayed game, a bench player to take over).
+  const slots = page.locator(nflPanel('.card.nfl button.slot'));
+  let found = false;
+  for (let i = 0; i < await slots.count() && !found; i++) {
+    await slots.nth(i).click();
+    await page.locator(nflPanel('.card.nfl.selected')).waitFor();
+    found = await page.locator(nflPanel('.autosub-bar button')).count() > 0;
+    if (!found) await page.keyboard.press('Escape');
+  }
+  assert.ok(found, "a starter of this week's lineup can have an AutoSub");
+  assert.match(await page.locator(nflPanel('.autosub-bar span')).textContent(), /^1\/1 avail$/);
+  await page.screenshot({ path: `${OUT}nfl-autosub-bar.png` });
+  await page.locator(nflPanel('.autosub-bar button')).click();
+  await page.locator(nflPanel('.card.nfl[data-sub-pick]')).first().waitFor();
+  assert.match(await page.locator(nflPanel('.rhead .hint')).first().textContent(), /^Pick an AutoSub for .+ · Esc to cancel$/);
+  assert.equal(await page.locator(nflPanel('.card.nfl.selected')).count(), 1, 'the starter is marked');
+  await page.screenshot({ path: `${OUT}nfl-autosub-pick.png` });
+  const before = sleeper.mutations.length;
+  await page.locator(nflPanel('.card.nfl[data-sub-pick]')).first().click();
+  await page.locator(nflPanel('.notice.ok')).waitFor({ timeout: 30000 });
+  assert.match(await page.locator(nflPanel('.notice.ok')).textContent(), /^AutoSub: .+ takes .+'s spot if they don't play$/);
+  const set = sleeper.mutations.slice(before).filter((m) => /update_matchup_leg/.test(m.query));
+  assert.equal(set.length, 1, 'one save');
+  const subs = JSON.parse(set[0].variables.subs);
+  assert.equal(Object.keys(subs).length, 1, 'one AutoSub');
+  assert.match(set[0].query, new RegExp(`starters: \\[${mine.starters.map((id) => `"${id}"`).join(',')}\\]`), 'the lineup goes along unchanged');
+  assert.deepEqual(sleeper.nflSubs, subs);
+  assert.equal(await page.locator(nflPanel('[data-autosub-clear]')).count(), 1, "the starter's chip");
+  assert.match(await page.locator(nflPanel('.autosub-chip:not(button)')).textContent(), /^AutoSub for /, "and the sub's");
+  await page.screenshot({ path: `${OUT}nfl-autosub-set.png` });
+  // The limit is one: with it used, only its own starter offers a sub.
+  for (let i = 0; i < await slots.count(); i++) {
+    await slots.nth(i).click();
+    await page.locator(nflPanel('.card.nfl.selected')).waitFor();
+    // The starter with the AutoSub can still change it; no one else can set one.
+    const own = await page.locator(nflPanel('.card.nfl.selected [data-autosub-clear]')).count();
+    assert.equal(await page.locator(nflPanel('.autosub-bar button')).count(), own, 'no more to set');
+    await page.keyboard.press('Escape');
+  }
+  // The chip takes it off.
+  await page.locator(nflPanel('[data-autosub-clear]')).click();
+  await page.locator(nflPanel('.notice.ok')).filter({ hasText: /^AutoSub removed for / }).waitFor({ timeout: 30000 });
+  assert.equal(sleeper.nflSubs, null);
+  assert.equal(await page.locator(nflPanel('.autosub-chip')).count(), 0);
+  await context.unroute('https://api.sleeper.app/v1/state/nfl');
+  sleeper.nflLegs = false;
+  sleeper.nflSubs = null;
   sleeper.me = null;
   documentBody = LOGGED_OUT;
 });
