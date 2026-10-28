@@ -33,7 +33,7 @@ const state = (overrides = {}) => ({
   maxWeek: 21,
   weeks: { 1: week },
   // Before the draft lineups save to the roster, so these weeks need no matchup legs.
-  league: { name: 'Test League', status: 'pre_draft', roster_positions: ['PG', 'G', 'UTIL', 'BN', 'BN'], settings: { reserve_slots: 2, taxi_slots: 1 } },
+  league: { name: 'Test League', status: 'pre_draft', roster_positions: ['PG', 'G', 'UTIL', 'BN', 'BN'], settings: { reserve_slots: 2, reserve_allow_out: 1, taxi_slots: 1 } },
   usersById: {
     u1: { display_name: 'louhow', avatar: 'abc', metadata: { team_name: 'COOKIE <MONSTER>' } },
     u2: { display_name: 'rival', metadata: { team_name: 'Cling Kong' } },

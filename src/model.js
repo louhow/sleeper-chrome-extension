@@ -152,6 +152,12 @@
     return Boolean(RESERVE_ALLOW[status] && settings[RESERVE_ALLOW[status]]);
   }
 
+  // Players on IR the league no longer allows there (healthy, or a status it doesn't accept).
+  // Sleeper's apps make you move them off IR before any other roster move; its API doesn't check.
+  function illegalReserve(reserve, players, settings) {
+    return (reserve || []).filter((id) => players?.[id] && !reserveEligible(players[id], settings || {}));
+  }
+
   // A lineup spot, by ref:
   //   's:<i>'  starter slot i ('0' in starters means empty, like Sleeper)
   //   'b:<id>' bench player       'be:<k>' open bench spot (roster has room)
@@ -203,6 +209,11 @@
 
   function canMove(a, b, l) {
     if (a.ref === b.ref) return false;
+    // With an ineligible player on IR, the only move allowed is taking one of them off.
+    if (l.irBlocked?.length) {
+      const off = [a, b].find((x) => x.slot === 'IR' && l.irBlocked.includes(x.id));
+      if (!off) return false;
+    }
     if (a.slot === 'TX' || b.slot === 'TX') return taxiMove(a, b, l) || taxiMove(b, a, l);
     if (a.slot === 'IR' || b.slot === 'IR') return reserveMove(a, b, l) || reserveMove(b, a, l);
     return canSwap(a, b, l.players);
@@ -1217,7 +1228,7 @@
     ranks, rankShift, shiftTint, adminDeltas,
     weekDays, sideTeam, gameState, gamesByTeam, pointsByGame, statLine, playerDays, lockInDefault, ownedPicks, pickSeasons, PICK_SEASONS, lastWeek,
     spotRefs, swapTargets, applyMove, describeMove, lineupOnLeg, nextTeam,
-    taxiEligible, taxiOpen, reserveEligible,
+    taxiEligible, taxiOpen, reserveEligible, illegalReserve,
     lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
     openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, medianOn, median, leagueMedian, medianStanding, nextLiveRead,

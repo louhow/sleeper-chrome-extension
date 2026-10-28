@@ -36,6 +36,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
 - Lineup swaps on your own roster: tap a slot badge, then one of the highlighted players (G takes PG/SG, F takes SF/PF, UTIL and bench take anyone).
 - Taxi moves on your own roster, following the league's taxi settings (see below). Only badges with a legal move are clickable.
 - IR moves on your own roster: players whose injury status the league allows (`reserve_allow_out`, `_dtd`, `_dnr` and so on; IR and PUP always) can go onto IR from the bench or the lineup, or trade places with an IR player. Coming off IR into an open spot needs room on the active roster.
+- A player on IR the league no longer allows there (healthy, or a status it doesn't accept) freezes the lineup, NBA and NFL: Sleeper's apps check this on the client and its API doesn't, so the extension does. The only move left is taking that player off IR, the Optimize lineup button is disabled (its tooltip says why) and the Starters hint names who to move.
 
 #### Taxi rules
 

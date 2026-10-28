@@ -33,7 +33,7 @@
 
   function open() {
     const l = lineup(true);
-    if (!l?.editable) return;
+    if (!l?.editable || l.irBlocked?.length) return;
     state.modal = { lineup: l, ...plan(l), errors: [], saving: false, busy: null, done: null };
     state.notice = null;
     render();
@@ -51,7 +51,7 @@
     const m = state.modal;
     if (!m || m.saving) return null;
     const l = lineup(true);
-    const next = l?.editable ? plan(l) : null;
+    const next = l?.editable && !l.irBlocked?.length ? plan(l) : null;
     if (!next) {
       m.errors = ['The Team tab changed; open Optimize again.'];
       render();
@@ -116,17 +116,22 @@
     const actions = page === 'team' ? document.querySelector('.user-tab-menu .actions') : null;
     const button = document.getElementById(BUTTON_ID);
     if (!actions || !lineup(false)?.editable) return button?.remove();
-    if (button && actions.firstElementChild === button) return;
+    const full = lineup(true);
+    const blocked = full?.irBlocked || [];
+    const tip = blocked.length ? ui.irBlockTip(blocked.map((id) => full.reserve[id].name).join(', ')) : 'Propose the best starting lineup for this week';
     const el = button || Object.assign(document.createElement('div'), {
       id: BUTTON_ID,
       className: 'btn-container space',
       innerHTML: nflOptimizeView.BUTTON,
-      title: 'Propose the best starting lineup for this week',
       tabIndex: 0,
     });
+    el.title = tip;
     el.setAttribute('role', 'button');
     el.setAttribute('aria-label', 'Optimize lineup');
-    actions.prepend(el);
+    el.setAttribute('aria-disabled', String(blocked.length > 0));
+    el.style.opacity = blocked.length ? '0.4' : '';
+    el.style.cursor = blocked.length ? 'not-allowed' : '';
+    if (actions.firstElementChild !== el) actions.prepend(el);
   }
 
   function onClick(e) {

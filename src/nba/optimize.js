@@ -11,7 +11,7 @@
   // Proposes the best lineup for the shown week; nothing saves until it's applied.
   function open() {
     const lineup = ui.lineup(state);
-    if (state.saving || !lineup?.editable || !lineup.week || ui.whatIfOn(state)) return;
+    if (state.saving || !lineup?.editable || !lineup.week || ui.whatIfOn(state) || lineup.irBlocked.length) return;
     state.swap = null;
     state.lockConfirm = null;
     state.notice = null;
@@ -36,7 +36,7 @@
   function freshPlan() {
     const m = state.modal;
     const lineup = ui.lineup(state);
-    if (m?.kind !== 'optimize' || m.saving || !lineup?.editable) return null;
+    if (m?.kind !== 'optimize' || m.saving || !lineup?.editable || lineup.irBlocked.length) return null;
     // The plan was made with the league's scoring; what-if numbers would change it.
     if (ui.whatIfOn(state)) {
       m.errors = ['Switch what-if scoring off to apply. Optimize picks the lineup with your league\'s scoring.'];

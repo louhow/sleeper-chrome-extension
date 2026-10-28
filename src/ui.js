@@ -210,6 +210,7 @@
       // IR also belongs to the roster, so it's edited from the current week too.
       reserveEditable: editable && (settings.reserve_slots || 0) > 0 && s.week === s.currentWeek,
       reserveRoom: Math.max(0, (settings.reserve_slots || 0) - reserve.length),
+      irBlocked: globalThis.SNP.model.illegalReserve(reserve, s.players, settings),
       benchRoom: Math.max(0, (s.league.roster_positions || []).length - active),
     };
   }
@@ -234,6 +235,11 @@
       : `through preseason week ${settings.taxi_deadline || 1}`;
     return `${who} can move to taxi ${until}.`;
   }
+
+  // Names of the players stuck on IR who no longer qualify ('' when none), and the
+  // Optimize button's tooltip for them.
+  const irBlockNames = (l) => (l?.irBlocked || []).map((id) => shortName(playerOf(l.players, id))).join(', ');
+  const irBlockTip = (names) => `Optimize is off until ${names} comes off IR (no longer injured). Make that move first.`;
 
   // Which injury statuses the league lets onto IR, e.g. "Out, DTD and DNR players can move to IR."
   function reserveRule(settings) {
@@ -451,9 +457,10 @@
   }
 
   // The Starters hint on an editable lineup; `picked`: the name of the player in the spot being moved.
-  function swapHint(s, editable, picked) {
+  function swapHint(s, editable, picked, blocked = '') {
     if (!editable) return '';
-    return s.saving ? 'Saving lineup…'
+    return blocked ? `Move ${esc(blocked)} off IR first`
+      : s.saving ? 'Saving lineup…'
       : picked ? `Pick a player to swap with ${esc(picked)} · Esc to cancel`
       : s.swap ? 'Pick a player for this slot · Esc to cancel'
       : 'Tap a position to update your lineup';
@@ -516,11 +523,12 @@
 
   // The tab, the API log, then Optimize lineup (`optimize`: shown), the picker,
   // any `tools` and refresh.
-  function toolbar(s, log, { optimize = false, tools = '' } = {}) {
+  function toolbar(s, log, { optimize = false, tools = '', irBlock = '' } = {}) {
     const tab = (id, label) =>
       `<button role="tab" data-tab="${id}" aria-selected="${s.tab === id}" class="${s.tab === id ? 'active' : ''}">${label}</button>`;
     const picker = !s.rosters?.length || s.sessionExpired ? '' : s.page === 'matchup' ? matchupPicker(s) : teamPicker(s);
     const button = !optimize ? ''
+      : irBlock ? `<button class="optimize" disabled title="${esc(irBlock)}">Optimize lineup</button>`
       : whatIfOn(s) ? '<button class="optimize" disabled title="Optimize uses your league\'s scoring. Switch what-if scoring off to use it.">Optimize lineup</button>'
       : `<button class="optimize" data-action="optimize" title="Propose the best starting lineup for this week" ${s.saving ? 'disabled' : ''}>Optimize lineup</button>`;
     return `<nav class="toolbar">
@@ -728,7 +736,7 @@
   }
 
   return {
-    reserveRule, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
+    reserveRule, irBlockNames, irBlockTip, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
     esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
     lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, ordinal, researchLine,

@@ -3,7 +3,7 @@
 // player, any team or matchup from the picker. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflPanelView = (() => {
   const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
-    shell, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
+    shell, irBlockNames, irBlockTip, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
   const { scoreTier, spotRefs, swapTargets, winProbability, gameState, medianOn, leagueMedian, medianStanding, isChopped, chopBlock, chopTeamStats, graveyard } = globalThis.SNP.model;
   const { slotBadge, headshot, injury, chopAvatar } = globalThis.SNP.nflUi;
   // Sleeper's apps list bench players by position in this order.
@@ -19,6 +19,7 @@
     return shell(s, log, body, {
       cls: 'nfl-panel',
       optimize: Boolean(l?.mine && s.optimizable),
+      irBlock: l?.irBlocked.length ? irBlockTip(irBlockNames(l)) : '',
       tools: `<button class="icon" data-action="sleeper-view" title="Show Sleeper's own ${esc(pageTitle(s))} tab" aria-label="Sleeper's view">⇄</button>`,
     });
   }
@@ -28,7 +29,8 @@
     const parts = s.weeks?.[s.week] ? rosterParts(s, rosterId, POSITION_ORDER) : null;
     if (!parts) return null;
     const mine = owns(s, parts.roster);
-    return { ...parts, mine, players: s.players, editable: mine && s.editableWeek === s.week };
+    return { ...parts, mine, players: s.players, editable: mine && s.editableWeek === s.week,
+      irBlocked: globalThis.SNP.model.illegalReserve(parts.reserve, s.players, s.league.settings) };
   }
 
   // The player's game this week and where it stands: 'bye', else model.gameState's 'left', 'live' or 'done'.
@@ -167,7 +169,8 @@
     if (!l) return loading();
     const t = totals(s, l);
     const oppId = opponentOf(l);
-    const editable = l.editable && !s.saving;
+    // Lineup moves wait until an ineligible player comes off IR (Sleeper's own Team tab does that).
+    const editable = l.editable && !s.saving && !l.irBlocked.length;
     const ml = editable ? moveLineup(s, l) : null;
     const targets = new Set(ml && s.swap ? targetsOf(s.swap, ml) : []);
     // Only spots with somewhere to go get a button, so nothing is a dead click.
@@ -179,7 +182,7 @@
     const head = (title, hint = '') => rowHead(title, { hint, cls: 'nfl', middle: '<div class="nfl-game-h">Game</div>' });
     // IR and taxi keep the league's slots, open ones included, so the page holds its shape.
     return `${teamCard(s, l.roster, { points: t.points, proj: t.proj, opponent: oppId != null && s.rosters.find((r) => r.roster_id === oppId), week: l.week, sub: chopLine(s, l.roster), face: chopFace(s, l.roster) })}
-      ${head('Starters', swapHint(s, l.editable, real(picked) ? s.players[picked]?.name || 'them' : null))}
+      ${head('Starters', swapHint(s, l.editable, real(picked) ? s.players[picked]?.name || 'them' : null, irBlockNames(l)))}
       ${l.starters.map((id, i) => row(l.slots[i] ?? 'FLEX', id, `s:${i}`)).join('')}
       ${l.bench.length ? `${head('Bench')}${l.bench.map((id) => row('BN', id, `b:${id}`)).join('')}` : ''}
       ${l.reserve.length || settings.reserve_slots ? `${head('Injured Reserve')}${padTo(l.reserve, settings.reserve_slots).map((id) => row('IR', id)).join('')}` : ''}

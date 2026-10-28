@@ -578,7 +578,10 @@ async function answerGraphql(route) {
   }
   for (const nfl of [NFL_LEAGUE, CHOP_LEAGUE]) {
     if (/query league_rosters\b/.test(query) && query.includes(nfl)) {
-      return json({ data: { league_rosters: await (await fetch(`https://api.sleeper.app/v1/league/${nfl}/rosters`)).json() } });
+      // The live league can have a healthy player on IR, which freezes the lineup; these tests need it editable.
+      const live = await (await fetch(`https://api.sleeper.app/v1/league/${nfl}/rosters`)).json();
+      for (const r of live) r.reserve = [];
+      return json({ data: { league_rosters: live } });
     }
     if (/query matchup_legs\b/.test(query) && query.includes(nfl)) return json({ data: { matchup_legs: null } });
   }

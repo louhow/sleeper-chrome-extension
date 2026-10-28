@@ -1266,6 +1266,11 @@
       };
       if (p.hasTeamPlayedMap?.[pl.team]) played[id] = true;
     }
+    const reserve = {};
+    for (const id of roster.reserve || []) {
+      const pl = p.playersMap[id];
+      if (pl) reserve[id] = { name: `${pl.first_name} ${pl.last_name}`.trim(), position: pl.position, positions: pl.fantasy_positions || [pl.position], team: pl.team, injury: pl.injury_status || null };
+    }
     // Each roster row renders Sleeper's projection with the raw projected stats and league scoring.
     const projections = {};
     let scoring = null;
@@ -1284,6 +1289,7 @@
       starters,
       bench,
       players,
+      reserve,
       played,
       projections,
       scoring,

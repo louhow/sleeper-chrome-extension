@@ -21,7 +21,11 @@
   });
   const chop = chopped ? nflChop({ info, panel }) : null;
   if (chopped) nav?.feed(leagueId, () => (info.currentWeek == null ? null : panel.weekView(info.currentWeek)));
-  const optimizer = nflOptimize({ lineup, nflSave, notify: (text) => panel.notify(text) });
+  const optimizeLineup = (full) => {
+    const l = lineup(full);
+    return l?.reserve ? { ...l, irBlocked: model.illegalReserve(Object.keys(l.reserve), l.reserve, league.settings) } : l;
+  };
+  const optimizer = nflOptimize({ lineup: optimizeLineup, nflSave, notify: (text) => panel.notify(text) });
   const leagueCards = nflLeague(league);
   const playersTab = nflPlayers({ api, league, info });
   let page = initialPage;

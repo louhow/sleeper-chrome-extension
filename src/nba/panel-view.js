@@ -2,7 +2,7 @@
 // Matchup and League tabs are in matchup-view.js). Pure: (state, api log) -> HTML.
 (globalThis.SNP ||= {}).nbaPanelView = (() => {
   const { playerDays, lockInDefault, statLine, lockState, spotRefs, swapTargets, lockedGameId, scoreTier, gameState } = globalThis.SNP.model;
-  const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule,
+  const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule, irBlockNames, irBlockTip,
     whatIfOn, playerOf, teamTag, researchLine, padTo, real, loading, errorMsg, shell, teamCard, rowHead, swapHint, swapClass, emptyCard, apiView, sessionExpired } = globalThis.SNP.ui;
 
   function render(state, log) {
@@ -16,7 +16,8 @@
       : teamView(state);
     // Optimize lineup: only on the owner's editable Team tab, once the week's games are in.
     const l = state.ready && state.page === 'team' && state.tab === 'page' && !state.error && !state.sessionExpired ? lineup(state) : null;
-    return shell(state, log, body, { optimize: Boolean(l?.editable && l.week) });
+    const blocked = irBlockNames(l);
+    return shell(state, log, body, { optimize: Boolean(l?.editable && l.week), irBlock: blocked ? irBlockTip(blocked) : '' });
   }
 
   function teamView(s) {
@@ -43,7 +44,7 @@
     const picked = s.swap && s.players[spotId(s.swap, starters)];
     return `
       ${summary(s, l)}
-      ${week ? rosterSections(ctx, l, swapHint(s, editable, picked?.name)) : loading('Loading week…')}`;
+      ${week ? rosterSections(ctx, l, swapHint(s, editable, picked?.name, irBlockNames(l))) : loading('Loading week…')}`;
   }
 
   // A section's header row, aligned with its player rows: title, the week's days, points.
