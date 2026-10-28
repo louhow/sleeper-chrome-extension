@@ -47,6 +47,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 **NFL**
 - Team tab, compact like the NBA one: a row per player (game, live clock and score, stat line, start and rostered %, points in their score color), any team from the picker, lineup swaps from the slot badges, Optimize lineup in the toolbar. Sleeper's own tab is a click away (⇄). A player's name opens Sleeper's player card.
 - Matchup tab: the League tab's matchup card on top (a team opens on the Team tab), both lineups slot by slot with the game and box score under each player, muted as on Sleeper's own tab; the picker picks a matchup.
+- AutoSub: tap a starter, then "Set an AutoSub" to name the bench player who takes their spot if they don't play; a chip on the row takes it off.
 - Optimize lineup, slot by slot like the NBA one; apply one row or all of them.
 - League tab matchups drawn like the NBA ones, with Sleeper's own live numbers.
 - League median on the League tab and medallions on the Matchup and League tabs, as on NBA.

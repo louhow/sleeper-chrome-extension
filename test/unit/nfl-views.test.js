@@ -148,3 +148,34 @@ test('NFL League tab: the week\'s median first and a medallion on every team ove
   assert.doesNotMatch(nflLeagueView.render({ cards, round: 15 }, league, new Set()), /medal|median-bar/, 'not in the playoffs');
   assert.doesNotMatch(nflLeagueView.render({ cards, round: 7 }, { settings: {} }, new Set()), /medal|median-bar/, 'not without median on');
 });
+
+test('AutoSub: set from a picked starter, chips on both players, the bench lit while picking', () => {
+  const setup = (extra = {}) => {
+    const s = state({ me: 'u1', ...extra });
+    s.league = { ...s.league, settings: { ...s.league.settings, max_subs: 1, sub_start_time_eligibility: 1 } };
+    s.weeks[7].legs = [{ roster_id: 1, matchup_id: 3, starters: ['qb1', 'rb1', 'wr1', '0'] }];
+    s.rosters[0].players.push('sub1', 'sub2');
+    s.players.sub1 = { name: 'Jaxon Smith', first: 'Jaxon', last: 'Smith', position: 'WR', positions: ['WR'], team: 'SEA' }; // plays after Aiyuk's game starts
+    s.players.sub2 = { name: 'Late Receiver', first: 'Late', last: 'Receiver', position: 'WR', positions: ['WR'], team: 'DAL' }; // game under way
+    return s;
+  };
+  const html = (s) => nflPanelView.render(s, []);
+  assert.doesNotMatch(html(setup()), /autosub/, 'nothing to show until a starter is picked');
+  const picked = html(setup({ swap: 's:2' }));
+  assert.match(text(picked), /Set an AutoSub for Brandon Aiyuk 1\/1 avail/);
+  assert.match(picked, /data-action="autosub-start"/);
+  assert.doesNotMatch(html(setup({ swap: 's:0' })), /autosub-start/, 'Mahomes has played');
+  const picking = html(setup({ autosub: 'wr1' }));
+  assert.match(text(picking), /Pick an AutoSub for Brandon Aiyuk · Esc to cancel/);
+  assert.match(picking, /data-sub-pick="sub1"/, 'a later game can sub in');
+  assert.doesNotMatch(picking, /data-sub-pick="sub2"|data-sub-pick="bn1"/, 'a game under way or a kicker cannot');
+  assert.doesNotMatch(picking, /data-spot=/, 'no swap buttons meanwhile');
+  const set = setup();
+  set.weeks[7].legs = [{ roster_id: 1, matchup_id: 3, starters: ['qb1', 'rb1', 'wr1', '0'], subs: { wr1: 'sub1' } }];
+  const done = html(set);
+  assert.match(done, /data-autosub-clear="wr1"[^>]*>AutoSub J\. Smith ✕/, 'the starter names the sub, a tap clears it');
+  assert.match(text(done), /AutoSub for B\. Aiyuk/, 'and the sub names the starter');
+  const full = html({ ...set, swap: 's:1' });
+  assert.doesNotMatch(full, /autosub-start/, 'the limit is used, and Lamb is under way');
+  assert.doesNotMatch(html({ ...setup(), me: null }), /autosub/, 'not your team');
+});

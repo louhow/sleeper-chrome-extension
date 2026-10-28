@@ -7,7 +7,7 @@
 //   load(api, data, league, week, currentWeek, { research }) -> { players, week: { matchups, legs, teamOf, proj, actual, stats, games, days, research } }
 //   data: loaders.leagueData for the league (its legs).
 (globalThis.SNP ||= {}).nflWeek = (() => {
-  const LEG_FIELDS = 'leg matchup_id roster_id round starters points proj_points custom_points';
+  const LEG_FIELDS = 'leg matchup_id roster_id round starters subs points proj_points custom_points';
 
   async function load(api, data, league, week, currentWeek, { research: withResearch = true } = {}) {
     const { model, scoring, loaders } = globalThis.SNP;

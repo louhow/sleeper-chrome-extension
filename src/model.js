@@ -235,6 +235,46 @@
     return spotRefs(l).filter((ref) => canMove(from, spotOf(ref, l), l));
   }
 
+  // AutoSub: a bench player named to take a starter's spot if the starter doesn't play,
+  // set on the week's matchup leg as `subs` (starter id -> sub id). Rules, from Sleeper's
+  // apps: at most settings.max_subs per week, the sub fits the starter's slot, neither
+  // game has kicked off, and with settings.sub_start_time_eligibility on the sub's game
+  // starts at the same time as the starter's or later (a starter on a bye has no time to beat).
+  //   l: { slots, starters, bench, players, settings }; `game(id)`: { start, kickedOff } | null for a bye.
+  // The sub options for one starter: bench ids, in the bench's order; [] when none or when no sub can be set.
+  function autosubOptions(starterId, l, subs, game) {
+    const i = l.starters.indexOf(starterId);
+    if (i < 0 || !starterId || starterId === '0') return [];
+    const settings = l.settings || {};
+    const used = Object.entries(subs || {});
+    const max = settings.max_subs || 0;
+    if (!used.some(([starter]) => starter === starterId) && used.length >= max) return [];
+    const mine = game(starterId);
+    if (mine?.kickedOff) return [];
+    const taken = new Set(used.filter(([starter]) => starter !== starterId).map(([, sub]) => sub));
+    return l.bench.filter((id) => {
+      const player = l.players[id];
+      if (!player || taken.has(id) || !fits(l.slots[i], player)) return false;
+      const theirs = game(id);
+      if (!theirs || theirs.kickedOff) return false;
+      return !settings.sub_start_time_eligibility || mine?.start == null || theirs.start == null || theirs.start >= mine.start;
+    });
+  }
+
+  // The subs once `starter` is given `sub` (null clears it): a copy, keyed by starter.
+  function withAutosub(subs, starter, sub) {
+    const next = { ...(subs || {}) };
+    if (sub == null) delete next[starter];
+    else next[starter] = sub;
+    return next;
+  }
+
+  // Subs worth keeping after a lineup change: only those for players still starting
+  // with their sub still on the bench.
+  function liveSubs(subs, starters, bench) {
+    return Object.fromEntries(Object.entries(subs || {}).filter(([starter, sub]) => starters.includes(starter) && bench.includes(sub)));
+  }
+
   // Starters, taxi and IR after two spots trade occupants. The bench is implicit:
   // whoever isn't starting, on taxi or on IR.
   function applyMove(fromRef, toRef, l) {
@@ -1227,7 +1267,7 @@
   return {
     ranks, rankShift, shiftTint, adminDeltas,
     weekDays, sideTeam, gameState, gamesByTeam, pointsByGame, statLine, playerDays, lockInDefault, ownedPicks, pickSeasons, PICK_SEASONS, lastWeek,
-    spotRefs, swapTargets, applyMove, describeMove, lineupOnLeg, nextTeam,
+    spotRefs, swapTargets, autosubOptions, withAutosub, liveSubs, applyMove, describeMove, lineupOnLeg, nextTeam,
     taxiEligible, taxiOpen, reserveEligible, illegalReserve,
     lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,

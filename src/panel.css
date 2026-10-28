@@ -3058,3 +3058,46 @@ button.danger.solid:hover:not(:disabled) {
 .settings-foot button.primary {
   min-width: 0;
 }
+
+/* AutoSub (NFL Team tab): the chips on rows that have one, and the button that starts naming one */
+.autosub-chip {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  white-space: nowrap;
+}
+button.autosub-chip {
+  cursor: pointer;
+}
+button.autosub-chip:hover {
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.autosub-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.autosub-bar button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 14px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.card[data-sub-pick] {
+  cursor: pointer;
+}

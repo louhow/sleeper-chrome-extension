@@ -278,6 +278,14 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
 - Matchup: a row is the player and their points (a finished game's in its score color as text, not a chip), with the game under them in muted text as on Sleeper's own tab ("Final L 21-35 vs LAR", the clock and score while it's on, or kickoff) and the box score below it.
 - Sleeper's own tab is hidden as soon as the league is known to be NFL, and ours stays blank until its first load is in, as on the NBA tabs, so nothing shifts.
 - Your own lineup, for the week Sleeper's Team tab shows: tap a slot badge, then one of the highlighted players. Players whose game has kicked off stay put, as Sleeper locks them. Saves go through Sleeper's own Team component (`updateMatchupLeg`), as Optimize's do.
+- AutoSub: tap a starter's badge and a "Set an AutoSub for <name> · 1/1 avail" button appears under the Starters header (only when a bench player can take the spot).
+  It lights the eligible bench players; tap one to save.
+  A chip on the starter ("AutoSub J. Price ✕") takes it off, and the sub's row says who they cover.
+  Rules (`model.autosubOptions`, ported from the mobile app): at most `settings.max_subs` per week; the sub fits the starter's slot; neither game has kicked off; with `settings.sub_start_time_eligibility` on, the sub's game starts at the same time as the starter's or later (a starter on a bye has no time to beat).
+  Saves go straight to GraphQL (not Sleeper's Team component), and the answer's `subs` must equal what was asked or the save reports an error.
+  A lineup swap on this tab puts the subs that still make sense back afterwards (`model.liveSubs`), so nothing depends on Sleeper's lineup save leaving them alone.
+  Checked against the live league: saving `subs` as `"{}"` clears an AutoSub (the answer holds `{}`, a later read `null`), and a lineup save that leaves `subs` out keeps an existing one.
+  Optimize lineup does not set or keep AutoSubs yet.
 - Optimize lineup sits in the toolbar, as on the NBA Team tab, and opens the same dialog.
 - A player's name or headshot (Team and Matchup tabs) opens Sleeper's own player card, the one its Players tab shows.
   Sleeper builds that card in its own handlers (the Team component's `_onClickPlayerNews`, a Matchup row's click) and hands it to `openModal`; page-hook runs one of them with `openModal` caught, then opens the card it got for the player asked for.
@@ -403,6 +411,7 @@ It enables:
 - `me`: which roster is yours (swaps are only offered there, for the current and future weeks).
 - `matchup_legs(league_id, round)`: the week's saved lineup, Sleeper's own points and Lock-In picks (`starters_games`, shown with a lock).
 - `update_matchup_leg(...)` during the season, `roster_update_starters(...)` outside it: saving a swap.
+- `update_matchup_leg(..., starters: [...], subs: $subs)`: AutoSub (NFL). `$subs` (type `Map`) is a JSON string of starter id -> sub id, e.g. `"{\"4866\":\"13286\"}"`; the lineup goes along unchanged, and `matchup_legs` reads `subs` back. Found from the mobile app's HAR.
 - `update_matchup_leg(..., starters_games: $starters_games)`: Lock-In. The variable is the week's full player -> game map as JSON, with the new lock added.
 - `roster_update_taxi(league_id, roster_id, taxi)`: taxi moves. Saved before any starter change, like Sleeper's web app.
 - `roster_update_reserve(league_id, roster_id, reserve)`: IR moves. A starter going to IR is first saved out of the lineup, then IR, then the final lineup, so no save has a player both starting and on IR.
