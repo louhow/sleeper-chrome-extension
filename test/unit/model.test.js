@@ -985,3 +985,18 @@ test('autosub subs: set, cleared, and kept only while the starter starts and the
   assert.deepEqual(plain(model.liveSubs({ a: 'b', c: 'd', e: 'f' }, ['a', 'e'], ['b', 'x'])), { a: 'b' });
   assert.deepEqual(plain(model.liveSubs(null, ['a'], ['b'])), {});
 });
+
+test('autosub options follow the league cap: 0 to 3 subs a week', () => {
+  const rb = { positions: ['RB'] };
+  const game = () => ({ start: 100, kickedOff: false });
+  const l = (max_subs) => ({ slots: ['RB', 'RB', 'RB', 'RB'], starters: ['a', 'b', 'c', 'd'], bench: ['x', 'y', 'z', 'w'], players: { x: rb, y: rb, z: rb, w: rb }, settings: { max_subs } });
+  const opts = (max, subs, starter = 'd') => plain(model.autosubOptions(starter, l(max), subs, game));
+  assert.deepEqual(opts(0, {}), []);
+  for (const max of [1, 2, 3]) {
+    const used = Object.fromEntries(['a', 'b', 'c'].slice(0, max).map((s, i) => [s, ['x', 'y', 'z'][i]]));
+    const open = Object.fromEntries(Object.entries(used).slice(0, max - 1));
+    assert.deepEqual(opts(max, used), [], `${max} used of ${max}`);
+    assert.equal(opts(max, open).length, 4 - (max - 1), `${max - 1} used of ${max}: only the unclaimed bench`);
+    assert.equal(opts(max, used, 'a').length, 4 - (max - 1), 'a starter with a sub can change it');
+  }
+});
