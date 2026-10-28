@@ -284,6 +284,7 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
   Rules (`model.autosubOptions`, ported from the mobile app): at most `settings.max_subs` per week; the sub fits the starter's slot; neither game has kicked off; with `settings.sub_start_time_eligibility` on, the sub's game starts at the same time as the starter's or later (a starter on a bye has no time to beat).
   Saves go straight to GraphQL (not Sleeper's Team component), and the answer's `subs` must equal what was asked or the save reports an error.
   A lineup swap on this tab puts the subs that still make sense back afterwards (`model.liveSubs`), so nothing depends on Sleeper's lineup save leaving them alone.
+  Checked against the live league: saving `subs` as `"{}"` clears an AutoSub (the answer holds `{}`, a later read `null`), and a lineup save that leaves `subs` out keeps an existing one.
   Optimize lineup does not set or keep AutoSubs yet.
 - Optimize lineup sits in the toolbar, as on the NBA Team tab, and opens the same dialog.
 - A player's name or headshot (Team and Matchup tabs) opens Sleeper's own player card, the one its Players tab shows.
