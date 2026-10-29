@@ -362,9 +362,9 @@ Settings are saved for the whole browser (`chrome.storage.local`, key `settings`
 Sleeper pads every chat message, avatar, embed and report card generously, so the chat shows about half what it could.
 The same stylesheet (`src/chat.js`, switched on by `data-snp-chat`) tightens it, changing only padding, margins and sizes.
 
-- Messages: the group's padding, a 28px avatar, no gap under the name line, a 17px text line.
-- Free agent and waiver moves: one line a player (name and position side by side, a 26px headshot), the bid beside them.
-- Weekly report: tighter cards and a 30px avatar (a report is about 40% shorter).
+- Messages: the group's padding, a 32px avatar and some breathing room (Sleeper sets avatar sizes inline, hence `!important`).
+- Free agent and waiver moves: one line a player (name and position side by side, a 30px headshot), the bid beside them.
+- Weekly report: tighter cards and a 36px avatar (a report is about a third shorter).
 - Reaction rows are untouched (below).
 
 ### Chat reactions
