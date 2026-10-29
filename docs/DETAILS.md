@@ -82,7 +82,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - Lock in: such a starter is recommended for locking when the best lineup keeps them and they have a game left (with none, the last game counts anyway).
   Each recommendation shows the score, the open value and when the window closes (their next tip-off).
   "Keep open" leaves it out and keeps the player in the lineup, so the score can still be locked later; the rest of the plan is worked out again. "Lock instead" brings it back.
-  A player being locked keeps their slot, and the lineup is worked out around them.
+  A player being locked always starts but can take any slot they fit (so they can leave UTIL for a specific slot and free UTIL for someone on the bench); the rest of the lineup is worked out around them.
 - Starters whose finished game can be locked but isn't worth it yet show the score and the open value in their row ("16.50 Wed vs MIL · open 31.91"), with no action.
 - Slots no one can fill that day go to the players with the most projected points per game left this week.
 - Lineup: tries every way to fit the movable players into the starting slots and keeps the highest total, so scarce slots go to the players who can only fill them. Ties keep the most players where they are, then put players in their most specific slot.

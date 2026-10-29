@@ -712,13 +712,15 @@
   //   have a game in the span `worth` covers; later(id): the next tie-breaker;
   //   fixedReason(id): why they can't move, or null;
   //   fits(slot, player), specificity(slot) (a small integer, higher = fewer
-  //   positions), openSlot: the slot a starter index past `slots` plays.
+  //   positions), openSlot: the slot a starter index past `slots` plays;
+  //   must: players who start in any case (free to take any slot they fit);
+  //   shift: players to move to the most specific slot they fit afterwards.
   // Worth is floored at 0, so a slot never goes empty to dodge a negative
   // projection: that's noise more than a forecast, and an empty slot is the
   // one thing Sleeper's own lineup screens flag as a mistake.
   function solveLineup({
     slots, starters: current, bench, players, worth, plays = () => false, later = () => 0, fixedReason = () => null,
-    fits: fitsSlot = fits, specificity = slotSpecificity, openSlot = 'UTIL', shift = new Set(),
+    fits: fitsSlot = fits, specificity = slotSpecificity, openSlot = 'UTIL', shift = new Set(), must = new Set(),
   }) {
     const real = (id) => id && id !== '0';
     const fixed = [];
@@ -739,6 +741,10 @@
     // numbers, so the totals stay exact integers in a double.
     const cents = (x) => Math.max(0, Math.min(Math.round((x || 0) * 100), 99999));
     const worthOf = Object.fromEntries(pool.map((id) => [id, cents(worth(id))]));
+    // `must` players start whichever slot they fit: a bonus worth more than every
+    // other player's worth together puts them first, ahead of any total.
+    const mustBonus = Object.values(worthOf).reduce((a, b) => a + b, 0) + 1;
+    for (const id of pool) if (must.has(id)) worthOf[id] += mustBonus;
     // A game to play outranks anything `later` adds up to (it is capped at 99999).
     const laterOf = Object.fromEntries(pool.map((id) => [id, (plays(id) ? 100000 : 0) + cents(later(id))]));
     const n = open.length;
@@ -824,7 +830,9 @@
       // A zero projection with a game still beats an idle slot: it's all upside.
       plays: (id) => look[id].left.some((d) => d.date === date),
       later: (id) => look[id].value,
-      fixedReason: (id) => look[id].fixed || (locking.has(id) ? 'locking' : null),
+      fixedReason: (id) => look[id].fixed,
+      // A player being locked starts for sure, in any slot they fit: the lock pins them there.
+      must: locking,
       shift: locking,
     });
     // Locks go to starters worth keeping that the best lineup keeps, and who
@@ -851,7 +859,6 @@
     const first = solve(new Set());
     const locking = new Set(l.starters.filter((id) => lockable(id) && !skip.has(id) && first.starters.includes(id)));
     const plan = locking.size ? solve(locking) : first;
-    plan.fixed = plan.fixed.filter((f) => f.reason !== 'locking');
     plan.date = date;
     // Unticked ones stay listed, so they can be ticked again.
     plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {

@@ -545,6 +545,21 @@ test('best lineup: a player being locked keeps their slot, and the lineup works 
   assert.deepEqual(plain(plan.locks.map((k) => k.id)), ['kj']);
 });
 
+test('best lineup: a player being locked can leave UTIL for a specific slot, freeing UTIL for a bench player', () => {
+  // kj (SG/SF) sits at UTIL and gets locked. He can lock at F instead, so the guard on the bench takes UTIL
+  // rather than a pure forward taking F and the guard staying out.
+  const l = optimizerLineup(['G', 'F', 'UTIL'], ['pg', 'big', 'kj'], ['sf', 'guard'], { pg: ['PG'], big: ['SF', 'PF'], kj: ['SG', 'SF'], sf: ['SF'], guard: ['PG', 'SG'] }, {
+    pg: [['p1', '2026-10-22', 'pre_game', 40]],
+    big: [['b1', '2026-10-22', 'pre_game', 0]],
+    kj: [['k1', '2026-10-20', 'complete', 40, 40], ['k2', '2026-10-23', 'pre_game', 10]],
+    sf: [['s1', '2026-10-22', 'pre_game', 20]],
+    guard: [['g1', '2026-10-22', 'pre_game', 30]],
+  });
+  const plan = model.bestLineup(l, OPT_NOW);
+  assert.deepEqual(plain(plan.starters), ['pg', 'kj', 'guard']);
+  assert.deepEqual(plain(plan.locks.map((k) => k.id)), ['kj']);
+});
+
 test('best lineup: locked players and players in a game right now stay put', () => {
   const l = optimizerLineup(['G', 'UTIL'], ['lock', 'live'], ['star', 'benchLive'], { lock: ['PG'], live: ['SG'], star: ['PG'], benchLive: ['SG'] }, {
     lock: [['l1', '2026-10-20', 'complete', 5, 4]],
