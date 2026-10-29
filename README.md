@@ -70,6 +70,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Each league opens on the tab you were last on in it when you switch leagues in the sidebar.
 - Settings: the gear in Sleeper's sidebar opens the extension's settings (a switch for the NFL pages and tools, so Sleeper's own show instead), with Sleeper's account settings a button away.
 - Chat: hovering a message's emoji reactions no longer shifts the chat around, and who reacted shows in full.
+- Chat: compact messages, free agent and waiver moves (one line a player) and weekly reports, about half the height.
 - API tab: a log of every call the extension makes, with status, timing, size and a JSON preview.
 
 Details: [docs/DETAILS.md](docs/DETAILS.md) (NBA and NFL) and [docs/EPL.md](docs/EPL.md) (Premier League).

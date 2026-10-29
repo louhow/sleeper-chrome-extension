@@ -16,6 +16,11 @@
 // for a moment after the cursor leaves, as its names popup lingers (with or
 // without names, which only a picked emoji has). Let go then, Sleeper's own
 // wide row would come back in place, under the cursor, and open it again, and so on.
+// The messages themselves are tightened too (inspected 2026-10-29): Sleeper
+// pads every message group, avatar, embed and report card generously, so the
+// chat shows about half as much as it could. Only padding, margins and sizes
+// change (a smaller avatar, a player's name and position on one line); every
+// element stays where Sleeper puts it, and the reaction rows below are untouched.
 //   chat() -> { destroy }
 (globalThis.SNP ||= {}).chat = () => {
   const ROW = '.comment-reactions-container';
@@ -27,7 +32,39 @@
   const PAD = 6;
   // Only while the extension runs (data-snp-chat on <html>).
   const on = 'html[data-snp-chat]';
+  const list = `${on} .comment-list`;
+  const tx = `${list} .embed-league-transaction`;
+  const report = `${list} .weekly-report-owner-item`;
   const css = `
+    /* Compact messages: the group's padding, the avatar and the name line. */
+    ${list} .comment-group { padding: 3px 12px 4px; }
+    ${list} .comment-group .avatar { width: 28px; height: 28px; min-width: 28px; }
+    ${list} .comment-group .avatar img { width: 28px; height: 28px; }
+    ${list} .content-container { padding: 0 0 0 10px; }
+    ${list} .name-container { margin: 0; }
+    ${list} .name-container .reply { padding: 2px 6px; }
+    ${list} .text-container { padding: 1px 0; line-height: 17px; }
+    ${list} :is(.embed-gif, .embed-poll, .embed-url) { margin-top: 4px; margin-bottom: 4px; }
+    /* Free agent and waiver moves: one line a player, the bid beside them. */
+    ${tx} { margin: 3px 0 4px; padding-left: 10px; }
+    ${tx} .header-text { margin: 0 0 4px; }
+    ${tx} .transaction-body { width: 100%; justify-content: space-between; }
+    ${tx} .actions-container { width: auto; flex: 1 1 auto; min-width: 0; }
+    ${tx} .transaction-player { height: 30px; margin: 0 0 2px; align-items: center; }
+    ${tx} img.avatar-player { width: 26px; height: 26px; }
+    ${tx} .meta { flex-direction: row; align-items: baseline; gap: 6px; height: auto; }
+    ${tx} .meta :is(.name, .position) { width: auto; margin: 0; white-space: nowrap; }
+    ${tx} :is(.bid-container, .bid-button) { height: 32px; }
+    /* The weekly report: a tighter card and a smaller avatar. */
+    ${list} .embed-league-report { margin: 4px 0 0; }
+    ${report} { margin: 6px 0; padding: 0 0 0 10px; }
+    ${report} .tagline { margin: 2px 0 0; }
+    ${report} .owner-row { margin: 6px 0 0; align-items: center; }
+    ${report} .owner-row .avatar { width: 30px; height: 30px; min-width: 30px; }
+    ${report} .owner-row .avatar img { width: 30px; height: 30px; }
+    ${report} .owner-meta { height: auto; }
+    ${report} .username { height: auto; line-height: 16px; }
+    ${report} .team-name { margin: 0; line-height: 14px; }
     /* Picked emoji first, so the options opening up never come before them. */
     ${on} ${ROW} ${UNUSED} { order: 1; }
     /* Widths change at once (only the pop-in animates), so a closing row never reflows. */

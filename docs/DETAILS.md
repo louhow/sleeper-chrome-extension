@@ -357,6 +357,16 @@ Settings are saved for the whole browser (`chrome.storage.local`, key `settings`
 
 - **NFL tabs and tools** (on by default): the Team and Matchup tabs, League cards, Optimize lineup and the Players tab's Last 5. Off, an NFL league shows Sleeper's own pages and the extension stays out of them; changing it starts each league's session over, no reload needed.
 
+### Chat, compact
+
+Sleeper pads every chat message, avatar, embed and report card generously, so the chat shows about half what it could.
+The same stylesheet (`src/chat.js`, switched on by `data-snp-chat`) tightens it, changing only padding, margins and sizes.
+
+- Messages: the group's padding, a 28px avatar, no gap under the name line, a 17px text line.
+- Free agent and waiver moves: one line a player (name and position side by side, a 26px headshot), the bid beside them.
+- Weekly report: tighter cards and a 30px avatar (a report is about 40% shorter).
+- Reaction rows are untouched (below).
+
 ### Chat reactions
 
 Sleeper's chat (any page) keeps every emoji option in a message's reaction row, the unused ones at width 0, and widens them all while the row is hovered.
