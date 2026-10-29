@@ -364,7 +364,7 @@ The same stylesheet (`src/chat.js`, switched on by `data-snp-chat`) tightens it,
 
 - Messages: the group's padding, a 32px avatar and some breathing room (Sleeper sets avatar sizes inline, hence `!important`).
 - Free agent and waiver moves: one line a player (name and position side by side, a 30px headshot), the bid beside them.
-- Weekly report: tighter cards and a 36px avatar (a report is about a third shorter).
+- Weekly report: tighter cards (a card for each manager, and for each position of the week in football) and a 36px avatar.
 - Reaction rows are untouched (below).
 
 ### Chat reactions

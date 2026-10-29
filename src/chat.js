@@ -34,7 +34,7 @@
   const on = 'html[data-snp-chat]';
   const list = `${on} .comment-list`;
   const tx = `${list} .embed-league-transaction`;
-  const report = `${list} .weekly-report-owner-item`;
+  const report = `${list} :is(.weekly-report-owner-item, .weekly-report-player-item)`;
   const css = `
     /* Compact messages: the group's padding, the avatar and the name line.
        Sleeper sizes every avatar and headshot inline, so those need !important. */
@@ -56,16 +56,17 @@
     ${tx} .meta { flex-direction: row; align-items: baseline; gap: 6px; height: auto; }
     ${tx} .meta :is(.name, .position) { width: auto; margin: 0; white-space: nowrap; }
     ${tx} :is(.bid-container, .bid-button) { height: 36px; }
-    /* The weekly report: tighter cards and a smaller avatar. */
+    /* The weekly report (a card for each manager, and a player for each position in football). */
     ${list} .embed-league-report { margin: 6px 0 0; }
-    ${report} { margin: 8px 0; padding: 0 0 0 12px; }
+    ${report} { margin: 8px 0; padding: 10px 14px 12px; }
     ${report} .tagline { margin: 3px 0 0; }
     ${report} .owner-row { margin: 8px 0 0; align-items: center; }
-    ${report} .owner-row .avatar { width: 36px !important; height: 36px !important; min-width: 36px; }
+    ${report} .owner-row :is(.avatar, img.avatar-player) { width: 36px !important; height: 36px !important; min-width: 36px !important; flex: 0 0 36px !important; }
     ${report} .owner-row .avatar img { width: 36px !important; height: 36px !important; }
     ${report} .owner-meta { height: auto; }
     ${report} .username { height: auto; line-height: 17px; }
     ${report} .team-name { margin: 0; line-height: 15px; }
+    ${report} .stat-text { margin: 2px 0 0; line-height: 14px; }
 
     /* Picked emoji first, so the options opening up never come before them. */
     ${on} ${ROW} ${UNUSED} { order: 1; }
