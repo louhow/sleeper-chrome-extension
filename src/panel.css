@@ -3101,3 +3101,77 @@ button.autosub-chip:hover {
 .card[data-sub-pick] {
   cursor: pointer;
 }
+
+/* The League tab's standings: click a header to sort by it. */
+.standings-head {
+  margin-top: 18px;
+}
+.standings {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.standings th,
+.standings td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+}
+.standings .num {
+  text-align: right;
+}
+.standings .rank {
+  width: 40px;
+  color: var(--muted);
+  font-weight: 900;
+}
+.standings .sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.standings .sort:hover:not(:disabled),
+.standings .sort.on {
+  background: none;
+  color: var(--text, inherit);
+}
+.standings .arrow {
+  display: inline-block;
+  min-width: 10px;
+  font-size: 9px;
+}
+.standings .name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.standings .name-cell .avatar {
+  width: 26px;
+  height: 26px;
+}
+.standings .team-name {
+  font-size: 14px;
+  line-height: 26px;
+  font-weight: 800;
+}
+.standings tr.is-mine td {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.standings td .sub {
+  color: var(--muted);
+  font-size: 12px;
+}

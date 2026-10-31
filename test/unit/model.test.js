@@ -1015,3 +1015,23 @@ test('autosub options follow the league cap: 0 to 3 subs a week', () => {
     assert.equal(opts(max, used, 'a').length, 4 - (max - 1), 'a starter with a sub can change it');
   }
 });
+
+test('standings rows carry PF, PA, Max PF and waiver, and sort by any column with rank breaking ties', () => {
+  const league = { settings: { waiver_budget: 100 } };
+  const r = (id, st) => ({ roster_id: id, settings: st });
+  const rosters = [
+    r(1, { wins: 2, losses: 0, fpts: 700, fpts_decimal: 50, fpts_against: 600, ppts: 800, ppts_decimal: 25, waiver_position: 3, waiver_budget_used: 10 }),
+    r(2, { wins: 1, losses: 1, fpts: 650, fpts_against: 640, ppts: 900, waiver_position: 1 }),
+    r(3, { wins: 0, losses: 2, fpts: 650, fpts_against: 700, ppts: 700, waiver_position: 2 }),
+  ];
+  const rows = model.standingsRows(league, rosters, { 1: 1, 2: 2, 3: 3 });
+  assert.deepEqual(plain(rows[0]), { roster: rosters[0], rank: 1, wins: 2, losses: 0, ties: 0, pf: 700.5, pa: 600, maxPf: 800.25, waiver: 3, faab: 90 });
+  const ids = (key, dir) => plain(model.sortStandings(rows, key, dir).map((x) => x.roster.roster_id));
+  assert.deepEqual(ids('rank', 1), [1, 2, 3]);
+  assert.deepEqual(ids('maxPf', -1), [2, 1, 3]);
+  assert.deepEqual(ids('pf', -1), [1, 2, 3], 'equal points fall back to rank');
+  assert.deepEqual(ids('pa', 1), [1, 2, 3]);
+  assert.deepEqual(ids('waiver', 1), [2, 3, 1]);
+  assert.deepEqual(ids('record', -1), [1, 2, 3]);
+  assert.deepEqual(ids('rank', -1), [3, 2, 1]);
+});

@@ -34,6 +34,8 @@
   const corner = shared.shadowHost('sleeper-nba-scoring', schedule);
   // Sleeper's "not yet available" placeholder, hidden while the panel fills its spot.
   const hide = shared.hideSleeper('nba-placeholder', '.postdraft-panel > :has(.empty-panel-container)');
+  // On the League tab, Sleeper's "League is full" teams list and its standings give way to ours.
+  const hideLeague = shared.hideSleeper('nba-league', '.league-tab-container .league-members-container, .league-tab-container .league-tab-standings');
   let mountedAt = Date.now();
 
   const state = {
@@ -99,6 +101,7 @@
   function attach() {
     nflSession?.attach();
     hide.set(!destroyed && !disabled && state.onPanel && state.page !== 'league');
+    hideLeague.set(!destroyed && !disabled && state.onPanel && state.page === 'league');
     if (destroyed || disabled) return;
     if (!state.onPanel) return detach();
     // The League tab: on top of Sleeper's own content, which stays.
@@ -654,6 +657,14 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     if (team) return openRoster(Number(team.dataset.openTeam), 'team');
     const match = e.target.closest('[data-open-matchup]');
     if (match) return openRoster(Number(match.dataset.openMatchup), 'matchup');
+    const sort = e.target.closest('[data-sort]');
+    if (sort) {
+      const key = sort.dataset.sort;
+      const cur = state.standingsSort;
+      // A new column sorts best-first (most points, first rank, A to Z); again flips it.
+      state.standingsSort = cur?.key === key ? { key, dir: -cur.dir } : { key, dir: ['rank', 'team', 'waiver'].includes(key) ? 1 : -1 };
+      return schedule();
+    }
     const tab = e.target.closest('[data-tab]');
     if (tab) {
       state.tab = tab.dataset.tab;
@@ -839,6 +850,7 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     layer.host.remove();
     corner.host.remove();
     hide.remove();
+    hideLeague.remove();
   }
 
   function destroy() {

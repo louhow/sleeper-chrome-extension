@@ -144,6 +144,9 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 - Above Sleeper's own League tab content (which stays), the week's matchups, every one in the league, yours first and framed: each is the Matchup tab's header for that pair (avatars, scores, win chance, record and rank, starters yet to play, projection), with the same week picker.
 - The cards are a compact take on that header, so a 14-team league's 7 matchups fit in the tab without scrolling.
 - Clicking a matchup opens it on the Matchup tab, that team on the left, through Sleeper's own MATCHUP tab; clicking a team's avatar, owner or name opens that team on the Team tab.
+- Under the matchups, a standings table: rank, team, record, PF, PA, Max PF (`ppts`) and waiver (FAAB left and waiver spot).
+  A click on a header sorts by it (most first, or first rank and A to Z for rank, team and waiver), another click flips it.
+  It stands in for Sleeper's own "League is full" teams list and standings, which are hidden.
 
 ### League median
 

@@ -1140,6 +1140,37 @@
     return Object.fromEntries(order.map((r, i) => [r.roster_id, i + 1]));
   }
 
+  // The League tab's standings table: one row per roster with the numbers
+  // Sleeper's roster settings hold (PF, PA, Max PF = ppts, waiver spot and FAAB left).
+  // `ranks`: roster_id -> rank (standingsRanks).
+  function standingsRows(league, rosters, ranks) {
+    const dec = (st, k) => (st[k] ?? 0) + (st[`${k}_decimal`] ?? 0) / 100;
+    return (rosters || []).map((roster) => {
+      const st = roster.settings || {};
+      return {
+        roster, rank: ranks?.[roster.roster_id] ?? null,
+        wins: st.wins ?? 0, losses: st.losses ?? 0, ties: st.ties ?? 0,
+        pf: dec(st, 'fpts'), pa: dec(st, 'fpts_against'), maxPf: dec(st, 'ppts'),
+        waiver: st.waiver_position ?? null, faab: faabLeft(league, roster),
+      };
+    });
+  }
+
+  // Sorted rows (a copy). `key`: rank | team | record | pf | pa | maxPf | waiver;
+  // `dir`: 1 ascending, -1 descending. Ties fall back to rank, so a sort is steady.
+  function sortStandings(rows, key, dir, name = (r) => r.roster.roster_id) {
+    const by = {
+      rank: (a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9),
+      team: (a, b) => String(name(a)).localeCompare(String(name(b)), undefined, { sensitivity: 'base' }),
+      record: (a, b) => a.wins - b.wins || a.ties - b.ties || b.losses - a.losses,
+      pf: (a, b) => a.pf - b.pf,
+      pa: (a, b) => a.pa - b.pa,
+      maxPf: (a, b) => a.maxPf - b.maxPf,
+      waiver: (a, b) => (a.waiver ?? 1e9) - (b.waiver ?? 1e9),
+    }[key] || (() => 0);
+    return [...rows].sort((a, b) => dir * by(a, b) || (a.rank ?? 1e9) - (b.rank ?? 1e9));
+  }
+
   // Waivers, ported from Sleeper's add/drop dialog. waiver_type 2 is FAAB.
   const FAAB = 2;
 
@@ -1277,7 +1308,7 @@
     taxiEligible, taxiOpen, reserveEligible, illegalReserve,
     lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
-    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
+    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
     isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, chopLeagueAvg, graveyard,
   };

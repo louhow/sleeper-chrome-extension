@@ -31,6 +31,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Team tab: roster, each player's last finished game as a box score under their name, weekly game strips that show what's locked, still lockable (only games the player started) or past locking, tinted by score (lock right from the cell), projections, lineup swaps, taxi and IR moves, draft picks.
 - Matchup tab: both lineups slot by slot, win probability, Lock-In status.
 - League tab: every matchup of the week, styled like the Matchup tab; click one to open it, or a team to see its roster.
+- Standings on the League tab (NBA): rank, record, PF, PA, Max PF and waiver, sortable by any column; Sleeper's "League is full" teams list is gone.
 - League median, in leagues that play one: the week's median score (now and projected) at the top of the League tab, and a medallion on every team over it now, solid once it's likely to stay over and gold once it's won.
 - Points and projections follow the games: the week's stats are read again while a game is on.
 - Sidebar: each NBA league shows your matchup this week under its name (both teams, points and projections), as Sleeper does for NFL.

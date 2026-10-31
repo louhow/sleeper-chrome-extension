@@ -119,3 +119,18 @@ test('league median: the League tab leads with it, and every team over it now we
     assert.doesNotMatch(matchup.render(s) + matchup.league({ ...s, page: 'league' }), /medal|median-bar/);
   }
 });
+
+test('league tab standings: PF, PA, Max PF and waiver columns, sortable by the header', () => {
+  const rosters = [
+    { roster_id: 10, owner_id: 'u1', settings: { wins: 1, losses: 0, fpts: 120, fpts_against: 100, ppts: 150, waiver_position: 2 }, players: [], reserve: [] },
+    { roster_id: 5, owner_id: 'u2', settings: { wins: 0, losses: 1, fpts: 100, fpts_against: 120, ppts: 170, waiver_position: 1 }, players: [], reserve: [] },
+  ];
+  const lg = (extra) => matchup.league(state({ page: 'league', rosters, ...extra }));
+  const order = (html) => [...html.matchAll(/<td><span class="name-cell"[^>]*>.*?<span class="team-name">([^<]+)/g)].map((m) => m[1]);
+  const head = text(lg());
+  assert.match(head, /Standings # ▲ Team Record PF PA Max PF Waiver 3 COOKIE MONSTER 1-0 120\.00 100\.00 150\.00 2 7 Cling Kong 0-1 100\.00 120\.00 170\.00 1/);
+  assert.deepEqual(order(lg()), ['COOKIE MONSTER', 'Cling Kong']);
+  assert.match(lg(), /<th class="" aria-sort="ascending"><button class="sort on" data-sort="rank">/);
+  assert.deepEqual(order(lg({ standingsSort: { key: 'maxPf', dir: -1 } })), ['Cling Kong', 'COOKIE MONSTER']);
+  assert.deepEqual(order(lg({ standingsSort: { key: 'waiver', dir: 1 } })), ['Cling Kong', 'COOKIE MONSTER']);
+});

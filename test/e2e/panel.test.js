@@ -1047,7 +1047,23 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
     const host = document.querySelector('#sleeper-nba-panel');
     return host.parentElement.className === 'league-tab-container' && host.nextElementSibling.className === 'panel-row';
   }), true);
-  assert.equal(await page.locator('.league-members-container').isVisible(), true);
+  // The "League is full" teams list is gone; our standings are in its place, sortable by a click on a header.
+  assert.equal(await page.locator('.league-members-container').isVisible(), false);
+  const standingsHead = await page.locator(panel('.standings thead th')).allTextContents();
+  assert.deepEqual(standingsHead.map((t) => t.replace(/[▲▼]/g, '').trim()), ['#', 'Team', 'Record', 'PF', 'PA', 'Max PF', 'Waiver']);
+  assert.equal(await page.locator(panel('.standings tbody tr')).count(), 14);
+  const column = async (i) => (await page.locator(panel(`.standings tbody tr td:nth-child(${i})`)).allTextContents()).map((t) => Number(t.trim().split(/\s+/)[0]));
+  const sorted = (dir) => page.locator(panel(`.standings th[aria-sort="${dir}"] [data-sort="pf"]`)).waitFor();
+  await page.locator(panel('.standings [data-sort="pf"]')).click();
+  await sorted('descending');
+  const pf = await column(4);
+  assert.deepEqual(pf, [...pf].sort((a, b) => b - a), 'PF sorts most first');
+  await page.locator(panel('.standings [data-sort="pf"]')).click();
+  await sorted('ascending');
+  assert.deepEqual(await column(4), [...pf].sort((a, b) => a - b), 'a second click flips it');
+  await page.screenshot({ path: `${OUT}league-standings.png`, fullPage: true });
+  await page.locator(panel('.standings [data-sort="rank"]')).click();
+  await page.locator(panel('.standings th[aria-sort="ascending"] [data-sort="rank"]')).waitFor();
   // A 14-team league's 7 matchups fit in Sleeper's tab without scrolling.
   const fit = await page.evaluate(() => {
     const host = document.querySelector('#sleeper-nba-panel');
