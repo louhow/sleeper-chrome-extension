@@ -53,7 +53,7 @@
 
   // A lineup's (ui.lineup) totals for its week, with each starter's lockState,
   // added up from Lock-In rules: points are each starter's locked game, else
-  // their latest finished one (Sleeper's own leg or matchup points win when it
+  // their final game once it is done (Sleeper's own leg or matchup points win when it
   // has them); the projection counts each starter's locked game, else the
   // final game of the week, played or projected. Sleeper's leg projection
   // (proj_points) is set before the week and never moves, so it isn't used.
@@ -65,7 +65,7 @@
       states[id] = { days, ...model.lockState(days, l.locks[id], s.now, l.started ? (game) => l.started(id, game) : null) };
     }
     const all = Object.values(states);
-    // Sleeper's running total: each starter's locked game, else their latest finished one.
+    // Sleeper's running total: each starter's locked game, else their final game once it is done.
     const live = all.reduce((sum, st) => sum + st.livePoints, 0);
     const projected = all.reduce((sum, st) => sum + (st.counted ? st.points : model.lockInDefault(st.days) ?? 0), 0);
     // Sleeper's totals use the league's scoring; what-if scoring keeps the ones added up here.

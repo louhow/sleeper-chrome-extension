@@ -7,7 +7,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
 ### Team
 
 - Team card: avatar, record, this week's points, Lock-In projection, opponent.
-  Points are Sleeper's running total, added up from your lineup as Sleeper does (each starter's locked game, else their latest finished one), because the public matchup Sleeper serves is cached for minutes and lags a lineup change. Sleeper's leg points, or a commissioner's custom points, win when set.
+  Points are Sleeper's running total, added up from your lineup as Sleeper does (each starter's locked game, else their final game once it is done; an open game counts only when locked), because the public matchup Sleeper serves is cached for minutes and lags a lineup change. Sleeper's leg points, or a commissioner's custom points, win when set.
 - Starters, bench, injured reserve and taxi squad, each player with a Monday-Sunday strip of games: projected points (actual once played), opponent, tip-off time.
 - Each game cell shows where the game stands under Lock-In:
 

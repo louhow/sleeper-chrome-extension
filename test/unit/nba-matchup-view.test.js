@@ -57,9 +57,9 @@ const state = (overrides = {}) => ({
 
 test('header pairs both teams with win %, record, rank and projection', () => {
   const out = text(matchup.render(state()));
-  // Sleeper's running total counts each starter's latest finished game (the leg's points are empty).
+  // Sleeper's running total counts only locked and final games, so Luka's open one is 0 (the leg's points are empty).
   // The projections are added up: Luka's last game of the week (39.83), Mitchell's (25.75), never the legs' frozen ones.
-  assert.match(out, /@louhow COOKIE MONSTER 41\.50 96% WIN 0-0 \(#3\) Yet to play \(1\) 39\.83 VS @badonkeyds Cling Kong – 4% WIN 0-0 \(#7\) Yet to play \(1\) 25\.75/);
+  assert.match(out, /@louhow COOKIE MONSTER 0.00 84% WIN 0-0 \(#3\) Yet to play \(1\) 39\.83 VS @badonkeyds Cling Kong – 16% WIN 0-0 \(#7\) Yet to play \(1\) 25\.75/);
 });
 
 test('starter rows mirror the slot with the lockable game and logos', () => {
@@ -103,16 +103,16 @@ test('lock controls only for rosters the logged-in user owns', () => {
 
 test('league median: the League tab leads with it, and every team over it now wears a medallion, only when the league plays one', () => {
   const league = { ...state().league, settings: { reserve_slots: 1, league_average_match: 1, playoff_week_start: 19 } };
-  // Points so far 41.50 and none (0): median 20.75; projections 39.83 and 25.75: median 32.79.
-  const lg = matchup.league(state({ league, page: 'league' }));
-  assert.match(text(lg), /^ Matchups ‹ Week 1 OCT 19-25 › M League Median: 20\.75 Proj 32\.79 Win an extra matchup by scoring higher than the league median\. Top 1 of 2 win M @louhow/);
+  // Luka's locked 41.50 and none (0): median 20.75; projections 41.50 (locked) and 25.75: median 33.63.
+  const lg = matchup.league(state({ league, page: 'league', weeks: { 1: week(legs('g1')) } }));
+  assert.match(text(lg), /^ Matchups ‹ Week 1 OCT 19-25 › M League Median: 20\.75 Proj 33\.63 Win an extra matchup by scoring higher than the league median\. Top 1 of 2 win M @louhow/);
   assert.match(lg, /<section class="median-bar" aria-label="League median">/);
   // Over it now and likely to stay over: a solid medallion on the avatar; under it, none.
   const medals = [...lg.matchAll(/<span class="medal (\w+)" title="([^"]+)"/g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(medals, [['likely', 'Over the league median now, 88% to finish over it']]);
+  assert.deepEqual(medals, [['likely', 'Over the league median now, 91% to finish over it']]);
   assert.match(lg, /<span class="mu-av"><(?:img|div) class="avatar team-link"[^>]*>(?:<\/div>)?<span class="medal likely"/);
   // The Matchup tab: medallions on the matchup's teams, no banner.
-  const mu = matchup.render(state({ league }));
+  const mu = matchup.render(state({ league, weeks: { 1: week(legs('g1')) } }));
   assert.equal([...mu.matchAll(/class="medal likely"/g)].length, 1);
   assert.doesNotMatch(mu, /median-bar/);
   for (const s of [state(), state({ league: { ...league, settings: { ...league.settings, playoff_week_start: 1 } } })]) {

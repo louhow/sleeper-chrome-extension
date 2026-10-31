@@ -986,7 +986,7 @@ test('matchup: locks in a finished game for your starter', async () => {
   const [rosterId, playerId] = ref.split(':');
   assert.equal(Number(rosterId), myRoster.roster_id);
   const before = sleeper.mutations.length;
-  // The header is Sleeper's running total: each starter's locked game, else their latest finished one.
+  // The header is Sleeper's running total: each starter's locked game, else their final game once it is done.
   const headerPts = async () => Number((await page.locator(panel('.mu-team.mine .mu-pts')).textContent()).match(/\d+\.\d\d/)[0]);
   const headerBefore = await headerPts();
   await open.first().click();
@@ -1009,7 +1009,7 @@ test('matchup: locks in a finished game for your starter', async () => {
   await card.first().waitFor();
   assert.equal(await card.first().locator('.lk.locked').count(), 1, 'shows the lock');
   assert.ok(Number((await card.first().locator('.mp-pts b').textContent()).trim()) > 0, 'the locked game counts');
-  assert.ok(Math.abs(await headerPts() - headerBefore) < 0.01, `the finished game already counted, so the lock keeps the total (${headerBefore})`);
+  assert.ok(await headerPts() > headerBefore, `an open game doesn't count until locked, so the lock raises the total (${headerBefore})`);
   await page.screenshot({ path: `${OUT}lock-done.png` });
   sleeper.midWeek = false;
   documentBody = LOGGED_OUT;

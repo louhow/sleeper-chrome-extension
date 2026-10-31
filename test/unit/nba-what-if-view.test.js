@@ -141,8 +141,8 @@ test('matchup tab: what-if replaces Sleeper\'s totals and turns off locking', ()
   assert.doesNotMatch(matchup.render(s), /data-lock=/, 'a lock is real points');
   const league = { ...panelState(false), page: 'matchup' };
   league.weeks[1].legs[0].starters_games = {};
-  // Sleeper's points (59 more than the 40 seen); unlocked, the projection is his last game's (25), plus those 59.
-  assert.match(text(matchup.render(league)), /louhow 99\.00 .* 84\.00 VS/);
+  // Sleeper's points (99 with nothing locked); unlocked, the projection is his last game's (25), plus those 99.
+  assert.match(text(matchup.render(league)), /louhow 99\.00 .* 124\.00 VS/);
   assert.match(matchup.render(league), /data-lock="1:luka"/);
 });
 

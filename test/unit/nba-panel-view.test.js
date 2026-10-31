@@ -12,7 +12,7 @@ const games = [
 ];
 const week = {
   matchups: [
-    { roster_id: 1, matchup_id: 1, starters: ['a', 'b', '0'], points: 12.5, players_points: { a: 12.5 } },
+    { roster_id: 1, matchup_id: 1, starters: ['a', 'b', '0'], points: 0, players_points: { a: 12.5 } },
     { roster_id: 2, matchup_id: 1, starters: [], points: 3 },
   ],
   days: model.weekDays(games),
@@ -58,7 +58,7 @@ const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 test('team card shows record, live points, lock-in projection and opponent', () => {
   const out = text(render(state(), []));
-  assert.match(out, /COOKIE &lt;MONSTER&gt; louhow · 2-1 · vs Cling Kong 12\.50 proj 39\.83/);
+  assert.match(out, /COOKIE &lt;MONSTER&gt; louhow · 2-1 · vs Cling Kong 0\.00 proj 39\.83/);
   assert.match(out, /Week 1 OCT 19-25/);
 });
 

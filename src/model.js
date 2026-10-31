@@ -323,7 +323,7 @@
   //   can't be locked after moving them in);
   // - a lock is final, and only one game counts;
   // - with no lock, the final game of the week counts. Until then Sleeper's
-  //   running total counts each starter's latest finished game (`live`).
+  //   running total counts only locked games and last games (`live` is `counted`).
   // `started(game)`: whether the player was starting at that game's tip-off
   // (true, false, or null when unknown; see startedAt). Without it, assumed true.
   function lockState(days, lockValue, now = Date.now(), started = null) {
@@ -339,7 +339,6 @@
     // Can't tell whether they started it, so it may or may not be lockable.
     const unsure = open && was == null;
     const counted = locked ?? (next ? null : games.at(-1) ?? null);
-    const live = locked ?? lastDone;
     return {
       games,
       locked,
@@ -351,7 +350,7 @@
       current: locked ?? (lockable || unsure ? lastDone : next ?? lastDone),
       counted,
       points: counted ? counted.actual ?? 0 : null,
-      livePoints: live ? live.actual ?? 0 : 0,
+      livePoints: counted ? counted.actual ?? 0 : 0,
       yetToPlay: !locked && Boolean(next),
     };
   }
