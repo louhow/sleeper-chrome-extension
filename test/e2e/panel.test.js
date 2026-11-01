@@ -991,7 +991,30 @@ test('matchup: switching to Team keeps the session and data', async () => {
   await page.evaluate((id) => history.pushState({}, '', `/leagues/${id}/team`), LEAGUE);
   await page.locator(panel('.team-card')).waitFor();
   assert.equal(await page.locator(panel('[data-tab="api"]')).getAttribute('title'), calls, 'no refetch');
+  await assertFitsAtWidths('Team tab');
 });
+
+// Whatever the tab, the extension's panel never outgrows Sleeper's panel at any width, so the
+// page never scrolls sideways. Anything inside a scroller of its own (a table box) is its own business.
+async function assertFitsAtWidths(label, widths = [800, 600, 480]) {
+  for (const width of widths) {
+    const tag = await page.addStyleTag({ content: `.postdraft-panel, .league-panel, .league-panel-tabs-wrapper { width: ${width}px !important; }` });
+    const fit = await page.evaluate(() => {
+      const host = document.querySelector('#sleeper-nba-panel');
+      const box = host.getBoundingClientRect();
+      const scrolls = (el) => { for (let e = el.parentElement; e && e !== host.shadowRoot; e = e.parentElement) { if (e.classList?.contains('root')) break; if (/auto|scroll|hidden/.test(getComputedStyle(e).overflowX)) return true; } return false; };
+      const spill = [...host.shadowRoot.querySelectorAll('*')]
+        .filter((el) => el.getClientRects().length && !scrolls(el) && el.getBoundingClientRect().right > box.right + 0.5)
+        .slice(0, 5).map((el) => `${el.tagName.toLowerCase()}.${el.className}`);
+      const bar = host.shadowRoot.querySelector('.toolbar');
+      const kids = bar ? [...bar.querySelectorAll('.tabs > *, .tools > *')].filter((el) => el.getClientRects().length).map((el) => el.getBoundingClientRect()) : [];
+      const overlap = kids.some((a, i) => kids.some((b, j) => i < j && a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5));
+      return { width: Math.round(box.width), spill, overlap, page: document.documentElement.scrollWidth - innerWidth };
+    });
+    await tag.evaluate((el) => el.remove());
+    assert.deepEqual([fit.spill, fit.overlap, fit.page], [[], false, 0], `${label} fits a ${width}px panel ${JSON.stringify(fit)}`);
+  }
+}
 
 test('matchup: locks in a finished game for your starter', async () => {
   documentBody = LOGGED_IN;
@@ -1009,19 +1032,8 @@ test('matchup: locks in a finished game for your starter', async () => {
   await open.first().waitFor({ timeout: 30000 });
   assert.ok(!(await page.locator(panel('.mp.theirs button.lk')).count()), "no lock buttons on the opponent's side");
   await page.screenshot({ path: `${OUT}lock-open.png` });
-  // The toolbar (tab, Optimize, my-matchup shortcut, picker, debug, refresh) fits the panel at any width: it wraps, nothing spills or overlaps.
   assert.ok(await page.locator(panel('button.optimize[data-action="optimize"]')).isVisible(), 'Optimize lineup on the Matchup tab');
-  for (const width of [800, 600, 420]) {
-    await page.addStyleTag({ content: `.postdraft-panel { width: ${width}px !important; }` });
-    const fit = await page.evaluate(() => {
-      const bar = document.querySelector('#sleeper-nba-panel').shadowRoot.querySelector('.toolbar');
-      const box = bar.getBoundingClientRect();
-      const kids = [...bar.querySelectorAll('.tabs > *, .tools > *')].filter((el) => el.getClientRects().length).map((el) => el.getBoundingClientRect());
-      const overlap = kids.some((a, i) => kids.some((b, j) => i < j && a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5));
-      return { width: Math.round(box.width), spill: kids.filter((r) => r.right > box.right + 0.5 || r.left < box.left - 0.5).length, scroll: bar.scrollWidth - bar.clientWidth, page: document.documentElement.scrollWidth - innerWidth, overlap };
-    });
-    assert.deepEqual([fit.spill, fit.scroll, fit.page, fit.overlap], [0, 0, 0, false], `the toolbar fits a ${width}px panel ${JSON.stringify(fit)}`);
-  }
+  await assertFitsAtWidths('Matchup tab');
 
   const ref = await open.first().getAttribute('data-lock');
   const [rosterId, playerId] = ref.split(':');
@@ -1103,6 +1115,7 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
   await sorted('ascending');
   assert.deepEqual(await column(4), [...pf].sort((a, b) => a - b), 'a second click flips it');
   await page.screenshot({ path: `${OUT}league-standings.png`, fullPage: true });
+  await assertFitsAtWidths('League tab');
   // Record is centered under its header; the waiver amounts and spots pad so their digits line up in columns.
   const align = await page.evaluate(() => {
     const root = document.querySelector('#sleeper-nba-panel').shadowRoot;

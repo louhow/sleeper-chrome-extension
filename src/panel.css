@@ -896,6 +896,17 @@ span.team-link:hover {
 }
 .app.league {
   padding: 0 24px;
+  container-type: inline-size;
+}
+/* Narrow tab: the standings keep what decides them (rank, team, record, PF, waiver). */
+@container (max-width: 560px) {
+  .standings .opt {
+    display: none;
+  }
+  .standings th,
+  .standings td {
+    padding: 7px 6px;
+  }
 }
 /* NFL: inside Sleeper's own (already padded) matchups list. */
 .app.league.nfl-league {
@@ -3117,6 +3128,10 @@ button.autosub-chip:hover {
 /* The League tab's standings: click a header to sort by it. */
 .standings-head {
   margin-top: 18px;
+}
+/* The table scrolls inside its own box if it ever outgrows the tab, never the page. */
+.standings-scroll {
+  overflow-x: auto;
 }
 .standings {
   width: 100%;

@@ -51,6 +51,7 @@ User-facing docs: `README.md` (feature list, install, privacy), `docs/DETAILS.md
 - Sleeper's running total counts each starter's locked game, else their final game once it is done (an open, unlocked game is 0). The public `/matchups/<week>` lags minutes behind a lineup change, so with a leg the totals are added up from its lineup.
 - Save order: taxi before starters; a starter going to IR leaves the lineup, then IR saves, then the final lineup.
 - Nothing renders until the first league + week load is done, so the user never sees a half-built panel or Sleeper's placeholder.
+- Width: Sleeper's panel is as narrow as 480px with its chat open, and the page must never scroll sideways. No fixed pixel widths without a `max-width: 100%`; flex rows `flex-wrap`; wide tables sit in their own scroller and drop secondary columns in an `@container` query (`.app.league` and `.body` are the containers). `assertFitsAtWidths` in the e2e suite sweeps the Team, Matchup and League tabs at 800, 600 and 480px; call it for any new tab.
 - Writing style: no em-dashes; one sentence per line in long Markdown.
 
 ## Debugging
