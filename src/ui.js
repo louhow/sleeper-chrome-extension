@@ -527,8 +527,8 @@
   const PAGES = { team: 'Team', matchup: 'Matchup' };
   const pageTitle = (s) => PAGES[s.page] || 'Team';
 
-  // The tab, the API log, then Optimize lineup (`optimize`: shown), the picker,
-  // any `tools` and refresh.
+  // The tab, then Optimize lineup (`optimize`: shown), the picker, any `tools`,
+  // the debug button (the API calls tab) and refresh.
   function toolbar(s, log, { optimize = false, tools = '', irBlock = '' } = {}) {
     const tab = (id, label) =>
       `<button role="tab" data-tab="${id}" aria-selected="${s.tab === id}" class="${s.tab === id ? 'active' : ''}">${label}</button>`;
@@ -538,14 +538,21 @@
       : whatIfOn(s) ? '<button class="optimize" disabled title="Optimize uses your league\'s scoring. Switch what-if scoring off to use it.">Optimize lineup</button>'
       : `<button class="optimize" data-action="optimize" title="Propose the best starting lineup for this week" ${s.saving ? 'disabled' : ''}>Optimize lineup</button>`;
     return `<nav class="toolbar">
-      <div class="tabs" role="tablist">${tab('page', pageTitle(s))}${tab('api', `API calls <span class="count">${log.length}</span>`)}</div>
+      <div class="tabs" role="tablist">${tab('page', pageTitle(s))}</div>
       <div class="tools">
         ${button}
         ${picker}
         ${tools}
+        ${debugButton(s, log)}
         <button class="icon" data-action="refresh" title="Refetch everything" aria-label="Refresh">↻</button>
       </div>
     </nav>`;
+  }
+
+  // The API calls tab, out of the way: a small button whose tooltip says what it is.
+  function debugButton(s, log) {
+    const on = s.tab === 'api';
+    return `<button class="icon debug${on ? ' active' : ''}" data-tab="api" aria-pressed="${on}" title="Debug: API calls (${log.length})" aria-label="Debug: API calls">{ }</button>`;
   }
 
   // The Team and Matchup tabs' panel around `body`. The notice floats over the
@@ -741,15 +748,45 @@
     return `<span class="os-arrow ${kind}" aria-label="${kind === 'in' ? 'Coming in' : 'Going out'}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="${path}"/></svg></span>`;
   }
 
+  // Standings columns: label, sort key, and the direction a first click sorts by.
+  const STANDINGS_COLS = [
+    ['#', 'rank', 1], ['Team', 'team', 1], ['Record', 'record', -1], ['PF', 'pf', -1], ['PA', 'pa', -1], ['Max PF', 'maxPf', -1], ['Waiver', 'waiver', 1],
+  ];
+
+  // The league's standings (NBA and NFL League tabs), in place of Sleeper's: click a header to sort by it,
+  // again to flip. `s.standingsSort`: { key, dir }, rank ascending by default.
+  function standingsTable(s) {
+    const { standingsRanks, standingsRows, sortStandings, FAAB } = globalThis.SNP.model;
+    const { key, dir } = s.standingsSort || { key: 'rank', dir: 1 };
+    const faab = s.league.settings?.waiver_type === FAAB;
+    const ranks = s.weeks?.[s.week]?.ranks ?? standingsRanks(s.rosters || [], null);
+    const rows = sortStandings(standingsRows(s.league, s.rosters, ranks), key, dir, (r) => teamName(s, r.roster));
+    const head = STANDINGS_COLS.map(([label, k]) => {
+      const on = k === key;
+      const num = !['rank', 'team'].includes(k) ? ' num' : '';
+      return `<th class="${num.trim()}" aria-sort="${on ? (dir > 0 ? 'ascending' : 'descending') : 'none'}"><button class="sort${on ? ' on' : ''}" data-sort="${k}">${label}<span class="arrow">${on ? (dir > 0 ? '▲' : '▼') : ''}</span></button></th>`;
+    }).join('');
+    return `<div class="lg-head standings-head"><h3>Standings</h3></div>
+      <table class="standings"><thead><tr>${head}</tr></thead><tbody>${rows.map((r) => `<tr class="${r.roster.roster_id === s.rosterId ? 'is-mine' : ''}">
+        <td class="rank">${r.rank ?? '–'}</td>
+        <td><span class="name-cell" data-open-team="${r.roster.roster_id}" role="link" tabindex="0">${avatarImg(avatar(s, r.roster), 'avatar small', s.failedAvatars || undefined)}<span class="team-name">${esc(teamName(s, r.roster))}</span></span></td>
+        <td class="num">${r.wins}-${r.losses}${r.ties ? `-${r.ties}` : ''}</td>
+        <td class="num">${f2(r.pf)}</td>
+        <td class="num">${f2(r.pa)}</td>
+        <td class="num">${f2(r.maxPf)}</td>
+        <td class="num">${faab ? `$${r.faab} ` : ''}<span class="sub">${faab ? `(${r.waiver ?? '–'})` : r.waiver ?? '–'}</span></td>
+      </tr>`).join('')}</tbody></table>`;
+  }
+
   return {
-    reserveRule, irBlockNames, irBlockTip, irBanner, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
+    standingsTable, reserveRule, irBlockNames, irBlockTip, irBanner, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
     esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
     lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, ordinal, researchLine,
     dash, num, height, ago, newsSource, heat, scaler, tierClass,
     avatarImg, teamCard, teamSideOf, teamSide, matchupPair, medal, medianBanner, rowHead, swapHint, swapClass, emptyCard,
     muRow, muEmpty, muStarters, muSection,
-    PAGES, pageTitle, toolbar, shell, apiView, sessionExpired, teamPicker, matchupPicker, matchupPairs,
+    PAGES, pageTitle, toolbar, debugButton, shell, apiView, sessionExpired, teamPicker, matchupPicker, matchupPairs,
     howTip, planSummary, optimizeDialog, applyAll, applyChange, slotPlayer, subArrow,
   };
 })();

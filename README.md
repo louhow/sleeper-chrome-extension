@@ -31,7 +31,8 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Team tab: roster, each player's last finished game as a box score under their name, weekly game strips that show what's locked, still lockable (only games the player started) or past locking, tinted by score (lock right from the cell), projections, lineup swaps, taxi and IR moves, draft picks.
 - Matchup tab: both lineups slot by slot, win probability, Lock-In status.
 - League tab: every matchup of the week, styled like the Matchup tab; click one to open it, or a team to see its roster.
-- Standings on the League tab (NBA): rank, record, PF, PA, Max PF and waiver, sortable by any column; Sleeper's "League is full" teams list is gone.
+- Standings on the League tab (NBA and NFL): rank, record, PF, PA, Max PF and waiver, sortable by any column; Sleeper's "League is full" teams list is gone.
+- Recent Activity on the League tab: a player's name opens the extension's player card instead of Sleeper's popup.
 - League median, in leagues that play one: the week's median score (now and projected) at the top of the League tab, and a medallion on every team over it now, solid once it's likely to stay over and gold once it's won.
 - Points and projections follow the games: the week's stats are read again while a game is on.
 - Sidebar: each NBA league shows your matchup this week under its name (both teams, points and projections), as Sleeper does for NFL.
@@ -39,14 +40,14 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Team picker: every team with its avatar, A to Z, a "My team" shortcut, and team links from the Matchup and League tabs; on the Matchup tab it picks a matchup (both teams).
 - Healthy player stuck on IR: a red banner says so, and the only moves left take them off IR (to an open bench spot or swapped with an IR-eligible player); Optimize lineup stays off until they're out (Sleeper's API doesn't enforce this, its apps do).
 - NFL Team tab: IR and open bench spots are editable like on NBA.
-- Optimize lineup: recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
+- Optimize lineup (on the Team and Matchup tabs): recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.
 - Players tab: remembers your last view; a week strip per player (games played in their score's color, games left, scores on hover); a team picker to scan any roster; team avatars on rostered players; in Stats, a week's Avg (with games played) / Best / Worst game and an optional Shooting group (FGM, FGA, 3PA, FTM, FTA).
 - Player card: bio, game logs, career, news, transaction history.
 - Admin tools (off unless `?snp-admin=1`): what-if scoring on the Team and Matchup tabs and player card, adminFPTS and adminDelta columns on the Players tab.
 
 **NFL**
-- Team tab, compact like the NBA one: a row per player (game, live clock and score, stat line, start and rostered %, points in their score color), any team from the picker, lineup swaps from the slot badges, Optimize lineup in the toolbar. Sleeper's own tab is a click away (⇄). A player's name opens Sleeper's player card.
+- Team tab, compact like the NBA one: a row per player (game, live clock and score, stat line, start and rostered %, points in their score color), any team from the picker, lineup swaps from the slot badges, Optimize lineup in the toolbar (on the Matchup tab too, which opens your Team tab for it). Sleeper's own tab is a click away (⇄). A player's name opens Sleeper's player card.
 - Matchup tab: the League tab's matchup card on top (a team opens on the Team tab), both lineups slot by slot with the game and box score under each player, muted as on Sleeper's own tab; the picker picks a matchup.
 - AutoSub: tap a starter, then "Set an AutoSub" to name the bench player who takes their spot if they don't play; a chip on the row takes it off.
 - Optimize lineup, slot by slot like the NBA one; apply one row or all of them.
@@ -72,7 +73,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Settings: the gear in Sleeper's sidebar opens the extension's settings (a switch for the NFL pages and tools, so Sleeper's own show instead), with Sleeper's account settings a button away.
 - Chat: hovering a message's emoji reactions no longer shifts the chat around, and who reacted shows in full.
 - Chat: compact messages, free agent and waiver moves (one line a player) and weekly reports, about half the height.
-- API tab: a log of every call the extension makes, with status, timing, size and a JSON preview.
+- Debug button (`{ }` in the toolbar, its tooltip says what it is): a log of every call the extension makes, with status, timing, size and a JSON preview.
 
 Details: [docs/DETAILS.md](docs/DETAILS.md) (NBA and NFL) and [docs/EPL.md](docs/EPL.md) (Premier League).
 

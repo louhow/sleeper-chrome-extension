@@ -59,7 +59,6 @@ button.name:hover, button.name:focus-visible { background: none !important; text
   margin-bottom: -1px;
 }
 .tabs button.active { color: var(--text); border-bottom-color: var(--accent); background: transparent !important; }
-.tabs button.api-tab { text-transform: none; letter-spacing: 0; font-weight: 700; }
 .toolbar select { max-width: 220px; }
 .tools .sub { margin-right: 6px; }
 

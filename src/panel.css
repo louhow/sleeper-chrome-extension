@@ -3116,6 +3116,7 @@ button.autosub-chip:hover {
 .standings td {
   padding: 7px 10px;
   text-align: left;
+  vertical-align: middle;
   border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
 }
 .standings .num {
@@ -3154,7 +3155,7 @@ button.autosub-chip:hover {
   font-size: 9px;
 }
 .standings .name-cell {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   cursor: pointer;
@@ -3165,7 +3166,7 @@ button.autosub-chip:hover {
 }
 .standings .team-name {
   font-size: 14px;
-  line-height: 26px;
+  line-height: 1.2;
   font-weight: 800;
 }
 .standings tr.is-mine td {

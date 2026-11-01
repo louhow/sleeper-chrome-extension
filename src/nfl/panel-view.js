@@ -2,7 +2,7 @@
 // (which stay on the page, hidden, so its saves still work): a compact row per
 // player, any team or matchup from the picker. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nflPanelView = (() => {
-  const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, rosterParts, opponentOf,
+  const { esc, f2, shortName, weekNav, real, playerOf, teamTag, researchLine, padTo, loading, errorMsg, owns, myRoster, rosterParts, opponentOf,
     shell, irBlockNames, irBlockTip, irBanner, reserveRule, pageTitle, teamCard, teamSideOf, matchupPair, rowHead, swapHint, swapClass, emptyCard, tierClass, muRow, muEmpty, muStarters, muSection, apiView, sessionExpired } = globalThis.SNP.ui;
   const { scoreTier, spotRefs, swapTargets, autosubOptions: subOptions, winProbability, gameState, medianOn, leagueMedian, medianStanding, isChopped, chopBlock, chopTeamStats, graveyard } = globalThis.SNP.model;
   const { slotBadge, headshot, injury, chopAvatar } = globalThis.SNP.nflUi;
@@ -18,10 +18,19 @@
     const l = s.page === 'team' && s.tab === 'page' ? lineup(s) : null;
     return shell(s, log, body, {
       cls: 'nfl-panel',
-      optimize: Boolean(l?.mine && s.optimizable),
+      optimize: s.page === 'matchup' ? ownMatchupShown(s) : Boolean(l?.mine && s.optimizable),
       irBlock: l?.irBlocked.length ? irBlockTip(irBlockNames(l)) : '',
       tools: `<button class="icon" data-action="sleeper-view" title="Show Sleeper's own ${esc(pageTitle(s))} tab" aria-label="Sleeper's view">⇄</button>`,
     });
+  }
+
+  // Whether the Matchup tab shows your own matchup, the one place Optimize lineup is offered there
+  // (it works from the Team tab, which it opens).
+  function ownMatchupShown(s) {
+    const mine = myRoster(s);
+    if (s.tab !== 'page' || s.sessionExpired || s.error || !mine) return false;
+    const shown = lineup(s);
+    return Boolean(shown) && (shown.roster.roster_id === mine.roster_id || opponentOf(shown) === mine.roster_id);
   }
 
   // One roster's lineup for the shown week (see ui.rosterParts), once its games are in.

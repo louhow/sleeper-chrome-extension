@@ -12,6 +12,8 @@
   const ACTION = '.player-action-button.waiver, .player-action-button.add';
   // Player name and headshot on the Players tab, and a row on the Trend tab.
   const PLAYER = '.player-meta-container, .trending-list-item .player-details';
+  // An added or dropped player in the League tab's Recent Activity.
+  const ACTIVITY = '.league-activity-item .add-player, .league-activity-item .drop-player';
   // A league in the left sidebar.
   const NAV_LEAGUE = 'a.nav-league-item-wrapper';
   const MAX_DEPTH = 12;
@@ -100,13 +102,33 @@
     },
   };
 
+  // The player a Recent Activity line is about: it's the n-th add (or drop) of the
+  // transaction its component holds, which is checked against the name the line shows.
+  function activityPlayer(row) {
+    const owner = props(row, (x) => x.transaction && x.playersMap);
+    if (!owner) return null;
+    const adds = row.classList.contains('add-player');
+    const ids = Object.keys((adds ? owner.transaction.adds : owner.transaction.drops) || {});
+    const same = [...row.closest('.league-activity-item').querySelectorAll(adds ? '.add-player' : '.drop-player')];
+    const shown = row.querySelector('.name')?.textContent.trim();
+    const label = (id) => {
+      const p = owner.playersMap[id];
+      return p && `${(p.first_name || '').slice(0, 1)}. ${p.last_name || ''}`.trim();
+    };
+    const id = ids[same.indexOf(row)];
+    return id && label(id) === shown ? id : null;
+  }
+
   addEventListener('click', (e) => {
     const league = document.documentElement.dataset.snpNbaLeague;
     if (!league || !location.pathname.startsWith(`/leagues/${league}/`) || !(e.target instanceof Element)) return;
     const action = e.target.closest(ACTION);
     const card = !action && e.target.closest(PLAYER);
+    const row = !action && !card && e.target.closest(ACTIVITY);
+    const activityId = row && activityPlayer(row);
     const p = action ? props(action, (x) => x.playerId)
       : card ? props(card, (x) => x.playerId || x.player?.player_id)
+      : activityId ? { playerId: activityId }
       : null;
     if (!p) return;
     // Window capture runs before React's listener on the document, so Sleeper never sees the click.

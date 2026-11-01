@@ -14,8 +14,8 @@
       : state.sessionExpired ? sessionExpired()
       : state.page === 'matchup' ? globalThis.SNP.nbaMatchupView.render(state)
       : teamView(state);
-    // Optimize lineup: only on the owner's editable Team tab, once the week's games are in.
-    const l = state.ready && state.page === 'team' && state.tab === 'page' && !state.error && !state.sessionExpired ? lineup(state) : null;
+    // Optimize lineup: only on the owner's editable Team or Matchup tab, once the week's games are in.
+    const l = state.ready && state.tab === 'page' && !state.error && !state.sessionExpired ? lineup(state) : null;
     const blocked = irBlockNames(l);
     return shell(state, log, body, { optimize: Boolean(l?.editable && l.week), irBlock: blocked ? irBlockTip(blocked) : '' });
   }

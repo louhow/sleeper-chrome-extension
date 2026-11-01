@@ -1,13 +1,14 @@
 // An NFL league's session (nba/session.js hands over to it once the league
 // turns out to be NFL): the extension's own Team and Matchup tabs (panel.js),
-// the League tab's matchup cards (league.js), or in a chopped league its
-// chopping block (chop.js), Optimize lineup (optimize.js) and the Players
-// tab's Last 5 column (players.js). Sleeper's own Team
-// component reads and saves the lineup (page-hook.js).
+// the League tab's matchup cards (league.js) and, below them, its standings
+// (standings.js) or, in a chopped league, its chopping block (chop.js),
+// Optimize lineup (optimize.js) and the Players tab's Last 5 column
+// (players.js). Sleeper's own Team component reads and saves the lineup
+// (page-hook.js).
 //   nflSession(leagueId, page, api, league, nav) -> { attach, show, destroy, refresh }
 // A chopped league gives the sidebar (nav.js) its numbers for the week on now.
 (globalThis.SNP ||= {}).nflSession = (leagueId, initialPage, api, league, nav = null) => {
-  const { bridge, loaders, model, nflPanel, nflOptimize, nflLeague, nflChop, nflPlayers } = globalThis.SNP;
+  const { bridge, loaders, model, nflPanel, nflOptimize, nflLeague, nflChop, nflStandings, nflPlayers } = globalThis.SNP;
   const info = { currentWeek: null, tiers: null }; // the week on now and the league's score colors
   // The Team tab's lineup as Sleeper's Team component holds it; without `full`, only whether it's yours to edit.
   const lineup = (full) => bridge.ask('snp:nfl-lineup', { leagueId, full });
@@ -17,9 +18,10 @@
   const chopped = model.isChopped(league);
   const panel = nflPanel({
     leagueId, api, league, info, lineup, nflSave, openDialog: () => optimizer.open(), dialogOpen: () => optimizer.isOpen(),
-    livePages: chopped ? ['league'] : [], onUpdate: () => chop?.refresh(),
+    livePages: chopped ? ['league'] : [], onUpdate: () => (chop ?? standings).refresh(),
   });
   const chop = chopped ? nflChop({ info, panel }) : null;
+  const standings = chopped ? null : nflStandings({ info, panel });
   if (chopped) nav?.feed(leagueId, () => (info.currentWeek == null ? null : panel.weekView(info.currentWeek)));
   const optimizeLineup = (full) => {
     const l = lineup(full);
@@ -52,6 +54,7 @@
     if (destroyed) return;
     leagueCards.attach(page);
     chop?.attach(page);
+    standings?.attach(page);
     panel.attach();
     optimizer.attachButton(page);
   }
@@ -79,6 +82,7 @@
     playersTab.destroy();
     leagueCards.destroy();
     chop?.destroy();
+    standings?.destroy();
     optimizer.destroy();
     panel.destroy();
     if (document.documentElement.dataset.snpPlayersLeague === leagueId) delete document.documentElement.dataset.snpPlayersLeague;

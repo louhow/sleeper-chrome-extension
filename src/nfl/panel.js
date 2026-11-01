@@ -77,6 +77,12 @@
     if (!state.ready) return;
     // Optimize and swaps save through Sleeper's Team component, for the week it shows.
     const own = state.page === 'team' ? lineup(false) : null;
+    // Optimize asked for on the Matchup tab: once Sleeper's Team component has the lineup, open it.
+    if (pendingOptimize && own) {
+      pendingOptimize = false;
+      if (own.editable) setTimeout(openDialog);
+      else notify('Your lineup can\'t be changed this week.');
+    }
     const editableWeek = own?.editable ? own.round : null;
     if (editableWeek !== state.editableWeek || Boolean(own?.editable) !== state.optimizable) {
       state.editableWeek = editableWeek;
@@ -136,12 +142,24 @@
   }
 
   // A week, as nflWeek.load reads it; players met in it join the panel's.
+  // roster_id -> rank, Sleeper's own (the tiebreakers aren't ours to guess), else the record's order.
+  function loadRanks(week) {
+    return api.graphql(`roster_standings (week ${week})`, `query roster_standings {
+roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)}) { roster_id rank }
+}`).then((res) => res?.roster_standings ?? []).catch(() => [])
+      .then((standings) => model.standingsRanks(state.rosters, standings));
+  }
+
   async function loadWeek(week, force = false) {
     if (state.weeks[week] && !force) return;
-    const loaded = await nflWeek.load(api, data, league, week, info.currentWeek);
+    // Standings ranks are Sleeper's; a live read keeps the ones already in.
+    const [loaded, ranks] = await Promise.all([
+      nflWeek.load(api, data, league, week, info.currentWeek),
+      state.weeks[week]?.ranks ?? loadRanks(week),
+    ]);
     if (destroyed) return;
     for (const [id, p] of Object.entries(loaded.players)) state.players[id] ??= p;
-    state.weeks[week] = loaded.week;
+    state.weeks[week] = { ...loaded.week, ranks };
     planLiveRead();
     schedule();
   }
@@ -194,6 +212,19 @@
     if (rosterId === state.rosterId) return schedule();
     state.rosterId = rosterId;
     schedule();
+  }
+
+  // Optimize lineup from the Matchup tab: Sleeper's Team component holds the lineup it saves
+  // through, so this opens your Team tab and the dialog follows (see attach).
+  let pendingOptimize = false;
+  function optimizeFromMatchup() {
+    const mine = ui.myRoster(state);
+    if (!mine) return;
+    pendingOptimize = true;
+    openTeam(mine.roster_id);
+    setTimeout(() => {
+      pendingOptimize = false;
+    }, 5000);
   }
 
   // A team on the Matchup tab opens on the Team tab, through Sleeper's own tab (so its router follows).
@@ -398,6 +429,7 @@ update_matchup_leg(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(r
     if (action === 'optimize') {
       // The dialog covers the tab, so a notice still showing goes with it.
       state.notice = null;
+      if (state.page === 'matchup') return optimizeFromMatchup();
       return openDialog();
     }
     if (action === 'autosub-start') return startAutosub();

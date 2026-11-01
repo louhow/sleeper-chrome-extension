@@ -52,7 +52,7 @@ The projection follows Lock-In rules: an unlocked player scores their final game
 
 #### Optimize lineup
 
-The Team tab's **Optimize lineup** button (your own team, a week you can still edit) proposes the best starting lineup and the finished games worth locking in, and shows all of it in a dialog before anything saves.
+The **Optimize lineup** button on the Team and Matchup tabs (your own team, a week you can still edit) proposes the best starting lineup and the finished games worth locking in, and shows all of it in a dialog before anything saves.
 Nothing is written until you apply a row or press Apply all; Cancel, ✕, the backdrop or Esc leave the rest as it was.
 - Ties: at equal points, a player with a game that day takes the slot of one with none (a 0.00 projection with a game is all upside), even if the idle player is better later in the week; check back the next day to start them again. After that, the better player later, then fewest moves.
 
@@ -147,6 +147,7 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 - Under the matchups, a standings table: rank, team, record, PF, PA, Max PF (`ppts`) and waiver (FAAB left and waiver spot).
   A click on a header sorts by it (most first, or first rank and A to Z for rank, team and waiver), another click flips it.
   It stands in for Sleeper's own "League is full" teams list and standings, which are hidden.
+- In Recent Activity, a click on an added or dropped player opens the extension's player card (page-hook.js reads the player off the transaction its component holds, checked against the name the line shows), not Sleeper's popup.
 
 ### League median
 
@@ -231,7 +232,7 @@ Sleeper doesn't carry where a player was drafted in real life or his contract, s
 - Matching a Sleeper player to ESPN's: Sleeper's `espn_id` when it has one (about a quarter of NFL players, no NBA players), else ESPN's player search for the name (then the last name alone), only that sport's league, accepted only on an exact birth-date match with Sleeper's. No match shows a quiet "-", never a guess, so players with the same name or a spelling difference can't get someone else's pick.
 - Only on the cards, never on tables or the Team tab. The extension's service worker (`src/background.js`) makes the calls, since ESPN turns down calls from sleeper.com's pages; each gives up after 8 seconds. Kept in `chrome.storage.local`: the player's ESPN id for good (a "no match" for a week, as ESPN may add a rookie later), a draft for good, a contract for a day (when it still ends the same year, only the current season is read again), an error not at all. Cards asking about the same player at once share one lookup. A first card is a search, a record and a few contract seasons; after that, a contract a day.
 - While ESPN answers, the item shows a placeholder the rest of the card doesn't wait on; if ESPN is slow or down, it shows "-" (the NFL card gives up after 15 seconds), and nothing else on the card or in Sleeper changes.
-- The ESPN calls show in the API tab (`espn search`, `espn athlete`, `espn team`, `espn contract <season>`, or a cache entry).
+- The ESPN calls show in the debug button's API calls tab (`espn search`, `espn athlete`, `espn team`, `espn contract <season>`, or a cache entry).
 
 ### What-if scoring
 
@@ -290,6 +291,7 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
   Checked against the live league: saving `subs` as `"{}"` clears an AutoSub (the answer holds `{}`, a later read `null`), and a lineup save that leaves `subs` out keeps an existing one.
   Optimize lineup does not set or keep AutoSubs yet.
 - Optimize lineup sits in the toolbar, as on the NBA Team tab, and opens the same dialog.
+  On the Matchup tab (your own matchup) it opens your Team tab first, since Sleeper's Team component saves the lineup, and the dialog follows once that component has it.
 - A player's name or headshot (Team and Matchup tabs) opens Sleeper's own player card, the one its Players tab shows.
   Sleeper builds that card in its own handlers (the Team component's `_onClickPlayerNews`, a Matchup row's click) and hands it to `openModal`; page-hook runs one of them with `openModal` caught, then opens the card it got for the player asked for.
   A Matchup row knows only that matchup's players, so the extension sends the player's name, position and team along; Sleeper's card loads the rest.
@@ -304,7 +306,8 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
 
 - The week's matchups drawn as the NBA League tab draws them (yours first and framed; avatars, owners, team names, scores, win chance and bar, record, projection), in place of Sleeper's own cards.
 - The numbers are Sleeper's own: its cards stay on the page, hidden, and the extension reads them as they update during games, so they always match the rest of Sleeper.
-- Clicking a matchup opens it the way Sleeper's own card does. Sleeper's week picker and the rest of the tab (standings, activity) stay as they are.
+- Clicking a matchup opens it the way Sleeper's own card does. Sleeper's week picker and the rest of the tab (activity) stay as they are.
+- Below the cards, the NBA League tab's standings table (ranks from `roster_standings`, falling back to the record's order), in place of Sleeper's, which stay on the page, hidden. A chopped league has the chopping block instead.
 - In a league that plays the median, its banner comes first and every team over it wears a medallion (see League median).
 
 ### NFL: Chopped leagues

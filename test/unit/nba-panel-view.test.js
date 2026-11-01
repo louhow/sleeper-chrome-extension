@@ -261,3 +261,18 @@ test('an expired Sleeper login shows how to fix it instead of numbers that would
   assert.doesNotMatch(html, /class="card|team-card|data-action="optimize"/);
   assert.match(render(state({ sessionExpired: true, tab: 'api' }), [{ id: 1, at: 0, path: 'graphql me', status: 401, auth: true }]), /graphql me/, 'the API log stays available');
 });
+
+test('optimize lineup is on your Matchup tab too, not another team\'s', () => {
+  const mine = { me: 'u1', currentWeek: 1, tab: 'page', ready: true };
+  assert.match(render(state({ ...mine, page: 'team' }), []), /data-action="optimize"/);
+  assert.match(render(state({ ...mine, page: 'matchup' }), []), /data-action="optimize"/);
+  assert.doesNotMatch(render(state({ ...mine, page: 'matchup', rosterId: 2 }), []), /data-action="optimize"/, 'someone else\'s lineup');
+  assert.doesNotMatch(render(state({ ...mine, page: 'matchup', tab: 'api' }), []), /data-action="optimize"/, 'not on the API tab');
+});
+
+test('the API calls tab is a debug button with a tooltip, not a tab', () => {
+  const html = render(state({ tab: 'page', page: 'team' }), [{ id: 1, path: '/x', url: 'https://x', status: 200, at: 0 }]);
+  assert.doesNotMatch(text(html), /API calls/);
+  assert.match(html, /<button class="icon debug" data-tab="api" aria-pressed="false" title="Debug: API calls \(1\)"/);
+  assert.match(render(state({ tab: 'api' }), []), /class="icon debug active" data-tab="api" aria-pressed="true"/);
+});

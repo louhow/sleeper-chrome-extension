@@ -38,6 +38,34 @@ const TEAM_TAB = `<!doctype html><title>Sleeper</title>
   // Like Sleeper's React app: the tab (and its placeholder) render after load.
   setTimeout(() => document.body.append(document.getElementById('app').content.cloneNode(true)), 150);
 </script>`;
+test('player card: opens from the League tab\'s Recent Activity instead of Sleeper\'s popup', async () => {
+  documentBody = LOGGED_OUT;
+  const [added, dropped] = await freeAgents(2);
+  const [a, d] = [added, dropped].map((p) => ({ ...p, first: p.name.split(' ')[0], last: p.name.split(' ').slice(1).join(' ') }));
+  const short = (p) => `${p.first[0]}. ${p.last}`;
+  documentBody = `<!doctype html><title>Sleeper</title><script>localStorage.setItem('token', '${FAKE_TOKEN}')</script>
+<body style="margin:0;background:rgb(16,33,49);color:#fff"><div class="league-activity"><div class="league-activity-item"><div class="transactions">
+<div class="add-player"><div class="name">${short(a)} </div></div><div class="drop-player"><div class="name">${short(d)} </div></div></div></div></div>
+<script>
+  window.__sleeperPopups = 0;
+  document.addEventListener('click', (e) => { if (e.target.closest('.add-player, .drop-player')) window.__sleeperPopups++; });
+  const fiber = (props, depth) => (depth ? { memoizedProps: {}, return: fiber(props, depth - 1) } : { memoizedProps: props });
+  const props = { transaction: { type: 'waiver', adds: { '${a.id}': 1 }, drops: { '${d.id}': 1 } }, playersMap: {
+    '${a.id}': { first_name: '${a.first}', last_name: '${a.last}' }, '${d.id}': { first_name: '${d.first}', last_name: '${d.last}' } } };
+  for (const row of document.querySelectorAll('.add-player, .drop-player')) row.__reactInternalInstance$test = fiber(props, 3);
+</script></body>`;
+  await page.goto(`https://sleeper.com/leagues/${LEAGUE}/league`);
+  await page.waitForFunction((id) => document.documentElement.dataset.snpNbaLeague === id, LEAGUE, { timeout: 30000 });
+  for (const [selector, p] of [['.add-player', a], ['.drop-player', d]]) {
+    await page.locator(selector).click();
+    await page.locator(dialog('h2.pc-name')).filter({ hasText: p.name }).waitFor({ timeout: 30000 });
+    await page.keyboard.press('Escape');
+    await page.locator(dialog('.pc')).waitFor({ state: 'detached' });
+  }
+  assert.equal(await page.evaluate(() => window.__sleeperPopups), 0, "Sleeper's own popup never opens");
+  documentBody = LOGGED_OUT;
+});
+
 // Sleeper's NBA League tab: its own content (the teams list) in .league-tab-container,
 // which the week's matchups go on top of. Its MATCHUP tab routes like Sleeper's
 // router does, and the Matchup tab shows the placeholder the panel fills.
@@ -959,10 +987,10 @@ test('matchup: fills the Matchup tab with both teams', async () => {
 });
 
 test('matchup: switching to Team keeps the session and data', async () => {
-  const calls = await page.locator(panel('[data-tab="api"] .count')).textContent();
+  const calls = await page.locator(panel('[data-tab="api"]')).getAttribute('title');
   await page.evaluate((id) => history.pushState({}, '', `/leagues/${id}/team`), LEAGUE);
   await page.locator(panel('.team-card')).waitFor();
-  assert.equal(await page.locator(panel('[data-tab="api"] .count')).textContent(), calls, 'no refetch');
+  assert.equal(await page.locator(panel('[data-tab="api"]')).getAttribute('title'), calls, 'no refetch');
 });
 
 test('matchup: locks in a finished game for your starter', async () => {
@@ -2928,9 +2956,12 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   assert.equal(await cards.count(), 2);
   assert.deepEqual(await page.locator('.league-matchup-row-item').evaluateAll((els) => els.map((el) => el.checkVisibility())), [false, false], 'Sleeper\'s own cards stay, hidden');
   // Nothing of Sleeper's list takes room under ours.
-  const gap = await page.evaluate(() => document.querySelector('.league-tab-standings').getBoundingClientRect().top - document.querySelector('#sleeper-nfl-league').getBoundingClientRect().bottom);
+  const table = page.locator('#sleeper-nfl-standings .standings tbody tr');
+  await table.first().waitFor({ timeout: 30000 });
+  const gap = await page.evaluate(() => document.querySelector('#sleeper-nfl-standings').getBoundingClientRect().top - document.querySelector('#sleeper-nfl-league').getBoundingClientRect().bottom);
   assert.ok(gap < 24, `the standings follow the cards (${gap}px)`);
-  assert.equal(await page.locator('.league-tab-standings').isVisible(), true, 'the rest of the tab stays');
+  assert.equal(await page.locator('.league-tab-standings').isVisible(), false, 'Sleeper\'s standings give way to ours');
+  assert.ok(await table.count() > 0, 'a row a team');
   // Yours first, framed; each side as Sleeper shows it: owner, team, score, win chance and bar, record, projection.
   const first = cards.first();
   assert.match(await first.getAttribute('class'), /\bown\b/);

@@ -74,6 +74,18 @@ button.icon {
   min-width: 32px;
   padding: 6px 0;
 }
+/* The API calls tab's button: out of the way, its tooltip says what it is. */
+button.icon.debug {
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+button.icon.debug.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
 .count {
   display: inline-block;
   min-width: 18px;

@@ -1,10 +1,10 @@
 // Matchup view: the selected team (left) against its opponent (right), slot by
 // slot, with Lock-In status and the lock control for the logged-in owner.
 (globalThis.SNP ||= {}).nbaMatchupView = (() => {
-  const { playerDays, lockState, winProbability, medianStanding, standingsRanks, standingsRows, sortStandings, FAAB } = globalThis.SNP.model;
+  const { playerDays, lockState, winProbability, medianStanding } = globalThis.SNP.model;
   const { side, median } = globalThis.SNP.nbaWeek;
   const { esc, f2, headshot, teamLogo, teamName, shortName, injuryTag, teamTag, gameTime, weekday, gameLabel, slotBadge, weekNav, lineup, real, playerOf,
-    loading, errorMsg, avatar, avatarImg, opponentOf, teamSideOf, matchupPair, medianBanner, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
+    loading, errorMsg, avatar, avatarImg, opponentOf, teamSideOf, matchupPair, medianBanner, standingsTable, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
 
   function render(s) {
     if (s.error) return errorMsg(s.error);
@@ -147,34 +147,5 @@
     }).join('')}</div>${standingsTable(s)}`;
   }
 
-  // Standings columns: label, sort key, and the direction a first click sorts by.
-  const STANDINGS_COLS = [
-    ['#', 'rank', 1], ['Team', 'team', 1], ['Record', 'record', -1], ['PF', 'pf', -1], ['PA', 'pa', -1], ['Max PF', 'maxPf', -1], ['Waiver', 'waiver', 1],
-  ];
-
-  // The league's standings, in place of Sleeper's: click a header to sort by it,
-  // again to flip. `s.standingsSort`: { key, dir }, rank ascending by default.
-  function standingsTable(s) {
-    const { key, dir } = s.standingsSort || { key: 'rank', dir: 1 };
-    const faab = s.league.settings?.waiver_type === FAAB;
-    const ranks = s.weeks?.[s.week]?.ranks ?? standingsRanks(s.rosters || [], null);
-    const rows = sortStandings(standingsRows(s.league, s.rosters, ranks), key, dir, (r) => teamName(s, r.roster));
-    const head = STANDINGS_COLS.map(([label, k]) => {
-      const on = k === key;
-      const num = !['rank', 'team'].includes(k) ? ' num' : '';
-      return `<th class="${num.trim()}" aria-sort="${on ? (dir > 0 ? 'ascending' : 'descending') : 'none'}"><button class="sort${on ? ' on' : ''}" data-sort="${k}">${label}<span class="arrow">${on ? (dir > 0 ? '▲' : '▼') : ''}</span></button></th>`;
-    }).join('');
-    return `<div class="lg-head standings-head"><h3>Standings</h3></div>
-      <table class="standings"><thead><tr>${head}</tr></thead><tbody>${rows.map((r) => `<tr class="${r.roster.roster_id === s.rosterId ? 'is-mine' : ''}">
-        <td class="rank">${r.rank ?? '–'}</td>
-        <td><span class="name-cell" data-open-team="${r.roster.roster_id}" role="link" tabindex="0">${avatarImg(avatar(s, r.roster), 'avatar small', s.failedAvatars || undefined)}<span class="team-name">${esc(teamName(s, r.roster))}</span></span></td>
-        <td class="num">${r.wins}-${r.losses}${r.ties ? `-${r.ties}` : ''}</td>
-        <td class="num">${f2(r.pf)}</td>
-        <td class="num">${f2(r.pa)}</td>
-        <td class="num">${f2(r.maxPf)}</td>
-        <td class="num">${faab ? `$${r.faab} ` : ''}<span class="sub">${faab ? `(${r.waiver ?? '–'})` : r.waiver ?? '–'}</span></td>
-      </tr>`).join('')}</tbody></table>`;
-  }
-
-  return { render, league, standingsTable };
+  return { render, league };
 })();

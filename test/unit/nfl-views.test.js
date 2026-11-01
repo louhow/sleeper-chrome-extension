@@ -179,3 +179,10 @@ test('AutoSub: set from a picked starter, chips on both players, the bench lit w
   assert.doesNotMatch(full, /autosub-start/, 'the limit is used, and Lamb is under way');
   assert.doesNotMatch(html({ ...setup(), me: null }), /autosub/, 'not your team');
 });
+
+test('optimize lineup is on your own Matchup tab, which opens the Team tab for it', () => {
+  assert.match(render({ me: 'u1', page: 'matchup' }), /<button class="optimize" data-action="optimize"/);
+  assert.doesNotMatch(render({ me: 'u1', page: 'matchup', tab: 'api' }), /data-action="optimize"/);
+  assert.doesNotMatch(render({ page: 'matchup' }), /data-action="optimize"/, 'logged out');
+  assert.doesNotMatch(render({ me: 'u3', page: 'matchup' }), /data-action="optimize"/, 'not in this matchup');
+});

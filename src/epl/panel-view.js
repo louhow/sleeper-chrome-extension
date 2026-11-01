@@ -1,9 +1,9 @@
-// The panel shell: tab bar (Match, Team, Players, League, API), team picker,
+// The panel shell: tab bar (Match, Team, Players, League), team picker, debug button (the API calls),
 // and the body for the shown tab. Pure: (state, api log) -> HTML.
 (globalThis.SEP ||= {}).panelView = (() => {
   const { esc, teamName, notice } = globalThis.SEP.ui;
   // The API tab and the log-back-in message are the same as NBA and NFL's.
-  const { apiView, sessionExpired } = globalThis.SNP.ui;
+  const { apiView, sessionExpired, debugButton } = globalThis.SNP.ui;
   const PAGES = [['match', 'Match'], ['team', 'Team'], ['players', 'Players'], ['league', 'League']];
 
   function render(s, log) {
@@ -23,10 +23,11 @@
       .map((r) => `<option value="${r.roster_id}" ${r.roster_id === s.rosterId ? 'selected' : ''}>${esc(teamName(s, r))}${r.roster_id === s.myRosterId ? ' (you)' : ''}</option>`)
       .join('');
     return `<nav class="toolbar">
-      <div class="tabs" role="tablist">${PAGES.map(([id, label]) => tab(id, label)).join('')}<button role="tab" data-tab="api" aria-selected="${s.tab === 'api'}" class="api-tab ${s.tab === 'api' ? 'active' : ''}">API <span class="count">${log.length}</span></button></div>
+      <div class="tabs" role="tablist">${PAGES.map(([id, label]) => tab(id, label)).join('')}</div>
       <div class="tools">
         ${s.loggedIn ? '' : '<span class="sub" title="Log in to Sleeper to edit your lineup and add players">Logged out</span>'}
         ${options && !s.sessionExpired ? `<select data-action="roster" aria-label="Team to show">${options}</select>` : ''}
+        ${debugButton(s, log)}
         <button class="icon" data-action="refresh" title="Refetch everything" aria-label="Refresh">↻</button>
       </div>
     </nav>`;
