@@ -763,18 +763,18 @@
     const rows = sortStandings(standingsRows(s.league, s.rosters, ranks), key, dir, (r) => teamName(s, r.roster));
     const head = STANDINGS_COLS.map(([label, k]) => {
       const on = k === key;
-      const num = !['rank', 'team'].includes(k) ? ' num' : '';
-      return `<th class="${num.trim()}" aria-sort="${on ? (dir > 0 ? 'ascending' : 'descending') : 'none'}"><button class="sort${on ? ' on' : ''}" data-sort="${k}">${label}<span class="arrow">${on ? (dir > 0 ? '▲' : '▼') : ''}</span></button></th>`;
+      const align = k === 'record' ? 'mid' : !['rank', 'team'].includes(k) ? 'num' : '';
+      return `<th class="${align}" aria-sort="${on ? (dir > 0 ? 'ascending' : 'descending') : 'none'}"><button class="sort${on ? ' on' : ''}" data-sort="${k}">${label}<span class="arrow">${on ? (dir > 0 ? '▲' : '▼') : ''}</span></button></th>`;
     }).join('');
     return `<div class="lg-head standings-head"><h3>Standings</h3></div>
       <table class="standings"><thead><tr>${head}</tr></thead><tbody>${rows.map((r) => `<tr class="${r.roster.roster_id === s.rosterId ? 'is-mine' : ''}">
         <td class="rank">${r.rank ?? '–'}</td>
         <td><span class="name-cell" data-open-team="${r.roster.roster_id}" role="link" tabindex="0">${avatarImg(avatar(s, r.roster), 'avatar small', s.failedAvatars || undefined)}<span class="team-name">${esc(teamName(s, r.roster))}</span></span></td>
-        <td class="num">${r.wins}-${r.losses}${r.ties ? `-${r.ties}` : ''}</td>
+        <td class="mid">${r.wins}-${r.losses}${r.ties ? `-${r.ties}` : ''}</td>
         <td class="num">${f2(r.pf)}</td>
         <td class="num">${f2(r.pa)}</td>
         <td class="num">${f2(r.maxPf)}</td>
-        <td class="num">${faab ? `$${r.faab} ` : ''}<span class="sub">${faab ? `(${r.waiver ?? '–'})` : r.waiver ?? '–'}</span></td>
+        <td class="num">${faab ? `<span class="amt">$${r.faab}</span> ` : ''}<span class="sub"><span class="pos">${faab ? `(${r.waiver ?? '–'})` : r.waiver ?? '–'}</span></span></td>
       </tr>`).join('')}</tbody></table>`;
   }
 

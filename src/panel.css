@@ -38,6 +38,7 @@ a:focus-visible {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -48,6 +49,13 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+/* A narrow panel (Sleeper's chat open, a small window) wraps the tools onto their own line. */
+.tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 100%;
 }
 .tabs button {
   background: transparent;
@@ -715,12 +723,15 @@ ul.picks {
 /* The team picker: each team's avatar, name and owner, as on the Players tab. */
 .team-pick {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 .tp-button {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 220px;
+  max-width: 100%;
   height: 32px;
   padding: 0 12px 0 5px;
   border-radius: 16px;
@@ -816,6 +827,7 @@ button.tp-button:hover:not(:disabled) {
 /* The Matchup tab's picker: both teams of a matchup, side by side. */
 .pair-pick .tp-button {
   width: 340px;
+  max-width: 100%;
 }
 .pair-pick .tp-menu {
   width: 380px;
@@ -3121,6 +3133,21 @@ button.autosub-chip:hover {
 }
 .standings .num {
   text-align: right;
+}
+.standings .mid {
+  text-align: center;
+}
+/* Waiver: the amount and the spot each pad to a fixed width, so the digits scan down in columns. */
+.standings .amt,
+.standings .pos {
+  display: inline-block;
+  text-align: right;
+}
+.standings .amt {
+  min-width: 4ch;
+}
+.standings .pos {
+  min-width: 4ch;
 }
 .standings .rank {
   width: 40px;

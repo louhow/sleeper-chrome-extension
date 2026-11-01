@@ -1009,6 +1009,19 @@ test('matchup: locks in a finished game for your starter', async () => {
   await open.first().waitFor({ timeout: 30000 });
   assert.ok(!(await page.locator(panel('.mp.theirs button.lk')).count()), "no lock buttons on the opponent's side");
   await page.screenshot({ path: `${OUT}lock-open.png` });
+  // The toolbar (tab, Optimize, my-matchup shortcut, picker, debug, refresh) fits the panel at any width: it wraps, nothing spills or overlaps.
+  assert.ok(await page.locator(panel('button.optimize[data-action="optimize"]')).isVisible(), 'Optimize lineup on the Matchup tab');
+  for (const width of [800, 600, 420]) {
+    await page.addStyleTag({ content: `.postdraft-panel { width: ${width}px !important; }` });
+    const fit = await page.evaluate(() => {
+      const bar = document.querySelector('#sleeper-nba-panel').shadowRoot.querySelector('.toolbar');
+      const box = bar.getBoundingClientRect();
+      const kids = [...bar.querySelectorAll('.tabs > *, .tools > *')].filter((el) => el.getClientRects().length).map((el) => el.getBoundingClientRect());
+      const overlap = kids.some((a, i) => kids.some((b, j) => i < j && a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5));
+      return { width: Math.round(box.width), spill: kids.filter((r) => r.right > box.right + 0.5 || r.left < box.left - 0.5).length, scroll: bar.scrollWidth - bar.clientWidth, page: document.documentElement.scrollWidth - innerWidth, overlap };
+    });
+    assert.deepEqual([fit.spill, fit.scroll, fit.page, fit.overlap], [0, 0, 0, false], `the toolbar fits a ${width}px panel ${JSON.stringify(fit)}`);
+  }
 
   const ref = await open.first().getAttribute('data-lock');
   const [rosterId, playerId] = ref.split(':');
@@ -1090,6 +1103,22 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
   await sorted('ascending');
   assert.deepEqual(await column(4), [...pf].sort((a, b) => a - b), 'a second click flips it');
   await page.screenshot({ path: `${OUT}league-standings.png`, fullPage: true });
+  // Record is centered under its header; the waiver amounts and spots pad so their digits line up in columns.
+  const align = await page.evaluate(() => {
+    const root = document.querySelector('#sleeper-nba-panel').shadowRoot;
+    const mid = (el) => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
+    const right = (el) => Math.round(el.getBoundingClientRect().right * 10) / 10;
+    const cell = [...root.querySelectorAll('.standings tbody td.mid')];
+    const spread = (els) => new Set(els.map(right)).size;
+    return {
+      off: Math.max(...cell.map((td) => Math.abs(mid(td) - mid(root.querySelector('.standings th.mid'))))),
+      cells: cell.length,
+      amtEdges: spread([...root.querySelectorAll('.standings .amt')]),
+      posEdges: spread([...root.querySelectorAll('.standings .pos')]),
+    };
+  });
+  assert.ok(align.cells > 1 && align.off < 1, `record centered under its header ${JSON.stringify(align)}`);
+  assert.deepEqual([align.amtEdges, align.posEdges], [1, 1], `waiver digits share their columns ${JSON.stringify(align)}`);
   await page.locator(panel('.standings [data-sort="rank"]')).click();
   await page.locator(panel('.standings th[aria-sort="ascending"] [data-sort="rank"]')).waitFor();
   // A 14-team league's 7 matchups fit in Sleeper's tab without scrolling.

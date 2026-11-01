@@ -120,6 +120,19 @@ test('league median: the League tab leads with it, and every team over it now we
   }
 });
 
+test('league tab standings: record centered, FAAB and waiver spot padded into columns', () => {
+  const rosters = [
+    { roster_id: 10, owner_id: 'u1', settings: { wins: 1, losses: 0, waiver_position: 2, waiver_budget_used: 1 }, players: [], reserve: [] },
+    { roster_id: 5, owner_id: 'u2', settings: { wins: 0, losses: 1, waiver_position: 12 }, players: [], reserve: [] },
+  ];
+  const faab = { ...state().league, settings: { ...state().league.settings, waiver_type: 2, waiver_budget: 100 } };
+  const html = matchup.league(state({ page: 'league', rosters, league: faab }));
+  assert.match(html, /<th class="mid" aria-sort="none"><button class="sort" data-sort="record">/);
+  assert.equal((html.match(/<td class="mid">/g) || []).length, 2, 'a centered record a row');
+  assert.match(html, /<span class="amt">\$99<\/span> <span class="sub"><span class="pos">\(2\)<\/span><\/span>/);
+  assert.match(html, /<span class="amt">\$100<\/span> <span class="sub"><span class="pos">\(12\)<\/span><\/span>/);
+});
+
 test('league tab standings: PF, PA, Max PF and waiver columns, sortable by the header', () => {
   const rosters = [
     { roster_id: 10, owner_id: 'u1', settings: { wins: 1, losses: 0, fpts: 120, fpts_against: 100, ppts: 150, waiver_position: 2 }, players: [], reserve: [] },
