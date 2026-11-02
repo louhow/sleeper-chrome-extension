@@ -2748,14 +2748,15 @@ test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from
 });
 
 test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimize lineup sits in the toolbar, as on NBA', async () => {
+  const live = await (await fetch('https://api.sleeper.app/v1/state/nfl')).json();
   const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
   const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
   const me = users.find((u) => u.display_name === 'louhow');
   const mine = rosters.find((r) => r.owner_id === me.user_id);
   sleeper.me = me.user_id;
-  // Sleeper's Team tab on next week, when nobody has kicked off.
-  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
-  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: 8, token: true });
+  // Sleeper's Team tab on next week, when nobody has kicked off (the live week's next, since its games are real).
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: live.season, season_type: 'regular', week: live.week, display_week: live.week, leg: live.week } }));
+  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: live.week + 1, token: true });
   await page.goto(NFL_TEAM_URL);
   await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
   // The team last picked from the picker (in the test before) comes back, as on NBA; the arrow keys' was just for then.
@@ -2765,10 +2766,10 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
   // "My team" goes back to yours.
   if (picked !== nameOf(mine)) await page.locator(nflPanel('.my-team')).click();
   await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: me.metadata?.team_name || me.display_name }).waitFor();
-  // Week 7 isn't the one Sleeper's Team tab shows, so it can't be edited from here.
+  // This week isn't the one Sleeper's Team tab shows, so it can't be edited from here.
   assert.equal(await page.locator(nflPanel('button.slot')).count(), 0);
   await page.locator(nflPanel('.week-nav [data-action="next"]')).click();
-  await page.locator(nflPanel('.week-label b')).filter({ hasText: 'Week 8' }).waitFor();
+  await page.locator(nflPanel('.week-label b')).filter({ hasText: `Week ${live.week + 1}` }).waitFor();
   await page.locator(nflPanel('button.slot')).first().waitFor({ timeout: 30000 });
   // Optimize lineup, in the toolbar as on the NBA Team tab, opens the dialog.
   const optimize = page.locator(nflPanel('.tools button.optimize'));
@@ -2792,7 +2793,7 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
   const saves = await page.evaluate(() => window.__nflSaves);
   assert.equal(saves.length, before + 1);
   const [leagueId, rosterId, round] = saves.at(-1);
-  assert.deepEqual([leagueId, rosterId, round], [NFL_LEAGUE, mine.roster_id, 8], "through Sleeper's own updateMatchupLeg");
+  assert.deepEqual([leagueId, rosterId, round], [NFL_LEAGUE, mine.roster_id, live.week + 1], "through Sleeper's own updateMatchupLeg");
   assert.notDeepEqual(saves.at(-1)[4], mine.starters, 'the lineup changed');
   await context.unroute('https://api.sleeper.app/v1/state/nfl');
   sleeper.me = null;
@@ -2800,19 +2801,20 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
 });
 
 test('NFL team tab, logged in: an AutoSub is set from a picked starter and taken off from its chip', async () => {
+  const live = await (await fetch('https://api.sleeper.app/v1/state/nfl')).json();
   const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
   const me = users.find((u) => u.display_name === 'louhow');
   sleeper.me = me.user_id;
   sleeper.nflLegs = true;
   sleeper.nflSubs = null;
-  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: live.season, season_type: 'regular', week: live.week, display_week: live.week, leg: live.week } }));
   const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
   const mine = rosters.find((r) => r.owner_id === me.user_id);
-  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: 8, token: true });
+  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: live.week + 1, token: true });
   await page.goto(NFL_TEAM_URL);
   await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
   await page.locator(nflPanel('.week-nav [data-action="next"]')).click();
-  await page.locator(nflPanel('.week-label b')).filter({ hasText: 'Week 8' }).waitFor();
+  await page.locator(nflPanel('.week-label b')).filter({ hasText: `Week ${live.week + 1}` }).waitFor();
   await page.locator(nflPanel('button.slot')).first().waitFor({ timeout: 30000 });
   // Pick a starter that has an AutoSub to set (an unplayed game, a bench player to take over).
   const slots = page.locator(nflPanel('.card.nfl button.slot'));
@@ -3034,7 +3036,7 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   // Sleeper's numbers move during games; ours follow.
   await page.evaluate(() => { document.querySelectorAll('.league-matchup-row-item')[1].querySelector('.score').textContent = '25.90'; });
   await first.locator('.mu-team.mine .mu-pts').filter({ hasText: '25.90' }).waitFor();
-  // A card opens that matchup the way Sleeper's own card does.
+  // A card opens its matchup on the extension's Matchup tab (through Sleeper's tab, so its router follows), not Sleeper's small modal.
   await cards.nth(1).click();
   assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup'], []]);
   // A card whose rosters can't be read opens Sleeper's own, as before (without its ids
