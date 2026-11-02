@@ -382,7 +382,7 @@ Here the chat does too (any sport): each team, then the players, picks and FAAB 
 - `page-hook.js` reads the trade off the props of Sleeper's card (`snp:chat-trade`), `chat-view.js` draws it and `chat.js` puts it in the card, hiding what the card drew.
 - A player dropped to make room shows with a red minus, and a pick that came from another team says whose (`via`).
 - A player opens their card (the extension's own for basketball, Sleeper's for football); a click anywhere else still opens Sleeper's trade dialog. A card without its props stays as Sleeper draws it.
-- A trade Sleeper hasn't loaded has no card, just rows of each team's adds and drops (`transactions_by_roster` on the message). It's written out the same way, with no dialog to open.
+- A trade Sleeper hasn't loaded has no card, just rows of each team's adds and drops (`transactions_by_roster` on the message). It's written out the same way, and a click anywhere on it opens the extension's own Trade dialog with the whole trade (Escape or ✕ closes it); a player in the dialog closes it and opens their card.
 - A chat at its latest message stays there as the trade changes height.
 
 ### Chat reactions

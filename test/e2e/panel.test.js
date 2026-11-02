@@ -3589,6 +3589,20 @@ test('chat: a trade Sleeper has no card for is written out from its rows, with n
   assert.equal(await page.locator('.host.move .embed-league-transaction').isVisible(), true, 'a free agent move stays');
   assert.equal(await page.locator('.host.move .snp-trade').count(), 0);
   await page.screenshot({ path: `${OUT}chat-trade-rows.png`, clip: { x: 90, y: 10, width: 500, height: 300 } });
+  // A click anywhere in it opens the trade in a dialog; a player there asks for their card and the dialog gives way.
+  await page.evaluate(() => document.addEventListener('snp:nfl-player-card', (e) => { window.__card = JSON.parse(e.detail).playerId; }));
+  await page.locator('.snp-tr-title').click();
+  const dialog = page.locator('#sleeper-chat-trade .dialog');
+  await dialog.waitFor();
+  assert.deepEqual(await dialog.locator('.snp-tr-team').allTextContents(), ['@PavScore', '@tonipav']);
+  await page.screenshot({ path: `${OUT}chat-trade-dialog.png` });
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#sleeper-chat-trade').count(), 0, 'Escape closes it');
+  await page.locator('.snp-tr-body').click();
+  await dialog.waitFor();
+  await dialog.locator('.snp-tr-name').first().click();
+  assert.equal(await page.locator('#sleeper-chat-trade').count(), 0);
+  assert.equal(await page.evaluate(() => window.__card), '11');
   documentBody = LOGGED_OUT;
 });
 

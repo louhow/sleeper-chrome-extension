@@ -30,7 +30,7 @@
 // written out the same way from the message's own data (no dialog to open then).
 //   chat() -> { destroy }
 (globalThis.SNP ||= {}).chat = () => {
-  const { bridge, chatView, shared } = globalThis.SNP;
+  const { bridge, chatView, shared, ui } = globalThis.SNP;
   const ROW = '.comment-reactions-container';
   // An option nobody picked: its count is empty (Sleeper's `hide` class comes
   // off every option while it shows them all, so it can't tell them apart).
@@ -45,17 +45,15 @@
   const report = `${list} :is(.weekly-report-owner-item, .weekly-report-player-item)`;
   const TRADE = '.trade-list-item.is-chat';
   const trade = `${list} ${TRADE}:has(> .snp-trade)`;
-  const css = `
-    /* A trade written out: Sleeper's card and its wrapper give up their fixed size, and all it drew. */
-    ${list} .trade-list-item-attachment-wrapper:has(> ${TRADE} > .snp-trade) { height: auto; max-height: none; width: auto; max-width: 100%; margin-top: 4px; background: none; }
-    ${trade} { height: auto; min-height: 0; max-height: none; width: auto; max-width: 100%; padding: 0; background: none; }
-    ${list} [data-snp-trade]:has(> .snp-trade) > :not(.snp-trade) { display: none; }
+  // How a written-out trade looks, in the chat and in its dialog.
+  const tradeCss = `
     .snp-tr-title { margin: 0 0 6px; font-weight: 700; font-size: 14px; line-height: 18px; color: #fff; }
     .snp-tr-body { padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.1); border-left: 3px solid #59a7ff; border-radius: 8px; background: rgba(0, 0, 0, 0.14); }
     .snp-tr-side + .snp-tr-side { margin-top: 8px; }
     .snp-tr-team { margin: 0 0 6px; font-weight: 700; font-size: 13px; color: #a3bbd3; overflow-wrap: anywhere; }
     .snp-tr-assets { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr)); gap: 6px 10px; }
     .snp-tr-asset { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .snp-trade { cursor: pointer; }
     .snp-tr-asset.player { cursor: pointer; }
     .snp-tr-asset.player:hover .snp-tr-name { text-decoration: underline; }
     .snp-tr-face { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 36px; height: 36px; border: 2px solid #a3bbd3; border-radius: 50%; background: #4a5870; font-size: 11px; color: #fff; }
@@ -76,6 +74,13 @@
     .snp-tr-meta { display: flex; flex-direction: column; min-width: 0; }
     .snp-tr-name { font-weight: 700; font-size: 13px; line-height: 16px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .snp-tr-sub { font-size: 11px; line-height: 14px; color: #a3bbd3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  `;
+  const css = `
+    /* A trade written out: Sleeper's card and its wrapper give up their fixed size, and all it drew. */
+    ${list} .trade-list-item-attachment-wrapper:has(> ${TRADE} > .snp-trade) { height: auto; max-height: none; width: auto; max-width: 100%; margin-top: 4px; background: none; }
+    ${trade} { height: auto; min-height: 0; max-height: none; width: auto; max-width: 100%; padding: 0; background: none; }
+    ${list} [data-snp-trade]:has(> .snp-trade) > :not(.snp-trade) { display: none; }
+    ${tradeCss}
 
     /* Compact messages: the group's padding, the avatar and the name line.
        Sleeper sizes every avatar and headshot inline, so those need !important. */
@@ -216,28 +221,62 @@
     }
   });
 
-  // A player in a trade opens their card (a click there never reaches Sleeper's trade dialog):
-  // the extension's own for NBA (any league page it's mounted on), Sleeper's for NFL.
-  function openPlayer(e) {
-    const asset = e.target instanceof Element && e.target.closest('.snp-tr-asset.player');
+  // A trade with no Sleeper dialog behind it (its rows only) opens one of the extension's own, with
+  // the whole trade; a player in it opens their card in its place.
+  const layer = shared.shadowHost('sleeper-chat-trade', () => draw());
+  let shown = null;
+  function draw() {
+    if (!layer.styled) return;
+    if (!shown) return layer.host.remove();
+    if (!layer.host.isConnected) document.documentElement.appendChild(layer.host);
+    layer.root.innerHTML = `<style>${tradeCss}</style><div class="page-layer">${ui.dialog('Trade', '', `<div class="dialog-body snp-tr-dialog">${chatView.tradeHtml(shown)}</div>`)}</div>`;
+  }
+  const closeTrade = () => {
+    shown = null;
+    draw();
+  };
+  layer.root.addEventListener('click', (e) => {
+    if (e.target.closest('[data-action="close-modal"]')) return closeTrade();
+    const asset = e.target.closest('.snp-tr-asset.player');
     if (!asset) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    const id = asset.dataset.player;
-    const t = trades[asset.closest('[data-snp-trade]')?.dataset.snpTrade];
+    const t = shown;
+    closeTrade();
+    openCard(asset.dataset.player, t);
+  });
+
+  function openCard(id, t) {
     const p = t?.players?.[id] || {};
     if (p.sport === 'nba') bridge.tell('snp:player-card', { playerId: id });
     else shared.nflPlayerCard(id, { first: p.first_name, last: p.last_name, position: p.position, team: p.team });
   }
 
+  // A player in a trade opens their card (a click there never reaches Sleeper's trade dialog):
+  // the extension's own for NBA (any league page it's mounted on), Sleeper's for NFL.
+  function openPlayer(e) {
+    const block = e.target instanceof Element && e.target.closest('.snp-trade');
+    const t = block && trades[block.closest('[data-snp-trade]')?.dataset.snpTrade];
+    if (!t) return;
+    const asset = e.target.closest('.snp-tr-asset.player');
+    if (!asset && t.opens) return; // Sleeper's own dialog
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (asset) return openCard(asset.dataset.player, t);
+    shown = t;
+    draw();
+  }
+
   // Capture, so the row is held before the hover paints.
   document.addEventListener('click', openPlayer, true);
+  const onKey = (e) => shown && e.key === 'Escape' && closeTrade();
+  document.addEventListener('keydown', onKey);
   document.addEventListener('mouseover', enter, true);
   document.addEventListener('mouseout', leave, true);
   document.addEventListener('scroll', follow, true);
 
   function destroy() {
     document.removeEventListener('click', openPlayer, true);
+    document.removeEventListener('keydown', onKey);
+    layer.host.remove();
     document.removeEventListener('mouseover', enter, true);
     document.removeEventListener('mouseout', leave, true);
     document.removeEventListener('scroll', follow, true);
