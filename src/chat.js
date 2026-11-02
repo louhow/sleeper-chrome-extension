@@ -56,6 +56,8 @@
     .snp-tr-team { margin: 0 0 6px; font-weight: 700; font-size: 13px; color: #a3bbd3; overflow-wrap: anywhere; }
     .snp-tr-assets { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr)); gap: 6px 10px; }
     .snp-tr-asset { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .snp-tr-asset.player { cursor: pointer; }
+    .snp-tr-asset.player:hover .snp-tr-name { text-decoration: underline; }
     .snp-tr-face { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 36px; height: 36px; border: 2px solid #a3bbd3; border-radius: 50%; background: #4a5870; font-size: 11px; color: #fff; }
     .snp-tr-face.token { border-color: #4a5870; }
     .snp-tr-face.qb { border-color: #fc2b6d; }
@@ -196,6 +198,7 @@
   // Writes a trade out in its card or rows (page-hook.js marked them with the trade's id).
   // The new height mustn't take a chat at its latest message away from there.
   const images = {};
+  const trades = {};
   const offTrade = bridge.on('snp:chat-trade', (t) => {
     for (const card of document.querySelectorAll(`[data-snp-trade="${CSS.escape(t.id)}"]`)) {
       const box = scroller(card.closest('.comment-group') ?? card);
@@ -207,17 +210,34 @@
         shared.markMissingImages(block, images, () => {});
         card.append(block);
       }
+      trades[t.id] = t;
       block.innerHTML = chatView.tradeHtml(t);
       if (latest) box.scrollTop = box.scrollHeight;
     }
   });
 
+  // A player in a trade opens their card (a click there never reaches Sleeper's trade dialog):
+  // the extension's own for NBA (any league page it's mounted on), Sleeper's for NFL.
+  function openPlayer(e) {
+    const asset = e.target instanceof Element && e.target.closest('.snp-tr-asset.player');
+    if (!asset) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const id = asset.dataset.player;
+    const t = trades[asset.closest('[data-snp-trade]')?.dataset.snpTrade];
+    const p = t?.players?.[id] || {};
+    if (p.sport === 'nba') bridge.tell('snp:player-card', { playerId: id });
+    else shared.nflPlayerCard(id, { first: p.first_name, last: p.last_name, position: p.position, team: p.team });
+  }
+
   // Capture, so the row is held before the hover paints.
+  document.addEventListener('click', openPlayer, true);
   document.addEventListener('mouseover', enter, true);
   document.addEventListener('mouseout', leave, true);
   document.addEventListener('scroll', follow, true);
 
   function destroy() {
+    document.removeEventListener('click', openPlayer, true);
     document.removeEventListener('mouseover', enter, true);
     document.removeEventListener('mouseout', leave, true);
     document.removeEventListener('scroll', follow, true);

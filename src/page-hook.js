@@ -10,8 +10,8 @@
 // saves) the Team tab's lineup for Optimize lineup.
 (() => {
   const ACTION = '.player-action-button.waiver, .player-action-button.add';
-  // Player name and headshot on the Players tab, and a row on the Trend tab.
-  const PLAYER = '.player-meta-container, .trending-list-item .player-details';
+  // Player name and headshot on the Players tab, a row on the Trend tab, and a tile on the Trades tab's block and in the Propose Trade dialog.
+  const PLAYER = '.player-meta-container, .trending-list-item .player-details, .trade-block-player, .trade-center-player-box';
   // An added or dropped player in the League tab's Recent Activity.
   const ACTIVITY = '.league-activity-item .add-player, .league-activity-item .drop-player';
   // A league in the left sidebar.
@@ -119,15 +119,21 @@
     return id && label(id) === shown ? id : null;
   }
 
+  // A tile whose props don't name its player (the Trades tab's block): the id in its headshot's address.
+  function shotPlayer(el) {
+    const id = el.querySelector('img.avatar-player')?.src.match(/\/players\/thumb\/(\w+)\.jpg/)?.[1];
+    return id ? { playerId: id } : null;
+  }
+
   addEventListener('click', (e) => {
     const league = document.documentElement.dataset.snpNbaLeague;
     if (!league || !location.pathname.startsWith(`/leagues/${league}/`) || !(e.target instanceof Element)) return;
     const action = e.target.closest(ACTION);
-    const card = !action && e.target.closest(PLAYER);
+    const card = !action && !e.target.closest('.heart-container') && e.target.closest(PLAYER);
     const row = !action && !card && e.target.closest(ACTIVITY);
     const activityId = row && activityPlayer(row);
     const p = action ? props(action, (x) => x.playerId)
-      : card ? props(card, (x) => x.playerId || x.player?.player_id)
+      : card ? props(card, (x) => x.playerId || x.player?.player_id || x.player_id) || shotPlayer(card)
       : activityId ? { playerId: activityId }
       : null;
     if (!p) return;
@@ -138,7 +144,7 @@
       const status = p.waiverStatus?.status || (action.classList.contains('waiver') ? 'waiver' : 'free_agent');
       bridge.tell('snp:player-action', { playerId: String(p.playerId), status });
     } else {
-      bridge.tell('snp:player-card', { playerId: String(p.playerId || p.player.player_id) });
+      bridge.tell('snp:player-card', { playerId: String(p.playerId || p.player?.player_id || p.player_id) });
     }
   }, true);
 

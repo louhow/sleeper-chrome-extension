@@ -3458,8 +3458,10 @@ test('chat: a trade is written out in its card, every player of both teams, a cl
   });
   assert.deepEqual(fit, { inside: true, noScrollX: true, latest: true, twoAcross: true });
   await page.screenshot({ path: `${OUT}chat-trade.png`, clip: { x: 90, y: 10, width: 500, height: 440 } });
+  await page.locator('.snp-tr-name').nth(2).click();
+  assert.equal(await page.evaluate(() => window.__opened), 1, 'a pick opens the dialog');
   await page.locator('.snp-tr-name').first().click();
-  assert.equal(await page.evaluate(() => window.__opened), 1);
+  assert.equal(await page.evaluate(() => window.__opened), 1, 'a player opens a card, not the dialog');
   documentBody = LOGGED_OUT;
 });
 

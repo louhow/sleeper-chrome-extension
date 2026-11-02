@@ -213,7 +213,7 @@ Sleeper's own NBA Players table, with these additions:
 
 ### Player card
 
-Clicking a player's name or headshot on the Team or Matchup tab, or a player on the Players or Trend tab (instead of Sleeper's own NBA card), opens a card laid out like Sleeper's NFL player card:
+Clicking a player's name or headshot on the Team or Matchup tab, a player on the Players or Trend tab, or a tile in the Trades tab's trade block or the Propose Trade dialog (instead of Sleeper's own NBA card), opens a card laid out like Sleeper's NFL player card:
 
 - Hero in team colors: owner, age, height, weight, experience, college, and rankings (position and overall rank from the latest season with stats, plus rostered and started %).
 - Game logs per season (tabs): projected and actual fantasy points with the league's scoring, minutes, box score and shooting, shaded like Sleeper's tables. Fantasy points are colored by [score tier](#score-colors). The current season lists upcoming games with projections.
@@ -380,7 +380,7 @@ Here the chat does too (any sport): each team, then the players, picks and FAAB 
 
 - `page-hook.js` reads the trade off the props of Sleeper's card (`snp:chat-trade`), `chat-view.js` draws it and `chat.js` puts it in the card, hiding what the card drew.
 - A player dropped to make room shows with a red minus, and a pick that came from another team says whose (`via`).
-- A click anywhere still opens Sleeper's trade dialog. A card without its props stays as Sleeper draws it.
+- A player opens their card (the extension's own for basketball, Sleeper's for football); a click anywhere else still opens Sleeper's trade dialog. A card without its props stays as Sleeper draws it.
 - A trade Sleeper hasn't loaded has no card, just rows of each team's adds and drops (`transactions_by_roster` on the message). It's written out the same way, with no dialog to open.
 - A chat at its latest message stays there as the trade changes height.
 

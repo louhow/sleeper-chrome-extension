@@ -53,7 +53,7 @@
     };
   }
 
-  const row = (face, cls, name, sub, sign) => `<div class="snp-tr-asset">
+  const row = (face, cls, name, sub, sign, playerId) => `<div class="snp-tr-asset${playerId ? ' player' : ''}"${playerId ? ` data-player="${esc(playerId)}"` : ''}>
       <span class="snp-tr-face ${esc(cls)}">${face}${sign ? `<i class="snp-tr-sign ${sign === '+' ? 'add' : 'drop'}">${sign === '+' ? '+' : '&minus;'}</i>` : ''}</span>
       <span class="snp-tr-meta"><span class="snp-tr-name">${esc(name)}</span><span class="snp-tr-sub">${esc(sub)}</span></span>
     </div>`;
@@ -65,7 +65,7 @@
     }
     if (a.type === 'faab') return row(`<b>$${esc(a.amount)}</b>`, 'token', `$${a.amount}`, 'FAAB', '+');
     const p = playerLine(a.id, t.players?.[a.id]);
-    return row(`<img class="snp-tr-shot" src="${esc(p.photo)}" alt="">`, p.position, p.name, p.sub, a.add ? '+' : '-');
+    return row(`<img class="snp-tr-shot" src="${esc(p.photo)}" alt="">`, p.position, p.name, p.sub, a.add ? '+' : '-', a.id);
   }
 
   function tradeHtml(t) {

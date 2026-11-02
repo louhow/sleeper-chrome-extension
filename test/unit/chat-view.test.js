@@ -51,6 +51,12 @@ test('tradeHtml: names each team and writes out every asset, a defense by its lo
   assert.equal(html.match(/snp-tr-sign drop/g).length, 1);
 });
 
+test('tradeHtml: a player is marked to open their card, a pick or FAAB is not', () => {
+  const html = chatView.tradeHtml(trade);
+  assert.match(html, /snp-tr-asset player" data-player="10"/);
+  assert.equal(html.match(/data-player=/g).length, Object.keys({ ...trade.adds, ...trade.drops }).length);
+});
+
 test('tradeHtml: other sports use their own headshots, and text is escaped', () => {
   const html = chatView.tradeHtml({ status: 'pending', rosterIds: [1], adds: { 5: 1 }, players: { 5: { last_name: '<b>Lee', sport: 'nba', position: 'PG' } }, names: { 1: '<i>x' } });
   assert.match(html, /waiting to process/);
