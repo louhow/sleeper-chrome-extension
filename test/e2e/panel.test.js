@@ -3356,6 +3356,86 @@ const chatPage = () => {
 </script>`;
 };
 
+// Sleeper's chat with a trade card (markup, rules and props from its bundle,
+// 2026-11-01): the card holds the trade in its React props and opens a dialog when clicked.
+const chatTradePage = (withProps) => `<!doctype html><title>Sleeper</title>
+<style>
+  body { margin: 0; background: rgb(24, 28, 40); color: #fff; font-family: Lato, Arial, sans-serif; }
+  .chat { position: absolute; left: 100px; top: 20px; width: 480px; height: 420px; overflow-y: auto; background: rgba(58, 70, 91, 0.5); }
+  .comment-group { display: flex; overflow: hidden; padding: 12px 16px; }
+  .comment-group > .avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; background: #456; }
+  .content-container { flex: 1; min-width: 0; padding-left: 12px; }
+  .trade-list-item { display: flex; flex: 1; min-height: 156px; max-height: 156px; flex-direction: column; border-radius: 16px; padding: 16px; box-sizing: border-box; cursor: pointer; background-color: rgba(58,70,91,0.2); position: relative; }
+  .trade-list-item.is-chat { max-height: 220px; height: 220px; width: 300px; max-width: 300px; margin-top: 0; }
+  .trade-list-item-attachment-wrapper { display: flex; flex: 1; flex-direction: column; border-radius: 16px; box-sizing: border-box; background-color: rgba(58,70,91,0.2); position: relative; max-height: 220px; height: 220px; width: 300px; max-width: 300px; margin-top: 18px; }
+</style>
+<div class="chat"><div class="comment-list">
+  <div class="comment-group"><div class="avatar"></div><div class="content-container">
+    <div class="trade-list-item-attachment-wrapper"><div class="trade-list-item is-chat">
+      <div class="users-name">PavScore, tonipav</div><div class="assets-container">B. Strange</div><div class="view-button">VIEW</div>
+    </div></div>
+  </div></div>
+  <div class="comment-group"><div class="avatar"></div><div class="content-container">solid trade</div></div>
+</div></div>
+<script>
+  const card = document.querySelector('.trade-list-item');
+  card.addEventListener('click', () => { window.__opened = (window.__opened || 0) + 1; });
+  const chat = document.querySelector('.chat');
+  chat.scrollTop = chat.scrollHeight;
+  ${withProps ? `card.__reactFiber$test = { memoizedProps: {
+    transaction: {
+      transaction_id: '77', status: 'complete', roster_ids: [1, 2],
+      adds: { 11: 1, 12: 1, 21: 2, 22: 2, 23: 2 }, drops: { 11: 2, 12: 2, 21: 1, 22: 1, 23: 1 },
+      draft_picks: ['2,2027,1,1,2'], waiver_budget: ['1,2,15'],
+      player_map: {
+        11: { first_name: 'Ladd', last_name: 'McConkey', position: 'WR', team: 'LAC', sport: 'nfl' },
+        12: { first_name: 'Brenton', last_name: 'Strange', position: 'TE', team: 'JAX', sport: 'nfl' },
+        21: { first_name: 'Kyle', last_name: 'Monangai', position: 'RB', team: 'CHI', sport: 'nfl' },
+        22: { first_name: 'Alvin', last_name: 'Kamara', position: 'RB', team: 'NO', sport: 'nfl' },
+        23: { first_name: 'George', last_name: 'Kittle', position: 'TE', team: 'SF', sport: 'nfl' },
+      },
+    },
+    rostersInLeagueMap: { 1: { owner_id: 'a' }, 2: { owner_id: 'b' } },
+    usersInLeagueMap: { a: { display_name: 'PavScore' }, b: { display_name: 'tonipav' } },
+  }, return: null };` : ''}
+  // Sleeper renders the card after the page loads, as the chat comes in.
+  setTimeout(() => document.querySelector('.comment-group').append(document.createElement('span')), 50);
+</script>`;
+
+test('chat: a trade is written out in its card, every player of both teams, a click still opens Sleeper\'s dialog, and the chat stays at its latest', async () => {
+  documentBody = chatTradePage(true);
+  await page.goto('https://sleeper.com/settings', { waitUntil: 'domcontentloaded' });
+  await page.locator('.snp-trade .snp-tr-side').first().waitFor();
+  assert.deepEqual(await page.locator('.snp-tr-team').allTextContents(), ['@PavScore', '@tonipav']);
+  assert.deepEqual(await page.locator('.snp-tr-name').allTextContents(), ['L. McConkey', 'B. Strange', '2027 1st', 'K. Monangai', 'A. Kamara', 'G. Kittle', '$15']);
+  assert.equal(await page.locator('.view-button').isVisible(), false, 'Sleeper\'s card is hidden');
+  const fit = await page.evaluate(() => {
+    const chat = document.querySelector('.chat');
+    const body = document.querySelector('.snp-tr-body').getBoundingClientRect();
+    const assets = [...document.querySelectorAll('.snp-tr-asset')].map((a) => a.getBoundingClientRect());
+    return {
+      inside: body.right <= chat.getBoundingClientRect().right,
+      noScrollX: chat.scrollWidth <= chat.clientWidth,
+      latest: chat.scrollHeight - chat.scrollTop - chat.clientHeight < 2,
+      twoAcross: assets[0].top === assets[1].top,
+    };
+  });
+  assert.deepEqual(fit, { inside: true, noScrollX: true, latest: true, twoAcross: true });
+  await page.screenshot({ path: `${OUT}chat-trade.png`, clip: { x: 90, y: 10, width: 500, height: 440 } });
+  await page.locator('.snp-tr-name').first().click();
+  assert.equal(await page.evaluate(() => window.__opened), 1);
+  documentBody = LOGGED_OUT;
+});
+
+test('chat: without the trade in its props, Sleeper\'s own card stays', async () => {
+  documentBody = chatTradePage(false);
+  await page.goto('https://sleeper.com/settings', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('.view-button').isVisible(), true);
+  assert.equal(await page.locator('.snp-trade').count(), 0);
+  documentBody = LOGGED_OUT;
+});
+
 test('chat: hovering an emoji reaction opens its rows below, in place, moves nothing, never flickers, and the names popup shows whole', async () => {
   documentBody = chatPage();
   // A reacted emoji's place, the chat's scroll, and the names popup, as seen.

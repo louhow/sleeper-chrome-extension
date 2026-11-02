@@ -21,8 +21,14 @@
 // chat shows about half as much as it could. Only padding, margins and sizes
 // change (smaller avatars, a player's name and position on one line); every
 // element stays where Sleeper puts it, and the reaction rows below are untouched.
+// A trade (inspected in Sleeper's bundle 2026-11-01) is a card that shows two of
+// a side's players and a VIEW button. page-hook.js reads the whole trade off the
+// card's props and it's written out inside the card instead (chat-view.js), as
+// Sleeper's mobile app shows it. Sleeper's card stays underneath, hidden: without
+// its props nothing changes, and a click still opens its trade dialog.
 //   chat() -> { destroy }
 (globalThis.SNP ||= {}).chat = () => {
+  const { bridge, chatView, shared } = globalThis.SNP;
   const ROW = '.comment-reactions-container';
   // An option nobody picked: its count is empty (Sleeper's `hide` class comes
   // off every option while it shows them all, so it can't tell them apart).
@@ -35,7 +41,38 @@
   const list = `${on} .comment-list`;
   const tx = `${list} .embed-league-transaction`;
   const report = `${list} :is(.weekly-report-owner-item, .weekly-report-player-item)`;
+  const TRADE = '.trade-list-item.is-chat';
+  const trade = `${list} ${TRADE}:has(> .snp-trade)`;
   const css = `
+    /* A trade written out: Sleeper's card and its wrapper give up their fixed size, and all it drew. */
+    ${list} .trade-list-item-attachment-wrapper:has(> ${TRADE} > .snp-trade) { height: auto; max-height: none; width: auto; max-width: 100%; margin-top: 4px; background: none; }
+    ${trade} { height: auto; min-height: 0; max-height: none; width: auto; max-width: 100%; padding: 0; background: none; }
+    ${trade} > :not(.snp-trade) { display: none; }
+    .snp-tr-title { margin: 0 0 6px; font-weight: 700; font-size: 14px; line-height: 18px; color: #fff; }
+    .snp-tr-body { padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.1); border-left: 3px solid #59a7ff; border-radius: 8px; background: rgba(0, 0, 0, 0.14); }
+    .snp-tr-side + .snp-tr-side { margin-top: 8px; }
+    .snp-tr-team { margin: 0 0 6px; font-weight: 700; font-size: 13px; color: #a3bbd3; overflow-wrap: anywhere; }
+    .snp-tr-assets { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr)); gap: 6px 10px; }
+    .snp-tr-asset { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .snp-tr-face { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 36px; height: 36px; border: 2px solid #a3bbd3; border-radius: 50%; background: #4a5870; font-size: 11px; color: #fff; }
+    .snp-tr-face.token { border-color: #4a5870; }
+    .snp-tr-face.qb { border-color: #fc2b6d; }
+    .snp-tr-face.rb { border-color: #20ceb8; }
+    .snp-tr-face.wr { border-color: #59a7ff; }
+    .snp-tr-face.te { border-color: #feae58; }
+    .snp-tr-face.k { border-color: #c96cff; }
+    .snp-tr-face.def { border-color: #bf5f40; }
+    .snp-tr-face.dl { border-color: #fd5c01; }
+    .snp-tr-face.lb { border-color: #a3acff; }
+    .snp-tr-face.db { border-color: #fd7db6; }
+    .snp-tr-shot { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+    .snp-tr-shot.missing { visibility: hidden; }
+    .snp-tr-sign { position: absolute; right: -4px; bottom: -3px; width: 14px; height: 14px; border-radius: 50%; background: #20ceb8; color: #022047; font: 700 12px/14px Arial, sans-serif; text-align: center; }
+    .snp-tr-sign.drop { background: #fc2b6d; color: #fff; }
+    .snp-tr-meta { display: flex; flex-direction: column; min-width: 0; }
+    .snp-tr-name { font-weight: 700; font-size: 13px; line-height: 16px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .snp-tr-sub { font-size: 11px; line-height: 14px; color: #a3bbd3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
     /* Compact messages: the group's padding, the avatar and the name line.
        Sleeper sizes every avatar and headshot inline, so those need !important. */
     ${list} .comment-group { padding: 5px 14px 7px; }
@@ -154,6 +191,25 @@
     row.removeAttribute('data-snp-open');
   }
 
+  // Writes a trade out in its card (page-hook.js marked it with the trade's id).
+  // The new height mustn't take a chat at its latest message away from there.
+  const images = {};
+  const offTrade = bridge.on('snp:chat-trade', (t) => {
+    for (const card of document.querySelectorAll(`${TRADE}[data-snp-trade="${CSS.escape(t.id)}"]`)) {
+      const box = scroller(card.closest('.comment-group') ?? card);
+      const latest = box.scrollHeight - box.scrollTop - box.clientHeight < 2;
+      let block = card.querySelector(':scope > .snp-trade');
+      if (!block) {
+        block = document.createElement('div');
+        block.className = 'snp-trade';
+        shared.markMissingImages(block, images, () => {});
+        card.append(block);
+      }
+      block.innerHTML = chatView.tradeHtml(t);
+      if (latest) box.scrollTop = box.scrollHeight;
+    }
+  });
+
   // Capture, so the row is held before the hover paints.
   document.addEventListener('mouseover', enter, true);
   document.addEventListener('mouseout', leave, true);
@@ -163,6 +219,8 @@
     document.removeEventListener('mouseover', enter, true);
     document.removeEventListener('mouseout', leave, true);
     document.removeEventListener('scroll', follow, true);
+    offTrade();
+    for (const block of document.querySelectorAll('.snp-trade')) block.remove();
     document.documentElement.removeAttribute('data-snp-chat');
     style.remove();
   }

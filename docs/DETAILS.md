@@ -373,6 +373,16 @@ The same stylesheet (`src/chat.js`, switched on by `data-snp-chat`) tightens it,
 - Weekly report: tighter cards (a card for each manager, and for each position of the week in football) and a 36px avatar.
 - Reaction rows are untouched (below).
 
+### Chat trades
+
+Sleeper's web chat shows a trade as a card with two of a side's players and a VIEW button; its mobile app writes the whole trade out.
+Here the chat does too (any sport): each team, then the players, picks and FAAB it gets, with a headshot ringed in the position's color, name, position and team.
+
+- `page-hook.js` reads the trade off the props of Sleeper's card (`snp:chat-trade`), `chat-view.js` draws it and `chat.js` puts it in the card, hiding what the card drew.
+- A player dropped to make room shows with a red minus, and a pick that came from another team says whose (`via`).
+- A click anywhere still opens Sleeper's trade dialog. A card without its props stays as Sleeper draws it.
+- A chat at its latest message stays there as the trade changes height.
+
 ### Chat reactions
 
 Sleeper's chat (any page) keeps every emoji option in a message's reaction row, the unused ones at width 0, and widens them all while the row is hovered.

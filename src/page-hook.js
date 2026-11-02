@@ -1423,11 +1423,38 @@
       if (right <= room + 0.5) return;
     }
   }
+  // A trade in the chat: the whole of it, off the props of Sleeper's card (any
+  // sport), for the extension to write out (chat.js). Told again only when it changes.
+  const toldTrades = new WeakMap();
+  function chatTrades() {
+    for (const card of document.querySelectorAll('.trade-list-item.is-chat')) {
+      const p = props(card, (x) => x.transaction && x.rostersInLeagueMap);
+      const tx = p?.transaction;
+      if (!tx?.transaction_id || !tx.roster_ids) continue;
+      const players = {};
+      for (const id of Object.keys({ ...tx.adds, ...tx.drops })) {
+        const { first_name, last_name, position, team, sport } = tx.player_map?.[id] || {};
+        players[id] = { first_name, last_name, position, team, sport };
+      }
+      const names = {};
+      for (const [rosterId, roster] of Object.entries(p.rostersInLeagueMap)) {
+        names[rosterId] = p.usersInLeagueMap?.[roster?.owner_id]?.display_name;
+      }
+      const trade = { id: String(tx.transaction_id), status: tx.status, rosterIds: tx.roster_ids, adds: tx.adds, drops: tx.drops, picks: tx.draft_picks, budget: tx.waiver_budget, players, names };
+      const told = JSON.stringify(trade);
+      if (toldTrades.get(card) === told) continue;
+      toldTrades.set(card, told);
+      card.dataset.snpTrade = trade.id;
+      bridge.tell('snp:chat-trade', trade);
+    }
+  }
+
   let cardFrame = 0;
   new MutationObserver(() => {
     cardFrame ||= requestAnimationFrame(() => {
       cardFrame = 0;
       cardEspn();
+      chatTrades();
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
 

@@ -39,6 +39,7 @@
         "src/ui.js",
         "src/bridge.js",
         "src/shared.js",
+        "src/chat-view.js",
         "src/chat.js",
         "src/settings-view.js",
         "src/settings.js",
