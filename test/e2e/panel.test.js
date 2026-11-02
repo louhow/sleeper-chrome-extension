@@ -876,6 +876,15 @@ test('floats when the page has no placeholder to fill', async () => {
 
 const shadowText = (sel) => page.locator(panel(sel)).textContent();
 
+// With live data, a starter leaving the lineup may have a score that counts
+// (a finished game locked, lockable or their last), and the panel asks first;
+// a plain move says yes and goes on. Waits for the dialog or the save's notice.
+async function answerScoreAsk() {
+  const ask = page.locator(dialog('[data-action="swap-confirm"]'));
+  await Promise.race([ask.waitFor({ timeout: 10000 }), page.locator(panel('.notice')).waitFor({ timeout: 10000 })]).catch(() => {});
+  if (await ask.count()) await ask.click();
+}
+
 test('logged in: swaps a bench player into the lineup', async () => {
   documentBody = LOGGED_IN;
   const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}/rosters`)).json();
@@ -903,6 +912,7 @@ test('logged in: swaps a bench player into the lineup', async () => {
   await page.screenshot({ path: `${OUT}swap-picking.png` });
   const slotIndex = Number((await target.getAttribute('data-spot')).slice(2));
   await target.click();
+  await answerScoreAsk();
 
   await page.locator(panel('.notice.ok')).waitFor();
   const mutation = sleeper.mutations.at(-1);
@@ -923,6 +933,7 @@ test('logged in: a refused save shows the error and Escape cancels a pick', asyn
   sleeper.failNextMutation = true;
   await page.locator(panel('.card button.slot.bn')).first().click();
   await page.locator(panel('.card.target button.slot')).first().click();
+  await answerScoreAsk();
   await page.locator(panel('.notice.error')).waitFor();
   assert.match(await shadowText('.notice.error'), /Player is locked/);
 
@@ -1512,6 +1523,7 @@ test('IR: Out players move onto IR from the bench or the lineup', async () => {
   const mid = sleeper.mutations.length;
   await page.locator(panel('[data-spot="s:0"]')).click();
   await page.locator(panel('.card.target button.slot.ir[data-spot="re:0"]')).click();
+  await answerScoreAsk();
   await page.locator(panel('.notice.ok')).waitFor();
   const starterMoves = sleeper.mutations.slice(mid);
   assert.deepEqual(starterMoves.map((m) => m.query.match(/mutation (\w+)/)[1]), ['update_matchup_leg', 'roster_update_reserve'],
@@ -1968,6 +1980,65 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await page.locator(panel('button.optimize')).click();
   assert.match(await page.locator(dialog('.dialog-body')).textContent(), /already your best lineup/);
   await page.keyboard.press('Escape');
+  sleeper.projections = null;
+  sleeper.midWeek = false;
+  documentBody = LOGGED_OUT;
+});
+
+test('logged in: a move that takes a score out of the lineup asks first; Keep leaves it alone, Yes saves it', async () => {
+  documentBody = LOGGED_IN;
+  sleeper.rosters = null;
+  await startMidWeek();
+  const myRoster = await openMyTeam(TEAM_URL);
+  const leg = sleeper.legs[1].find((l) => l.roster_id === myRoster.roster_id);
+  const league = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}`)).json();
+  const util = league.roster_positions.filter((p) => p !== 'BN').indexOf('UTIL');
+  const lineupBefore = [...leg.starters];
+  const starter = leg.starters[util];
+  assert.notEqual(starter, '0', 'a UTIL starter');
+  // Every finished game scored 20, and the lineup was seen (by openMyTeam) before
+  // they tip off now, so each starter's finished game can still be locked in.
+  const statPts = (fpts) => fpts / league.scoring_settings.pts;
+  sleeper.projections = (rows) => rows.map((r) => (sleeper.finished.has(r.game_id) ? { ...r, stats: { pts: statPts(20) } } : r));
+  sleeper.tipAt = Date.now();
+  await page.reload();
+  await page.locator(panel('.taxi-head .hint')).waitFor({ timeout: 30000 });
+  const players = await (await fetch('https://api.sleeper.app/v1/players/nba')).json();
+  const before = sleeper.mutations.length;
+
+  // The UTIL starter's slot, then the first bench player offered for it: the dialog, not a save.
+  const pick = async () => {
+    await page.locator(panel(`button.slot[data-spot="s:${util}"]`)).click();
+    await page.locator(panel('.card.selected')).waitFor();
+    const bench = page.locator(panel('.card.target button.slot.bn')).first();
+    const id = (await bench.getAttribute('data-spot')).slice(2);
+    await bench.click();
+    await page.locator(dialog('.swap-ask')).waitFor();
+    return id;
+  };
+  await pick();
+  assert.equal(await page.locator(dialog('#dialog-title')).textContent(), 'Take a score out of your lineup?');
+  const ask = await page.locator(dialog('.swap-ask')).textContent();
+  assert.match(ask, new RegExp(`${players[starter].full_name}'s 20\\.00 \\(\\w{3} (vs|@) \\w+\\) can still be locked in; on the bench it can't\\.`));
+  assert.match(ask, /Move: .+ to bench, .+ to UTIL/);
+  await page.screenshot({ path: `${OUT}swap-confirm.png` });
+  // Keep: nothing saves, and the pick is dropped too.
+  await page.locator(dialog('button[data-action="close-modal"]:not(.close)')).click();
+  await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
+  assert.equal(sleeper.mutations.length, before, 'nothing saved');
+  assert.equal(await page.locator(panel('.card.selected')).count(), 0, 'the pick is dropped');
+  // Yes: the move saves as any swap does.
+  const benchId = await pick();
+  await page.locator(dialog('[data-action="swap-confirm"]')).click();
+  await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
+  await page.locator(panel('.notice.ok')).waitFor();
+  assert.equal(sleeper.mutations.length, before + 1, 'one save');
+  const saved = JSON.parse(sleeper.mutations.at(-1).query.match(/starters: (\[[^\]]*\])/)[1]);
+  assert.equal(saved[util], benchId, 'the bench player took the slot');
+  assert.ok(!saved.includes(starter), 'the starter is out');
+  assert.match(await shadowText('.notice.ok'), /^Saved: .+ to bench, .+ to UTIL$/);
+  await page.locator(panel('.notice.ok')).waitFor({ state: 'detached', timeout: 5000 });
+  leg.starters = lineupBefore;
   sleeper.projections = null;
   sleeper.midWeek = false;
   documentBody = LOGGED_OUT;

@@ -128,6 +128,23 @@ test('picking a spot highlights who it can swap with and dims the rest', () => {
   assert.match(text(html), /Pick a player to swap with Luka Doncic/);
 });
 
+test('the swap confirm names the score a move takes out of the lineup, why it counts, and the move', () => {
+  const s = state({ me: 'u1', currentWeek: 1, swap: 's:0' });
+  const day = { date: '2026-10-25', home: false, opponent: 'UTA', game: { id: 'g2', status: 'complete' }, actual: 12.5 };
+  const html = nbaPanelView.swapConfirm(s, { kind: 'swap', from: 's:0', to: 'b:g', moved: 'L. Doncic to bench, B. Guard to PG',
+    stakes: [{ id: 'a', to: 'bench', day, points: 12.5, why: 'lockable' }] });
+  const out = text(html);
+  assert.match(out, /Take a score out of your lineup\?/);
+  assert.match(out, /Luka Doncic 's 12\.50 \(Sun @ UTA\) can still be locked in; on the bench it can't\./);
+  assert.match(html, /<b class="score-chip tier tier-red">12\.50<\/b>/);
+  assert.match(out, /Move: L\. Doncic to bench, B\. Guard to PG/);
+  assert.match(html, /<button class="danger solid" data-action="swap-confirm" >Yes, take it out<\/button>\s*<button data-action="close-modal">Keep in lineup<\/button>/);
+  const why = (k, to = 'bench') => text(nbaPanelView.swapConfirm(s, { stakes: [{ id: 'a', to, day, points: 30, why: k }], moved: '' }));
+  assert.match(why('locked'), /30\.00 \(Sun @ UTA\) is locked in and goes on the bench with them\./);
+  assert.match(why('final', 'IR'), /is their final game this week and counts as it stands; on IR it won't\./);
+  assert.match(why('maybe', 'taxi'), /may still be lockable \(if they were starting at tip-off\); on taxi it isn't\./);
+});
+
 test('logged-in leg data wins: starters, points and locked games; the projection is added up, not Sleeper\'s', () => {
   const s = state({ me: 'u1', currentWeek: 1 });
   // Luka locked his first game (30.79); Sleeper's leg projection is from before the week and never moves.

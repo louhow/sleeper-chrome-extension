@@ -1829,6 +1829,31 @@ button.optimize:hover:not(:disabled) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The confirm before a swap takes a score out of the lineup (nbaPanelView.swapConfirm). */
+.dialog:has(.swap-ask) {
+  width: min(440px, 100%);
+}
+.swap-ask .stake {
+  margin: 2px 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.swap-ask .who {
+  color: var(--text);
+}
+.swap-ask .moving {
+  margin: 0;
+}
+.swap-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.swap-foot button {
+  padding: 10px 16px;
+  font-weight: 700;
+}
 /* The NFL League tab's matchup dialog (nfl/league.js): the Matchup tab's body
    in a dialog wide enough for both lineups to read as on the tab. */
 .dialog:has(.mu-dialog) {

@@ -87,6 +87,33 @@ test('applying a swap moves players between slots and the bench', () => {
   assert.deepEqual(starters('s:2', 'b:pf'), ['pg', 'sg', 'pf', '0', 'c2'], 'benched starter just drops out');
 });
 
+test('scores at stake: a starter leaving the lineup with a locked, final, lockable or maybe score; nothing for the rest', () => {
+  const games = [
+    score('g1', '2026-10-20', 'LAL', 'GSW', { status: 'complete' }),
+    score('g2', '2026-10-23', 'LAL', 'DEN'),
+    score('g3', '2026-10-20', 'BOS', 'MIA', { status: 'complete' }),
+  ];
+  const week = { days: model.weekDays(games), gamesByTeam: model.gamesByTeam(games), proj: {}, actual: { pg: { g1: 31.5 }, c2: { g3: 20 } } };
+  const now = Date.parse('2026-10-21T12:00:00Z');
+  const base = { slots: ['PG', 'G', 'C'], starters: ['pg', 'sg', 'c2'], bench: ['pgsg'], week, locks: {}, started: null,
+    players: { pg: { team: 'LAL' }, sg: { team: 'NOP' }, c2: { team: 'BOS' }, pgsg: { team: 'LAL' } } };
+  const out = (l, starters, extra = {}) => plain(model.scoresAtStake(l, { starters, taxi: [], reserve: [], ...extra }, now));
+  // The PG's finished game can still be locked (next game not tipped off); the C played their only game, so it counts.
+  assert.deepEqual(out(base, ['pgsg', 'sg', 'c2']).map(({ id, to, points, why, day }) => [id, to, points, why, day.game.id]), [['pg', 'bench', 31.5, 'lockable', 'g1']]);
+  assert.deepEqual(out(base, ['pg', 'sg', '0']).map(({ id, points, why }) => [id, points, why]), [['c2', 20, 'final']]);
+  assert.deepEqual(out({ ...base, locks: { pg: 'g1' } }, ['pgsg', 'sg', 'c2']).map(({ why }) => why), ['locked']);
+  assert.deepEqual(out({ ...base, started: () => null }, ['pgsg', 'sg', 'c2']).map(({ why }) => why), ['maybe'], 'unseen at tip-off');
+  // Played on the bench, with a game left: no lock to lose. A starter with nothing played yet: nothing either.
+  assert.deepEqual(out({ ...base, started: () => false }, ['pgsg', 'sg', 'c2']), []);
+  assert.deepEqual(out(base, ['pg', 'pgsg', 'c2']), [], 'the G has no game yet');
+  // Starters trading slots keep their scores; where the leaver lands is named.
+  assert.deepEqual(out(base, ['sg', 'pg', 'c2']), []);
+  assert.equal(out(base, ['pgsg', 'sg', 'c2'], { reserve: ['pg'] })[0].to, 'IR');
+  assert.equal(out(base, ['pgsg', 'sg', 'c2'], { taxi: ['pg'] })[0].to, 'taxi');
+  // Once the next game has tipped off, the window is shut and the game left means nothing counts yet.
+  assert.deepEqual(plain(model.scoresAtStake(base, { starters: ['pgsg', 'sg', 'c2'], taxi: [], reserve: [] }, Date.parse('2026-10-24T01:00:00Z'))), []);
+});
+
 const day = (id, date, status, start, extra = {}) =>
   ({ date, game: { id, date, status, start: Date.parse(start) }, opponent: 'GSW', home: true, proj: 30, ...extra });
 const NOW = Date.parse('2026-10-22T12:00:00Z');

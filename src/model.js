@@ -366,6 +366,27 @@
     return { ...st, error };
   }
 
+  // The scores a lineup change takes out of the starting lineup, which
+  // Sleeper's apps ask about first ("are you sure you want to take a score out
+  // of your starting lineup?"): for each starter who leaves it (`after`: the
+  // starters, taxi and reserve from applyMove), their finished game that counts
+  // or still could under Lock-In: locked in, the final game of their week (it
+  // counts once done), or one still lockable, for sure or maybe. A game played
+  // on the bench, or past locking with a game left, is nothing to lose.
+  //   [{ id, to: 'bench' | 'taxi' | 'IR', day, points, why: 'locked' | 'final' | 'lockable' | 'maybe' }], in lineup order.
+  function scoresAtStake(l, after, now) {
+    return l.starters
+      .filter((id) => id && id !== '0' && !after.starters.includes(id))
+      .flatMap((id) => {
+        const st = lockState(playerDays(l.week, l.players[id]?.team, id), l.locks[id], now, l.started ? (game) => l.started(id, game) : null);
+        const day = st.locked ?? st.counted ?? (st.lockable || st.unsure ? st.current : null);
+        if (!day || day.game.status !== 'complete') return [];
+        const why = st.locked ? 'locked' : st.counted ? 'final' : st.lockable ? 'lockable' : 'maybe';
+        const to = (after.reserve || []).includes(id) ? 'IR' : (after.taxi || []).includes(id) ? 'taxi' : 'bench';
+        return [{ id, to, day, points: day.actual ?? 0, why }];
+      });
+  }
+
   // Sleeper won't move a player once their game has tipped off, so any lineup
   // seen in this long after tip-off (a game runs longer) is the one they tipped off in.
   const FROZEN_MS = 2 * 3600e3;
@@ -1306,7 +1327,7 @@
     weekDays, sideTeam, gameState, gamesByTeam, pointsByGame, statLine, playerDays, lockInDefault, ownedPicks, pickSeasons, PICK_SEASONS, lastWeek,
     spotRefs, swapTargets, autosubOptions, withAutosub, liveSubs, applyMove, describeMove, lineupOnLeg, nextTeam,
     taxiEligible, taxiOpen, reserveEligible, illegalReserve,
-    lockedGameId, lockState, lockCheck, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
+    lockedGameId, lockState, lockCheck, scoresAtStake, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
     openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,

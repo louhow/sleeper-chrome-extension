@@ -3,7 +3,7 @@
 (globalThis.SNP ||= {}).nbaPanelView = (() => {
   const { playerDays, lockInDefault, statLine, lockState, spotRefs, swapTargets, lockedGameId, scoreTier, gameState } = globalThis.SNP.model;
   const { esc, f2, headshot, teamName, injuryTag, gameTime, weekday, gameLabel, lockIcon, slotBadge, lineup, taxiRule, reserveRule, irBlockNames, irBlockTip, irBanner,
-    whatIfOn, playerOf, teamTag, researchLine, padTo, real, loading, errorMsg, shell, teamCard, rowHead, swapHint, swapClass, emptyCard, apiView, sessionExpired } = globalThis.SNP.ui;
+    whatIfOn, playerOf, teamTag, researchLine, padTo, real, loading, errorMsg, shell, teamCard, rowHead, swapHint, swapClass, emptyCard, apiView, sessionExpired, dialog, tierClass } = globalThis.SNP.ui;
 
   function render(state, log) {
     // Sleeper's League tab keeps its own content; the week's matchups go on top of it.
@@ -210,5 +210,31 @@
     </li>`).join('')}</ul>`;
   }
 
-  return { render };
+  // The dialog before a swap takes a score out of the starting lineup, as
+  // Sleeper's apps ask first: who leaves with what score and why it counts
+  // (model.scoresAtStake), then the move itself. `m`: { stakes, moved } (the session's swap modal).
+  function swapConfirm(s, m) {
+    const stakes = m.stakes.map((k) => {
+      const p = playerOf(s.players, k.id);
+      const game = `${weekday(k.day.date)} ${k.day.home ? 'vs' : '@'} ${k.day.opponent}`;
+      const chip = `<b class="score-chip${tierClass(scoreTier(k.points, s.tiers, p.position))}">${f2(k.points)}</b>`;
+      const where = k.to === 'bench' ? 'on the bench' : `on ${k.to}`;
+      const why = k.why === 'locked' ? `is locked in and goes ${where} with them.`
+        : k.why === 'final' ? `is their final game this week and counts as it stands; ${where} it won't.`
+        : k.why === 'maybe' ? `may still be lockable (if they were starting at tip-off); ${where} it isn't.`
+        : `can still be locked in; ${where} it can't.`;
+      return `<p class="stake"><b class="who">${esc(p.name)}</b>'s ${chip} (${esc(game)}) ${why}</p>`;
+    }).join('');
+    return dialog('Take a score out of your lineup?', '', `
+      <div class="dialog-body swap-ask" role="alert">
+        ${stakes}
+        <p class="sub moving">Move: ${esc(m.moved)}</p>
+      </div>
+      <footer class="dialog-foot swap-foot">
+        <button class="danger solid" data-action="swap-confirm" ${s.saving ? 'disabled' : ''}>Yes, take it out</button>
+        <button data-action="close-modal">Keep in lineup</button>
+      </footer>`);
+  }
+
+  return { render, swapConfirm };
 })();

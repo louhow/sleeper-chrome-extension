@@ -28,7 +28,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 ## Features
 
 **NBA**
-- Team tab: roster, each player's last finished game as a box score under their name, weekly game strips that show what's locked, still lockable (only games the player started) or past locking, tinted by score (lock right from the cell), projections, lineup swaps, taxi and IR moves, draft picks.
+- Team tab: roster, each player's last finished game as a box score under their name, weekly game strips that show what's locked, still lockable (only games the player started) or past locking, tinted by score (lock right from the cell), projections, lineup swaps (a move that takes a score out of your lineup asks first, as Sleeper's app does), taxi and IR moves, draft picks.
 - Matchup tab: both lineups slot by slot, win probability, Lock-In status.
 - League tab: every matchup of the week, styled like the Matchup tab; click one to open it, or a team to see its roster.
 - Standings on the League tab (NBA and NFL): rank, record, PF, PA, Max PF and waiver, sortable by any column; Sleeper's "League is full" teams list is gone.

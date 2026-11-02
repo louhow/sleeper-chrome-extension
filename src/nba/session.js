@@ -75,6 +75,7 @@
     tiers: null, // score colors from the league's own games (see model.scoreTiers)
     // { kind: 'bid', playerId, status, bid, drops, errors, saving } | { kind: 'claims', errors, saving } | { kind: 'player', playerId, season }
     // | { kind: 'optimize', plan, noLock, ack, errors, saving, busy } (noLock: locks kept open; busy: 'all', 'row:<slot>' or 'lock:<player>' while it saves; done: what the last row saved); a player card can open over it (`back`).
+    // | { kind: 'swap', from, to, stakes, moved }: a lineup move waiting on its confirm, since it takes a score out of the lineup (model.scoresAtStake)
     modal: null,
     // What-if scoring: values that differ from the league's, whether they're in use, and the editor's state.
     // `drafts` holds text being typed that isn't a number yet.
@@ -166,7 +167,8 @@
     const scrolls = [...into.querySelectorAll('.dialog-body, [data-scroll]')].map((el) => [el.dataset.scroll || 'dialog', el.scrollTop]);
     const focused = layer.shadow.activeElement?.matches?.('[data-bid]');
     const kind = state.modal?.kind;
-    const dialog = kind === 'player' ? nbaCardView.render(state) : kind === 'optimize' ? nbaOptimizeView.render(state) : nbaWaiversView.render(state);
+    const dialog = kind === 'player' ? nbaCardView.render(state) : kind === 'optimize' ? nbaOptimizeView.render(state)
+      : kind === 'swap' ? nbaPanelView.swapConfirm(state, state.modal) : nbaWaiversView.render(state);
     // A player card opened from the optimize dialog sits on top of it.
     const under = state.modal?.back?.kind === 'optimize' ? nbaOptimizeView.render(state, state.modal.back) : '';
     into.innerHTML = `<div class="page-layer${ui.whatIfOn(state) ? ' whatif' : ''}">${under}${dialog}${showNotice ? ui.notice(state) : ''}</div>`;
@@ -523,6 +525,8 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
 
   function closeModal() {
     if (state.modal?.saving) return;
+    // Keeping the player in the lineup drops the move altogether.
+    if (state.modal?.kind === 'swap') state.swap = null;
     state.modal = state.modal?.back ?? null;
     schedule();
   }
@@ -554,6 +558,8 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
   // so a starter displaced by a taxi player lands on an up-to-date roster. IR
   // goes in three steps so no save ever has a player both starting and on IR:
   // starters going to IR leave the lineup, then IR saves, then the final lineup.
+  const movedText = (lineup, next) => shared.movedText(model.describeMove(lineup, next), (id) => ui.shortName(ui.playerOf(state.players, id)));
+
   function swap(fromRef, toRef) {
     const lineup = ui.lineup(state);
     const next = model.applyMove(fromRef, toRef, lineup);
@@ -563,7 +569,7 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     const toReserve = new Set(next.reserve.filter((id) => !lineup.reserve.includes(id)));
     const benched = lineup.starters.map((id) => (toReserve.has(id) ? '0' : id));
     const startersChanged = !same(next.starters, lineup.starters);
-    const moved = shared.movedText(model.describeMove(lineup, next), (id) => ui.shortName(ui.playerOf(state.players, id)));
+    const moved = movedText(lineup, next);
     state.swap = null;
     return save(async () => {
       if (taxiChanged) await saveRosterList('taxi', lineup.roster.roster_id, next.taxi);
@@ -623,12 +629,34 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     const lineup = ui.lineup(state);
     if (!lineup.editable) return;
     if (state.swap && state.swap !== ref && model.swapTargets(state.swap, lineup).includes(ref)) {
+      // A move that takes a score out of the starting lineup asks first, as Sleeper's apps do.
+      const next = model.applyMove(state.swap, ref, lineup);
+      const stakes = model.scoresAtStake(lineup, next, Date.now());
+      if (stakes.length) {
+        state.modal = { kind: 'swap', from: state.swap, to: ref, stakes, moved: movedText(lineup, next) };
+        state.notice = null;
+        return schedule();
+      }
       swap(state.swap, ref);
       return;
     }
     state.swap = state.swap === ref ? null : ref;
     state.notice = null;
     schedule();
+  }
+
+  // The move the swap dialog asked about, once the score it gives up is accepted.
+  function confirmSwap() {
+    const m = state.modal;
+    if (m?.kind !== 'swap' || state.saving) return;
+    state.modal = null;
+    const lineup = ui.lineup(state);
+    // The lineup may have been read again meanwhile; the move must still hold.
+    if (!lineup?.editable || !model.swapTargets(m.from, lineup).includes(m.to)) {
+      state.swap = null;
+      return schedule();
+    }
+    swap(m.from, m.to);
   }
 
   function setWeek(week) {
@@ -715,6 +743,7 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     if (season && state.modal?.kind === 'player') return playerCard.showSeason(Number(season.dataset.cardSeason));
     const action = e.target.closest('[data-action]')?.dataset.action;
     if (action === 'close-modal') closeModal();
+    if (action === 'swap-confirm') confirmSwap();
     if (action === 'submit-claim') waivers.submit();
     if (action === 'whatif-off') setWhatIf({ on: false });
   });
