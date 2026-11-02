@@ -3040,11 +3040,23 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   // Sleeper's numbers move during games; ours follow.
   await page.evaluate(() => { document.querySelectorAll('.league-matchup-row-item')[1].querySelector('.score').textContent = '25.90'; });
   await first.locator('.mu-team.mine .mu-pts').filter({ hasText: '25.90' }).waitFor();
-  // A card opens its matchup on the extension's Matchup tab (through Sleeper's tab, so its router follows), not Sleeper's small modal.
-  await cards.nth(1).click();
-  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup'], []]);
+  // A card opens its matchup in the extension's own dialog, laid out like the Matchup tab, not Sleeper's small modal.
+  const dialog = (sel) => `#sleeper-nfl-matchup ${sel}`;
+  await first.click();
+  const head = page.locator(dialog('.dialog .lg-match.nfl-mu-head'));
+  await head.waitFor({ timeout: 30000 });
+  assert.equal(await head.locator('.mu-team').count(), 2);
+  assert.match(await head.locator('.mu-team.mine .team-name').textContent(), /Lou Point/, 'the card clicked, yours on the left');
+  assert.ok(await page.locator(dialog('.mu-row .mp.nfl')).count() >= 2, 'rows slot by slot');
+  assert.match(await page.locator(dialog('.week-label b')).textContent(), /^Week 7$/, 'the week the League tab showed');
+  const box = await page.locator(dialog('.dialog')).boundingBox();
+  assert.ok(box.width >= 1000, `a full-size dialog (${box.width}px)`);
+  await page.screenshot({ path: `${OUT}nfl-league-matchup.png` });
+  await page.keyboard.press('Escape');
+  await page.locator(dialog('.dialog')).waitFor({ state: 'detached' });
+  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [[], []], 'no tab switch, no Sleeper modal');
   // Without the ids in Sleeper's props (gone since 2026-10), the owner names on the card find
-  // the rosters: yours stays first and still opens the Matchup tab.
+  // the rosters: yours stays first and still opens the dialog, yours on the left.
   await page.evaluate(() => {
     const row = document.querySelectorAll('.league-matchup-row-item')[1];
     delete row.__reactInternalInstance$test;
@@ -3053,12 +3065,16 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   await first.locator('.mu-team.mine .mu-pts').filter({ hasText: '26.90' }).waitFor();
   assert.match(await first.getAttribute('class'), /\bown\b/, 'yours, by name');
   await first.click();
-  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup', 'Matchup'], []]);
+  await head.waitFor({ timeout: 30000 });
+  assert.match(await head.locator('.mu-team.mine .team-name').textContent(), /Lou Point/);
+  await page.locator(dialog('[data-action="close-modal"].close')).click();
+  await page.locator(dialog('.dialog')).waitFor({ state: 'detached' });
+  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [[], []]);
   // A card that resolves neither way opens Sleeper's own, as before (not known as yours, it falls to second).
   await page.evaluate(() => { document.querySelectorAll('.league-matchup-row-item')[1].querySelectorAll('.team-name').forEach((el, i) => { el.textContent = `@nobody${i}`; }); });
   await cards.nth(1).locator('.mu-who .sub').filter({ hasText: '@nobody0' }).waitFor();
   await cards.nth(1).click();
-  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup', 'Matchup'], [1]], 'Sleeper\'s second card');
+  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [[], [1]], 'Sleeper\'s second card');
   documentBody = LOGGED_OUT;
 });
 

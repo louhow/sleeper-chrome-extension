@@ -1829,6 +1829,18 @@ button.optimize:hover:not(:disabled) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The NFL League tab's matchup dialog (nfl/league.js): the Matchup tab's body
+   in a dialog as wide as the page allows, so both lineups read as on the tab. */
+.dialog:has(.mu-dialog) {
+  width: min(1080px, 100%);
+  max-height: calc(100vh - 48px);
+}
+.dialog:has(.mu-dialog) .dialog-body {
+  padding: 0 20px 16px;
+}
+.mu-dialog .body {
+  padding: 0;
+}
 /* NBA Optimize lineup: one row per starting slot, in lineup order. A change
    shows who goes out beside who comes in; a slot that stays is dimmed. */
 .dialog:has(.os-row) {

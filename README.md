@@ -51,7 +51,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Matchup tab: the League tab's matchup card on top (a team opens on the Team tab), both lineups slot by slot with the game and box score under each player, muted as on Sleeper's own tab; the picker picks a matchup.
 - AutoSub: tap a starter, then "Set an AutoSub" to name the bench player who takes their spot if they don't play; a chip on the row takes it off.
 - Optimize lineup, slot by slot like the NBA one; apply one row or all of them.
-- League tab matchups drawn like the NBA ones, with Sleeper's own live numbers; a click opens the matchup on the Matchup tab instead of Sleeper's small modal.
+- League tab matchups drawn like the NBA ones, with Sleeper's own live numbers; a click opens the matchup in a full-size dialog laid out like the Matchup tab, instead of Sleeper's small modal.
 - League median on the League tab and medallions on the Matchup and League tabs, as on NBA.
 - Chopped leagues:
   - League tab: the Chopping Block as Sleeper's app shows it (your safe %, every team in the chop zone, danger or safe, with its FAAB left) and the Graveyard, with halos and devil's horns.

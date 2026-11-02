@@ -28,7 +28,7 @@
     return l?.reserve ? { ...l, irBlocked: model.illegalReserve(Object.keys(l.reserve), l.reserve, league.settings) } : l;
   };
   const optimizer = nflOptimize({ lineup: optimizeLineup, nflSave, notify: (text) => panel.notify(text) });
-  const leagueCards = nflLeague(league, { open: ({ rosterId, week }) => panel.openMatchup(rosterId, week), rosterOf: panel.rosterOf, myRosterId: panel.myRosterId });
+  const leagueCards = nflLeague(league, { weekView: panel.weekView, currentWeek: () => info.currentWeek, openTeam: panel.openTeam, rosterOf: panel.rosterOf, myRosterId: panel.myRosterId });
   const playersTab = nflPlayers({ api, league, info });
   let page = initialPage;
   let destroyed = false;
@@ -73,6 +73,7 @@
     page = next;
     panel.show(next);
     if (next !== 'team') optimizer.close();
+    if (next !== 'league') leagueCards.close();
     attach();
   }
 

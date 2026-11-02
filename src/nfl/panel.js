@@ -244,15 +244,6 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
   }
   const myRosterId = () => (state.rosters && state.me ? loaders.myRoster(state.rosters, state.me)?.roster_id ?? null : null);
 
-  // A League tab card opens its matchup on the Matchup tab, on the week the
-  // League tab showed (Sleeper's week picker), with `rosterId` as the left side.
-  function openMatchup(rosterId, week = null) {
-    if (week != null && week !== state.week) setWeek(week);
-    setRoster(rosterId);
-    state.tab = 'page';
-    shared.openSleeperTab('matchup');
-  }
-
   // A swap on your own Team tab: tap a slot badge, then one of the spots it
   // can trade places with. Saved through Sleeper's Team component.
   function pickSpot(ref) {
@@ -529,5 +520,5 @@ update_matchup_leg(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(r
   }
   const pendingWeeks = new Set();
 
-  return { load: () => load().catch(fail), fail, attach, show, notify, refresh: schedule, destroy, weekView, openTeam, openMatchup, rosterOf, myRosterId };
+  return { load: () => load().catch(fail), fail, attach, show, notify, refresh: schedule, destroy, weekView, openTeam, rosterOf, myRosterId };
 };

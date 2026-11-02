@@ -349,5 +349,5 @@
     </div>`;
   }
 
-  return { render, lineup, totals, chopBlockOf, chopBar, moveLineup, targetsOf, autosubOptions };
+  return { render, matchup: matchupView, lineup, totals, chopBlockOf, chopBar, moveLineup, targetsOf, autosubOptions };
 })();

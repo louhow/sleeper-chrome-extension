@@ -78,6 +78,10 @@ test('matchup: both teams, win chance, rows slot by slot and empty sections held
   assert.match(out, /@louhow Gridiron &lt;Gang&gt; 30\.50 90% WIN 4-2 50\.40 VS @rival Blitz 12\.00 10% WIN 3-3/);
   assert.match(html, /class="mu-head lg-match nfl-mu-head"/);
   assert.match(html, /data-open-team="2"/, 'the opponent opens on the Team tab');
+  // The body on its own, for the League tab's matchup dialog: the same, without the shell.
+  const body = nflPanelView.matchup(state({ page: 'matchup' }));
+  assert.ok(html.includes(body), 'what the tab shows');
+  assert.doesNotMatch(body, /class="toolbar/);
   assert.match(out, /Starters 1 yet to play · 2 for them/);
   // A row is the player and points, then the game and box score under them, as on Sleeper's own tab.
   assert.match(out, /P\. Mahomes QB • KC 24\.50 proj 21\.20 Final W 27-20 vs BUF 21\/30 CMP, 260 YD, 2 TD QB J\. Allen QB • BUF 12\.00 proj 18\.00 Final L 20-27 @ KC/);
