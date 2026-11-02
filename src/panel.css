@@ -1830,9 +1830,9 @@ button.optimize:hover:not(:disabled) {
   white-space: nowrap;
 }
 /* The NFL League tab's matchup dialog (nfl/league.js): the Matchup tab's body
-   in a dialog as wide as the page allows, so both lineups read as on the tab. */
+   in a dialog wide enough for both lineups to read as on the tab. */
 .dialog:has(.mu-dialog) {
-  width: min(1080px, 100%);
+  width: min(900px, 100%);
   max-height: calc(100vh - 48px);
 }
 .dialog:has(.mu-dialog) .dialog-body {

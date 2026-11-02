@@ -3050,7 +3050,7 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   assert.ok(await page.locator(dialog('.mu-row .mp.nfl')).count() >= 2, 'rows slot by slot');
   assert.match(await page.locator(dialog('.week-label b')).textContent(), /^Week 7$/, 'the week the League tab showed');
   const box = await page.locator(dialog('.dialog')).boundingBox();
-  assert.ok(box.width >= 1000, `a full-size dialog (${box.width}px)`);
+  assert.ok(box.width >= 860 && box.width <= 900, `a full-size dialog (${box.width}px)`);
   await page.screenshot({ path: `${OUT}nfl-league-matchup.png` });
   await page.keyboard.press('Escape');
   await page.locator(dialog('.dialog')).waitFor({ state: 'detached' });
