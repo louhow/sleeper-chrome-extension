@@ -58,6 +58,13 @@ test('tradeHtml: other sports use their own headshots, and text is escaped', () 
   assert.ok(!html.includes('<b>Lee') && !html.includes('<i>x'));
 });
 
+test('tradeHtml: Sleeper\'s own message text wins, and only a trade with a dialog says it opens one', () => {
+  const rows = chatView.tradeHtml({ title: 'The trade went through.', status: 'complete', rosterIds: [1], adds: {}, names: {} });
+  assert.match(rows, /The trade went through\./);
+  assert.doesNotMatch(rows, /View this trade/);
+  assert.match(chatView.tradeHtml({ status: 'complete', opens: true, rosterIds: [1], adds: {}, names: {} }), /title="View this trade"/);
+});
+
 test('tradeHtml: a player the trade has no details for still shows', () => {
   assert.match(chatView.tradeHtml({ status: 'complete', rosterIds: [1], adds: { 7: 1 }, players: {} }), /Player 7/);
 });

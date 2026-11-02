@@ -1,7 +1,8 @@
 // A trade in Sleeper's chat, written out as Sleeper's mobile app shows it: each
 // team and what it gets, so there's no VIEW to click for it. Pure: data -> HTML.
-//   t = { status, rosterIds, adds, drops, picks, budget, players, names }, read
-//   off Sleeper's trade card (page-hook.js): adds and drops are { playerId: rosterId },
+//   t = { title or status, opens, rosterIds, adds, drops, picks, budget, players, names },
+//   read off Sleeper's trade card or rows (page-hook.js); `opens` when a click opens
+//   Sleeper's trade dialog (a card does): adds and drops are { playerId: rosterId },
 //   picks "originalRosterId,season,round,newRosterId,oldRosterId", budget
 //   "fromRosterId,toRosterId,amount", players { playerId: player } and names { rosterId: name }.
 (globalThis.SNP ||= {}).chatView = (() => {
@@ -72,7 +73,7 @@
         <div class="snp-tr-team">@${esc(s.name)}</div>
         <div class="snp-tr-assets">${s.assets.map((a) => asset(t, a)).join('')}</div>
       </div>`).join('');
-    return `<div class="snp-tr-title">${esc(TITLES[t.status] || 'A trade.')}</div><div class="snp-tr-body" title="View this trade">${teams}</div>`;
+    return `<div class="snp-tr-title">${esc(t.title || TITLES[t.status] || 'A trade.')}</div><div class="snp-tr-body"${t.opens ? ' title="View this trade"' : ''}>${teams}</div>`;
   }
 
   return { sides, tradeHtml };

@@ -25,7 +25,9 @@
 // a side's players and a VIEW button. page-hook.js reads the whole trade off the
 // card's props and it's written out inside the card instead (chat-view.js), as
 // Sleeper's mobile app shows it. Sleeper's card stays underneath, hidden: without
-// its props nothing changes, and a click still opens its trade dialog.
+// its props nothing changes, and a click still opens its trade dialog. A trade
+// Sleeper hasn't loaded has no card, just rows of each team's adds and drops,
+// written out the same way from the message's own data (no dialog to open then).
 //   chat() -> { destroy }
 (globalThis.SNP ||= {}).chat = () => {
   const { bridge, chatView, shared } = globalThis.SNP;
@@ -47,7 +49,7 @@
     /* A trade written out: Sleeper's card and its wrapper give up their fixed size, and all it drew. */
     ${list} .trade-list-item-attachment-wrapper:has(> ${TRADE} > .snp-trade) { height: auto; max-height: none; width: auto; max-width: 100%; margin-top: 4px; background: none; }
     ${trade} { height: auto; min-height: 0; max-height: none; width: auto; max-width: 100%; padding: 0; background: none; }
-    ${trade} > :not(.snp-trade) { display: none; }
+    ${list} [data-snp-trade]:has(> .snp-trade) > :not(.snp-trade) { display: none; }
     .snp-tr-title { margin: 0 0 6px; font-weight: 700; font-size: 14px; line-height: 18px; color: #fff; }
     .snp-tr-body { padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.1); border-left: 3px solid #59a7ff; border-radius: 8px; background: rgba(0, 0, 0, 0.14); }
     .snp-tr-side + .snp-tr-side { margin-top: 8px; }
@@ -191,11 +193,11 @@
     row.removeAttribute('data-snp-open');
   }
 
-  // Writes a trade out in its card (page-hook.js marked it with the trade's id).
+  // Writes a trade out in its card or rows (page-hook.js marked them with the trade's id).
   // The new height mustn't take a chat at its latest message away from there.
   const images = {};
   const offTrade = bridge.on('snp:chat-trade', (t) => {
-    for (const card of document.querySelectorAll(`${TRADE}[data-snp-trade="${CSS.escape(t.id)}"]`)) {
+    for (const card of document.querySelectorAll(`[data-snp-trade="${CSS.escape(t.id)}"]`)) {
       const box = scroller(card.closest('.comment-group') ?? card);
       const latest = box.scrollHeight - box.scrollTop - box.clientHeight < 2;
       let block = card.querySelector(':scope > .snp-trade');

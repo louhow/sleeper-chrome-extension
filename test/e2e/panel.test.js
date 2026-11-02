@@ -3436,6 +3436,53 @@ test('chat: without the trade in its props, Sleeper\'s own card stays', async ()
   documentBody = LOGGED_OUT;
 });
 
+// A trade Sleeper hasn't loaded (from its bundle, 2026-11-01): no card, a block of
+// rows per team from the message's own data, beside a free agent move drawn alike.
+const chatRowsPage = () => `<!doctype html><title>Sleeper</title>
+<style>
+  body { margin: 0; background: rgb(24, 28, 40); color: #fff; font-family: Lato, Arial, sans-serif; }
+  .chat { position: absolute; left: 100px; top: 20px; width: 480px; height: 420px; overflow-y: auto; background: rgba(58, 70, 91, 0.5); }
+  .comment-group { display: flex; overflow: hidden; padding: 12px 16px; }
+  .content-container { flex: 1; min-width: 0; padding-left: 12px; }
+</style>
+<div class="chat"><div class="comment-list">
+  <div class="comment-group"><div class="content-container"><div class="host trade">
+    <div>A trade has been completed.</div>
+    <div class="embed-league-transaction"><div class="header-text">PavScore's Roster</div></div>
+    <div class="embed-league-transaction"><div class="header-text">tonipav's Roster</div></div>
+  </div></div></div>
+  <div class="comment-group"><div class="content-container"><div class="host move">
+    <div class="embed-league-transaction"><div class="header-text">tonipav made a free agent move.</div></div>
+  </div></div></div>
+</div></div>
+<script>
+  const ladd = { player_id: '11', first_name: 'Ladd', last_name: 'McConkey', position: 'WR', team: 'LAC', sport: 'nfl' };
+  const alvin = { player_id: '22', first_name: 'Alvin', last_name: 'Kamara', position: 'RB', team: 'NO', sport: 'nfl' };
+  const owner = (type, byRoster) => ({ memoizedProps: { children: [] }, return: { memoizedProps: { transactionId: type + '-1', comment: { text: 'A trade has been completed.' }, data: [{ type, transactions_by_roster: byRoster }], rostersInLeague: [{ roster_id: 3, owner_id: 'c' }], usersInLeague: [{ user_id: 'c', display_name: 'marion' }] }, return: null } });
+  document.querySelector('.host.trade').__reactFiber$test = owner('trade', {
+    1: { user: { display_name: 'PavScore' }, adds: [ladd], drops: [alvin], added_picks: [{ roster_id: 3, season: '2027', round: 1, owner_id: 1, previous_owner_id: 2 }], dropped_picks: [], added_budget: [], dropped_budget: [{ sender: 1, receiver: 2, amount: 15 }] },
+    2: { user: { display_name: 'tonipav' }, adds: [alvin], drops: [ladd], added_picks: [], dropped_picks: [{ roster_id: 3, season: '2027', round: 1, owner_id: 1, previous_owner_id: 2 }], added_budget: [{ sender: 1, receiver: 2, amount: 15 }], dropped_budget: [] },
+  });
+  document.querySelector('.host.move').__reactFiber$test = owner('free_agent', { 2: { user: { display_name: 'tonipav' }, adds: [ladd] } });
+  setTimeout(() => document.querySelector('.comment-group').append(document.createElement('span')), 50);
+</script>`;
+
+test('chat: a trade Sleeper has no card for is written out from its rows, with no +/− lists of the traded players, and other moves stay', async () => {
+  documentBody = chatRowsPage();
+  await page.goto('https://sleeper.com/settings', { waitUntil: 'domcontentloaded' });
+  await page.locator('.snp-trade .snp-tr-side').first().waitFor();
+  assert.deepEqual(await page.locator('.snp-tr-title').allTextContents(), ['A trade has been completed.']);
+  assert.deepEqual(await page.locator('.snp-tr-team').allTextContents(), ['@PavScore', '@tonipav']);
+  assert.deepEqual(await page.locator('.snp-tr-name').allTextContents(), ['L. McConkey', '2027 1st', 'A. Kamara', '$15']);
+  assert.deepEqual(await page.locator('.snp-tr-sub').allTextContents(), ['WR - LAC', 'via marion', 'RB - NO', 'FAAB']);
+  assert.equal(await page.locator('.snp-tr-sign.drop').count(), 0, 'a traded player is only listed under who gets them');
+  assert.equal(await page.locator('.host.trade .embed-league-transaction').first().isVisible(), false, "Sleeper's rows are hidden");
+  assert.equal(await page.locator('.host.move .embed-league-transaction').isVisible(), true, 'a free agent move stays');
+  assert.equal(await page.locator('.host.move .snp-trade').count(), 0);
+  await page.screenshot({ path: `${OUT}chat-trade-rows.png`, clip: { x: 90, y: 10, width: 500, height: 300 } });
+  documentBody = LOGGED_OUT;
+});
+
 test('chat: hovering an emoji reaction opens its rows below, in place, moves nothing, never flickers, and the names popup shows whole', async () => {
   documentBody = chatPage();
   // A reacted emoji's place, the chat's scroll, and the names popup, as seen.

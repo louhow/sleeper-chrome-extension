@@ -1426,7 +1426,45 @@
   // A trade in the chat: the whole of it, off the props of Sleeper's card (any
   // sport), for the extension to write out (chat.js). Told again only when it changes.
   const toldTrades = new WeakMap();
+  function tellTrade(el, trade) {
+    const told = JSON.stringify(trade);
+    if (toldTrades.get(el) === told) return;
+    toldTrades.set(el, told);
+    el.dataset.snpTrade = trade.id;
+    bridge.tell('snp:chat-trade', trade);
+  }
+
+  // A trade Sleeper hasn't loaded has no card: it draws a team's adds and drops
+  // in rows instead, from the message's own data (`transactions_by_roster`).
+  function tradeOffRows(p) {
+    const byRoster = p.data[0].transactions_by_roster;
+    const trade = { id: String(p.transactionId ?? p.data[0].transaction_id ?? ''), title: p.comment?.text, rosterIds: Object.keys(byRoster), adds: {}, drops: {}, picks: [], budget: [], players: {}, names: {} };
+    for (const roster of p.rostersInLeague || []) {
+      trade.names[roster.roster_id] = (p.usersInLeague || []).find((u) => u.user_id === roster.owner_id)?.display_name;
+    }
+    const note = (to, rosterId) => (x) => {
+      const { player_id, first_name, last_name, position, team, sport } = x;
+      to[player_id] = Number(rosterId);
+      trade.players[player_id] = { first_name, last_name, position, team, sport };
+    };
+    for (const [rosterId, r] of Object.entries(byRoster)) {
+      if (r.user?.display_name) trade.names[rosterId] = r.user.display_name;
+      (r.adds || []).forEach(note(trade.adds, rosterId));
+      (r.drops || []).forEach(note(trade.drops, rosterId));
+      for (const x of r.added_picks || []) trade.picks.push(`${x.roster_id},${x.season},${x.round},${x.owner_id},${x.previous_owner_id}`);
+      for (const x of r.added_budget || []) trade.budget.push(`${x.sender},${x.receiver},${x.amount}`);
+    }
+    return trade;
+  }
+
   function chatTrades() {
+    for (const row of document.querySelectorAll('.comment-list .embed-league-transaction:not(.embed-league-transaction + *)')) {
+      const box = row.parentElement;
+      const p = box && props(box, (x) => x.data?.[0]?.transactions_by_roster);
+      if (p?.data[0].type !== 'trade') continue;
+      const trade = tradeOffRows(p);
+      if (trade.id) tellTrade(box, trade);
+    }
     for (const card of document.querySelectorAll('.trade-list-item.is-chat')) {
       const p = props(card, (x) => x.transaction && x.rostersInLeagueMap);
       const tx = p?.transaction;
@@ -1440,12 +1478,7 @@
       for (const [rosterId, roster] of Object.entries(p.rostersInLeagueMap)) {
         names[rosterId] = p.usersInLeagueMap?.[roster?.owner_id]?.display_name;
       }
-      const trade = { id: String(tx.transaction_id), status: tx.status, rosterIds: tx.roster_ids, adds: tx.adds, drops: tx.drops, picks: tx.draft_picks, budget: tx.waiver_budget, players, names };
-      const told = JSON.stringify(trade);
-      if (toldTrades.get(card) === told) continue;
-      toldTrades.set(card, told);
-      card.dataset.snpTrade = trade.id;
-      bridge.tell('snp:chat-trade', trade);
+      tellTrade(card, { id: String(tx.transaction_id), status: tx.status, opens: true, rosterIds: tx.roster_ids, adds: tx.adds, drops: tx.drops, picks: tx.draft_picks, budget: tx.waiver_budget, players, names });
     }
   }
 
