@@ -361,7 +361,8 @@ const NFL_PLAYERS = {
 // Sleeper's own NFL League tab, reduced to its matchup cards (inspected
 // 2026-10-25): each row's markup as Sleeper draws it, with the live numbers it
 // works out; React-style props give the roster ids and, up the tree, the rosters,
-// your user id and the week shown (round). Clicking a card's header opens it (recorded in __nflOpened).
+// your user id and the week shown (round). Clicking a card's header opens Sleeper's
+// own modal (recorded in __nflOpened); Sleeper's tab row records which tab was clicked (__tabClicks).
 const NFL_LEAGUE_URL = `https://sleeper.com/leagues/${NFL_LEAGUE}/league`;
 const nflLeagueTab = () => {
   const side = (t, flip) => `<div class="user${flip ? ' reverse' : ''}"><div class="matchup-owner-item"><div class="owner-container">
@@ -377,11 +378,14 @@ const nflLeagueTab = () => {
   ];
   return `<!doctype html><title>Sleeper</title>
 <style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } /* Sleeper nests its cards' list in another. */ .league-tab-container { position: absolute; left: 264px; top: 100px; width: 750px; } .league-matchup-row-item { padding: 8px; border: 1px solid #456; margin: 4px 0; }</style>
+<div class="postdraft-panel"><div class="center-tab-selector"><div class="item-tab">Team</div><div class="item-tab">Matchup</div><div class="item-tab">League</div></div></div>
 <div class="league-tab-container"><div class="row"><div class="title">Matchups</div></div><div class="panel-row"><div class="league-matchups"><div class="league-matchups">
 ${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchup-header"><div class="matchup-row">${side(a)}<div class="vs-label"><div class="label">VS</div></div>${side(b, true)}</div></div></div>`).join('')}
 </div></div><div class="league-tab-standings">Standings</div></div></div>
 <script>
   window.__nflOpened = [];
+  window.__tabClicks = [];
+  document.querySelectorAll('.item-tab').forEach((tab) => tab.addEventListener('click', () => window.__tabClicks.push(tab.textContent)));
   const league = { rosters: [1, 2, 3, 4].map((r) => ({ roster_id: r, owner_id: 'u' + r })), userId: 'u1', round: 7 };
   const pairs = ${JSON.stringify(pairs.map(([a, b]) => [a.r, b.r]))};
   document.querySelectorAll('.league-matchup-row-item').forEach((row, i) => {
@@ -3032,7 +3036,17 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   await first.locator('.mu-team.mine .mu-pts').filter({ hasText: '25.90' }).waitFor();
   // A card opens that matchup the way Sleeper's own card does.
   await cards.nth(1).click();
-  assert.deepEqual(await page.evaluate(() => window.__nflOpened), [0], 'the other matchup is Sleeper\'s first card');
+  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup'], []]);
+  // A card whose rosters can't be read opens Sleeper's own, as before (without its ids
+  // it isn't known as yours either, so it falls to second).
+  await page.evaluate(() => {
+    const row = document.querySelectorAll('.league-matchup-row-item')[1];
+    delete row.__reactInternalInstance$test;
+    row.querySelector('.score').textContent = '26.90'; // ours redraw on any change to Sleeper's
+  });
+  await cards.nth(1).locator('.mu-team.mine .mu-pts').filter({ hasText: '26.90' }).waitFor();
+  await cards.nth(1).click();
+  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup'], [1]], 'Sleeper\'s second card');
   documentBody = LOGGED_OUT;
 });
 

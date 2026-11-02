@@ -28,7 +28,7 @@
     return l?.reserve ? { ...l, irBlocked: model.illegalReserve(Object.keys(l.reserve), l.reserve, league.settings) } : l;
   };
   const optimizer = nflOptimize({ lineup: optimizeLineup, nflSave, notify: (text) => panel.notify(text) });
-  const leagueCards = nflLeague(league);
+  const leagueCards = nflLeague(league, { open: ({ rosterId, week }) => panel.openMatchup(rosterId, week) });
   const playersTab = nflPlayers({ api, league, info });
   let page = initialPage;
   let destroyed = false;

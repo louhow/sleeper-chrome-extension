@@ -1434,7 +1434,8 @@
   // NFL League tab: Sleeper's own matchup cards, read as they show (so the
   // extension's cards carry Sleeper's exact live numbers), and which is yours.
   // Sleeper keeps drawing (and updating) them; the extension hides them and
-  // shows its own, and a click on one of ours clicks Sleeper's.
+  // shows its own (a click on one opens the extension's Matchup tab; only a
+  // card whose rosters can't be read here clicks Sleeper's, 'snp:nfl-league-open').
   const NFL_ROW = '.league-matchups .league-matchup-row-item';
   const text = (el, sel) => el?.querySelector(sel)?.textContent.trim() ?? '';
   bridge.answer('snp:nfl-league', () => {
@@ -1457,10 +1458,11 @@
           bar: parseFloat(user.querySelector('.win-bar > div')?.style.width) || 0,
         };
       });
-      return { own: mine != null && (ids.rosterId1 === mine || ids.rosterId2 === mine), sides };
+      const rosters = [ids.rosterId1 ?? null, ids.rosterId2 ?? null];
+      return { own: mine != null && rosters.includes(mine), rosters, sides };
     });
-    // The week shown (Sleeper's week picker), for whether it plays the league median.
-    return { cards, round: league?.round ?? null };
+    // The week shown (Sleeper's week picker), for whether it plays the league median, and your roster.
+    return { cards, round: league?.round ?? null, mine: mine ?? null };
   });
   bridge.on('snp:nfl-league-open', ({ index }) => {
     const row = document.querySelectorAll(NFL_ROW)[index];

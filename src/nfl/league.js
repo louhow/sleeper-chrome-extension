@@ -1,10 +1,13 @@
 // The NFL League tab: the extension's matchup cards (league-view.js draws them)
 // on top of Sleeper's, which stay on the page, hidden and still updating:
 // page-hook.js reads their live numbers ('snp:nfl-league'), again whenever
-// they change, and a click on one of ours clicks Sleeper's.
-(globalThis.SNP ||= {}).nflLeague = (league) => {
+// they change. A click on one of ours opens the matchup on the extension's
+// Matchup tab (`open({ rosterId, week })`, yours as the left side when it's
+// your matchup), as the NBA League tab does; a card whose rosters page-hook
+// couldn't read clicks Sleeper's instead.
+(globalThis.SNP ||= {}).nflLeague = (league, { open = null } = {}) => {
   const { nflLeagueView, bridge, shared } = globalThis.SNP;
-  const state = { failedAvatars: new Set() };
+  const state = { failedAvatars: new Set(), reply: null };
   const { host, root } = shared.shadowHost('sleeper-nfl-league');
   host.className = 'on-league';
   // Sleeper's cards sit in a list inside the list ours goes on top of.
@@ -21,7 +24,8 @@
 
   function render() {
     if (destroyed) return;
-    const html = nflLeagueView.render(bridge.ask('snp:nfl-league') || {}, league, state.failedAvatars);
+    state.reply = bridge.ask('snp:nfl-league') || {};
+    const html = nflLeagueView.render(state.reply, league, state.failedAvatars);
     if (root.innerHTML !== html) root.innerHTML = html;
   }
 
@@ -48,7 +52,12 @@
 
   root.addEventListener('click', (e) => {
     const card = e.target.closest('[data-nfl-matchup]');
-    if (card) bridge.tell('snp:nfl-league-open', { index: Number(card.dataset.nflMatchup) });
+    if (!card) return;
+    const index = Number(card.dataset.nflMatchup);
+    const { cards = [], round = null, mine = null } = state.reply || {};
+    const rosters = (cards[index]?.rosters || []).filter((id) => id != null);
+    if (open && rosters.length) return open({ rosterId: rosters.includes(mine) ? mine : rosters[0], week: round });
+    bridge.tell('snp:nfl-league-open', { index });
   });
   shared.activateOnKey(root, '[data-nfl-matchup]');
   shared.markMissingImages(root, state, render);
