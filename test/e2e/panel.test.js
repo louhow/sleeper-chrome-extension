@@ -363,8 +363,9 @@ const NFL_PLAYERS = {
 // works out; React-style props give the roster ids and, up the tree, the rosters,
 // your user id and the week shown (round). Clicking a card's header opens Sleeper's
 // own modal (recorded in __nflOpened); Sleeper's tab row records which tab was clicked (__tabClicks).
+// `you`: your roster id and user id (louhow's real ones, so the extension's own lookup by name agrees).
 const NFL_LEAGUE_URL = `https://sleeper.com/leagues/${NFL_LEAGUE}/league`;
-const nflLeagueTab = () => {
+const nflLeagueTab = ({ you = { roster: 1, user: 'u1' } } = {}) => {
   const side = (t, flip) => `<div class="user${flip ? ' reverse' : ''}"><div class="matchup-owner-item"><div class="owner-container">
     <div class="row space-between"><div class="row"><div class="avatar-container"><div class="avatar" style="background-image: url(&quot;https://sleepercdn.com/avatars/thumbs/${t.av}&quot;)"></div></div>
     <div class="meta"><div class="team-name">@${t.owner}</div><div class="name">${t.team}</div></div></div>
@@ -373,8 +374,8 @@ const nflLeagueTab = () => {
     <div class="bottom-row space-between"><div class="row"><div class="win-percentage-number">${t.win}%</div><div class="description">${t.record}</div></div>
     <div class="roster-score-and-projection-matchup"><div class="projections">${t.proj}</div></div></div></div></div>`;
   const pairs = [
-    [{ r: 3, owner: 'someone', team: 'Moore\'s Law', score: '20.12', win: 31, record: '5-7', proj: '100.65', av: 'a3' }, { r: 4, owner: 'kjenn', team: 'KyKy', score: '-', win: 69, record: '7-5', proj: '110.04', av: 'a4' }],
-    [{ r: 1, owner: 'louhow', team: 'Lou Point Conversion', score: '19.40', win: 90, record: '8-4', proj: '122.23', av: 'a1' }, { r: 2, owner: 'kalviar', team: 'Tank you, Jeremiah', score: '6.60', win: 10, record: '3-9', proj: '71.77', av: 'a2' }],
+    [{ r: 103, owner: 'someone', team: 'Moore\'s Law', score: '20.12', win: 31, record: '5-7', proj: '100.65', av: 'a3' }, { r: 104, owner: 'kjenn', team: 'KyKy', score: '-', win: 69, record: '7-5', proj: '110.04', av: 'a4' }],
+    [{ r: you.roster, owner: 'louhow', team: 'Lou Point Conversion', score: '19.40', win: 90, record: '8-4', proj: '122.23', av: 'a1' }, { r: 2, owner: 'kalviar', team: 'Tank you, Jeremiah', score: '6.60', win: 10, record: '3-9', proj: '71.77', av: 'a2' }],
   ];
   return `<!doctype html><title>Sleeper</title>
 <style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } /* Sleeper nests its cards' list in another. */ .league-tab-container { position: absolute; left: 264px; top: 100px; width: 750px; } .league-matchup-row-item { padding: 8px; border: 1px solid #456; margin: 4px 0; }</style>
@@ -386,7 +387,7 @@ ${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchu
   window.__nflOpened = [];
   window.__tabClicks = [];
   document.querySelectorAll('.item-tab').forEach((tab) => tab.addEventListener('click', () => window.__tabClicks.push(tab.textContent)));
-  const league = { rosters: [1, 2, 3, 4].map((r) => ({ roster_id: r, owner_id: 'u' + r })), userId: 'u1', round: 7 };
+  const league = { rosters: [${you.roster}, 2, 103, 104].map((r) => ({ roster_id: r, owner_id: r === ${you.roster} ? '${you.user}' : 'u' + r })), userId: '${you.user}', round: 7 };
   const pairs = ${JSON.stringify(pairs.map(([a, b]) => [a.r, b.r]))};
   document.querySelectorAll('.league-matchup-row-item').forEach((row, i) => {
     row.__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: { rosterId1: pairs[i][0], rosterId2: pairs[i][1] }, return: { memoizedProps: league } } };
@@ -2997,7 +2998,10 @@ test('settings: the sidebar gear opens the extension\'s dialog, the NFL pages sw
 });
 
 test('NFL league tab: the week\'s matchups as the NBA League tab draws them, with Sleeper\'s own live numbers', async () => {
-  documentBody = nflLeagueTab();
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
+  const me = users.find((u) => u.display_name === 'louhow');
+  documentBody = nflLeagueTab({ you: { roster: rosters.find((r) => r.owner_id === me.user_id).roster_id, user: me.user_id } });
   await page.goto(NFL_LEAGUE_URL);
   const cards = page.locator('#sleeper-nfl-league .lg-match[data-nfl-matchup]');
   await cards.first().waitFor({ timeout: 30000 });
@@ -3039,16 +3043,22 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   // A card opens its matchup on the extension's Matchup tab (through Sleeper's tab, so its router follows), not Sleeper's small modal.
   await cards.nth(1).click();
   assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup'], []]);
-  // A card whose rosters can't be read opens Sleeper's own, as before (without its ids
-  // it isn't known as yours either, so it falls to second).
+  // Without the ids in Sleeper's props (gone since 2026-10), the owner names on the card find
+  // the rosters: yours stays first and still opens the Matchup tab.
   await page.evaluate(() => {
     const row = document.querySelectorAll('.league-matchup-row-item')[1];
     delete row.__reactInternalInstance$test;
     row.querySelector('.score').textContent = '26.90'; // ours redraw on any change to Sleeper's
   });
-  await cards.nth(1).locator('.mu-team.mine .mu-pts').filter({ hasText: '26.90' }).waitFor();
+  await first.locator('.mu-team.mine .mu-pts').filter({ hasText: '26.90' }).waitFor();
+  assert.match(await first.getAttribute('class'), /\bown\b/, 'yours, by name');
+  await first.click();
+  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup', 'Matchup'], []]);
+  // A card that resolves neither way opens Sleeper's own, as before (not known as yours, it falls to second).
+  await page.evaluate(() => { document.querySelectorAll('.league-matchup-row-item')[1].querySelectorAll('.team-name').forEach((el, i) => { el.textContent = `@nobody${i}`; }); });
+  await cards.nth(1).locator('.mu-who .sub').filter({ hasText: '@nobody0' }).waitFor();
   await cards.nth(1).click();
-  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup'], [1]], 'Sleeper\'s second card');
+  assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [['Matchup', 'Matchup'], [1]], 'Sleeper\'s second card');
   documentBody = LOGGED_OUT;
 });
 

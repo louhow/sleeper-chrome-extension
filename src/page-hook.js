@@ -1494,8 +1494,9 @@
   // NFL League tab: Sleeper's own matchup cards, read as they show (so the
   // extension's cards carry Sleeper's exact live numbers), and which is yours.
   // Sleeper keeps drawing (and updating) them; the extension hides them and
-  // shows its own (a click on one opens the extension's Matchup tab; only a
-  // card whose rosters can't be read here clicks Sleeper's, 'snp:nfl-league-open').
+  // shows its own (a click on one opens the extension's Matchup tab; the roster
+  // ids, when the props hold them (they did until 2026-10, since then only the
+  // owner names on the card do), and 'snp:nfl-league-open' clicks Sleeper's).
   const NFL_ROW = '.league-matchups .league-matchup-row-item';
   const text = (el, sel) => el?.querySelector(sel)?.textContent.trim() ?? '';
   bridge.answer('snp:nfl-league', () => {

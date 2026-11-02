@@ -234,6 +234,16 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
     shared.openSleeperTab('team');
   }
 
+  // The roster whose owner (or co-owner) goes by `owner` (Sleeper's username, as
+  // a League tab card shows it), else null. And yours.
+  const sameName = (a, b) => Boolean(a && b) && a.trim().toLowerCase() === b.trim().toLowerCase();
+  function rosterOf(owner) {
+    if (!state.rosters || !state.usersById) return null;
+    const r = state.rosters.find((x) => [x.owner_id, ...(x.co_owners || [])].some((id) => sameName(state.usersById[id]?.display_name, owner)));
+    return r?.roster_id ?? null;
+  }
+  const myRosterId = () => (state.rosters && state.me ? loaders.myRoster(state.rosters, state.me)?.roster_id ?? null : null);
+
   // A League tab card opens its matchup on the Matchup tab, on the week the
   // League tab showed (Sleeper's week picker), with `rosterId` as the left side.
   function openMatchup(rosterId, week = null) {
@@ -519,5 +529,5 @@ update_matchup_leg(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(r
   }
   const pendingWeeks = new Set();
 
-  return { load: () => load().catch(fail), fail, attach, show, notify, refresh: schedule, destroy, weekView, openTeam, openMatchup };
+  return { load: () => load().catch(fail), fail, attach, show, notify, refresh: schedule, destroy, weekView, openTeam, openMatchup, rosterOf, myRosterId };
 };

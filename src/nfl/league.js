@@ -3,9 +3,11 @@
 // page-hook.js reads their live numbers ('snp:nfl-league'), again whenever
 // they change. A click on one of ours opens the matchup on the extension's
 // Matchup tab (`open({ rosterId, week })`, yours as the left side when it's
-// your matchup), as the NBA League tab does; a card whose rosters page-hook
-// couldn't read clicks Sleeper's instead.
-(globalThis.SNP ||= {}).nflLeague = (league, { open = null } = {}) => {
+// your matchup), as the NBA League tab does. Each card's rosters come from
+// Sleeper's props when they're there, else from the owner names on the card
+// (`rosterOf(owner)`, `myRosterId()`: the panel's rosters and users); a card
+// that resolves neither way clicks Sleeper's instead.
+(globalThis.SNP ||= {}).nflLeague = (league, { open = null, rosterOf = null, myRosterId = null } = {}) => {
   const { nflLeagueView, bridge, shared } = globalThis.SNP;
   const state = { failedAvatars: new Set(), reply: null };
   const { host, root } = shared.shadowHost('sleeper-nfl-league');
@@ -22,9 +24,19 @@
   });
   let watched = null;
 
+  // page-hook's reply with every roster it couldn't read filled in by owner name, and `own` from that.
+  function resolve(reply) {
+    const mine = reply.mine ?? myRosterId?.() ?? null;
+    const cards = (reply.cards || []).map((c) => {
+      const rosters = c.sides.map((t, i) => c.rosters?.[i] ?? (t && rosterOf?.(t.owner)) ?? null);
+      return { ...c, rosters, own: Boolean(c.own) || (mine != null && rosters.includes(mine)) };
+    });
+    return { ...reply, cards, mine };
+  }
+
   function render() {
     if (destroyed) return;
-    state.reply = bridge.ask('snp:nfl-league') || {};
+    state.reply = resolve(bridge.ask('snp:nfl-league') || {});
     const html = nflLeagueView.render(state.reply, league, state.failedAvatars);
     if (root.innerHTML !== html) root.innerHTML = html;
   }
@@ -70,5 +82,5 @@
     hide.remove();
   }
 
-  return { attach, destroy };
+  return { attach, refresh: render, destroy };
 };
