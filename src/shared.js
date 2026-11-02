@@ -170,6 +170,34 @@
   }
 
   // Opens a league tab through Sleeper's own tab row, so its router follows.
+  // Draws `html` into `root` by changing only what differs (attributes, text,
+  // nodes added or gone), so a node the cursor is on, or a scroll position,
+  // survives a redraw: innerHTML would rebuild everything, losing a hover
+  // between frames and a click between mousedown and mouseup.
+  function morph(root, html) {
+    const box = document.createElement('div');
+    box.innerHTML = html;
+    morphChildren(root, box);
+  }
+  function morphChildren(from, to) {
+    const a = [...from.childNodes];
+    const b = [...to.childNodes];
+    b.forEach((y, i) => {
+      const x = a[i];
+      if (!x) return from.appendChild(y);
+      if (x.nodeType !== y.nodeType || x.nodeName !== y.nodeName) return from.replaceChild(y, x);
+      if (x.nodeType === Node.TEXT_NODE) {
+        if (x.data !== y.data) x.data = y.data;
+        return;
+      }
+      if (x.nodeType !== Node.ELEMENT_NODE) return;
+      for (const { name } of [...x.attributes]) if (!y.hasAttribute(name)) x.removeAttribute(name);
+      for (const { name, value } of [...y.attributes]) if (x.getAttribute(name) !== value) x.setAttribute(name, value);
+      morphChildren(x, y);
+    });
+    for (const x of a.slice(b.length)) x.remove();
+  }
+
   function openSleeperTab(page) {
     const tabs = [...document.querySelectorAll('.center-tab-selector .item-tab')];
     tabs.find((t) => new RegExp(`^${page}$`, 'i').test(t.textContent.trim()))?.click();
@@ -184,5 +212,5 @@
     console[dropped ? 'debug' : level](label, err);
   }
 
-  return { report, stylesheet, shadowHost, hideSleeper, flasher, activateOnKey, markMissingImages, safeStore, arrowStep, teamOrder, movedText, listen, openSleeperTab, nflPlayerCard };
+  return { report, stylesheet, shadowHost, hideSleeper, flasher, activateOnKey, markMissingImages, safeStore, arrowStep, teamOrder, movedText, listen, openSleeperTab, nflPlayerCard, morph };
 })();

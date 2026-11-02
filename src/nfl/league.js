@@ -11,7 +11,7 @@
 // way clicks Sleeper's instead.
 (globalThis.SNP ||= {}).nflLeague = (league, { weekView = null, currentWeek = null, openTeam = null, rosterOf = null, myRosterId = null } = {}) => {
   const { nflLeagueView, nflPanelView, ui, bridge, shared } = globalThis.SNP;
-  const state = { failedAvatars: new Set(), reply: null, dialog: null };
+  const state = { failedAvatars: new Set(), reply: null, dialog: null, html: '', dialogHtml: '' };
   const { host, root } = shared.shadowHost('sleeper-nfl-league');
   host.className = 'on-league';
   const layer = shared.shadowHost('sleeper-nfl-matchup', renderDialog);
@@ -41,7 +41,10 @@
     if (destroyed) return;
     state.reply = resolve(bridge.ask('snp:nfl-league') || {});
     const html = nflLeagueView.render(state.reply, league, state.failedAvatars);
-    if (root.innerHTML !== html) root.innerHTML = html;
+    if (state.html !== html) {
+      state.html = html;
+      shared.morph(root, html);
+    }
     renderDialog();
   }
 
@@ -49,16 +52,17 @@
   function renderDialog() {
     if (destroyed || !layer.styled) return;
     const d = state.dialog;
-    if (!d) return layer.host.remove();
+    if (!d) {
+      state.dialogHtml = '';
+      return layer.host.remove();
+    }
     if (!layer.host.isConnected) document.documentElement.appendChild(layer.host);
     const s = weekView?.(d.week);
     const body = s ? nflPanelView.matchup({ ...s, rosterId: d.rosterId, failedAvatars: state.failedAvatars }) : ui.loading();
     const html = `<div class="page-layer">${ui.dialog('Matchup', '', `<div class="dialog-body"><div class="app nfl-panel mu-dialog"><div class="body">${body}</div></div></div>`)}</div>`;
-    if (layer.root.innerHTML === html) return;
-    const scroll = layer.root.querySelector('.dialog-body')?.scrollTop ?? 0;
-    layer.root.innerHTML = html;
-    const el = layer.root.querySelector('.dialog-body');
-    if (el) el.scrollTop = scroll;
+    if (state.dialogHtml === html) return;
+    state.dialogHtml = html;
+    shared.morph(layer.root, html);
   }
 
   function openDialog(rosterId, week) {

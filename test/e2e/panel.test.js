@@ -3037,9 +3037,14 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   });
   assert.deepEqual(read, ['https://sleepercdn.com/avatars/thumbs/a1', 'https://sleepercdn.com/avatars/thumbs/a2'], 'read off Sleeper\'s card');
   await page.screenshot({ path: `${OUT}nfl-league.png` });
-  // Sleeper's numbers move during games; ours follow.
+  // Sleeper's numbers move during games; ours follow, in place: the card under the cursor
+  // keeps its nodes, so a hover doesn't blink and a click in progress isn't lost.
+  await first.hover();
+  await page.evaluate(() => { window.__card = document.querySelector('#sleeper-nfl-league').shadowRoot.querySelector('.lg-match'); });
   await page.evaluate(() => { document.querySelectorAll('.league-matchup-row-item')[1].querySelector('.score').textContent = '25.90'; });
   await first.locator('.mu-team.mine .mu-pts').filter({ hasText: '25.90' }).waitFor();
+  assert.ok(await page.evaluate(() => window.__card === document.querySelector('#sleeper-nfl-league').shadowRoot.querySelector('.lg-match')), 'the same card node');
+  assert.ok(await page.evaluate(() => window.__card.matches(':hover')), 'still hovered');
   // A card opens its matchup in the extension's own dialog, laid out like the Matchup tab, not Sleeper's small modal.
   const dialog = (sel) => `#sleeper-nfl-matchup ${sel}`;
   await first.click();
@@ -3055,6 +3060,11 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   await page.keyboard.press('Escape');
   await page.locator(dialog('.dialog')).waitFor({ state: 'detached' });
   assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [[], []], 'no tab switch, no Sleeper modal');
+  // The VS badge between the teams is part of the card.
+  await first.locator('.vs').click();
+  await head.waitFor({ timeout: 30000 });
+  await page.locator(dialog('.backdrop')).click({ position: { x: 5, y: 5 } });
+  await page.locator(dialog('.dialog')).waitFor({ state: 'detached' });
   // Without the ids in Sleeper's props (gone since 2026-10), the owner names on the card find
   // the rosters: yours stays first and still opens the dialog, yours on the left.
   await page.evaluate(() => {
