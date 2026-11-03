@@ -1975,9 +1975,9 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   // Substitution marks, as soccer apps show them: green up coming in, red down going out.
   assert.equal(await victimRow.locator('.os-p.in .os-arrow.in').getAttribute('aria-label'), 'Coming in');
   assert.equal(await victimRow.locator('.os-p.out .os-arrow.out').getAttribute('aria-label'), 'Going out');
-  // Two clear options: apply the change, or keep them and lock their score.
+  // Two clear options: apply the change (the filled button), or keep them and lock their score (a link that names them).
   assert.equal(await victimRow.locator('button.os-apply').innerText(), 'APPLY CHANGE');
-  assert.equal(await victimRow.locator('[data-op-lock-out]').innerText(), 'LOCK');
+  assert.match(await victimRow.locator('[data-op-lock-out]').innerText(), /^Keep .+, lock 3\.00$/);
   assert.match(await victimRow.locator('[data-op-lock-out]').getAttribute('title'), /^Or keep .+ and lock 3\.00 \(\w{3} (vs|@) \w+\) instead\. Locking is final/);
   assert.match(await page.locator(dialog('.warn-banner')).textContent(), new RegExp(`${players[victim].full_name} 3\\.00.* finished games? you could still lock in`));
   assert.equal(await page.locator(dialog('.lose-banner')).count(), 0, 'no hard stop for a red score');
@@ -1991,12 +1991,12 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const lockRow = page.locator(dialog('.os-row.lock'));
   assert.equal(await lockRow.count(), 1, 'one game worth locking');
   assert.equal(await lockRow.locator('.os-p [data-player]').first().getAttribute('data-player'), locker);
-  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
+  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm)[\s\S]*LOCK \d+\.\d\d\s+Keep open instead/i);
   assert.ok(Number(await lockRow.locator('.sub .score-chip.tier-green').textContent()) >= 70, 'the score, in its tier color');
   // The live week's projections set the open value, so it's judged against the score, not a fixed number.
   const locked = Number(await lockRow.locator('.sub .score-chip.tier-green').textContent());
   assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < locked / 2, 'keeping it open is worth far less');
-  assert.equal(await lockRow.locator('[data-op-lock-row]').textContent(), 'Lock');
+  assert.match(await lockRow.locator('[data-op-lock-row]').textContent(), /^Lock \d+\.\d\d$/);
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
   assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply all');
   // The Form column waits for every starter's game log, then draws the charts together (the locked score's bar in gold).
@@ -2019,7 +2019,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   // Kept open, it stays listed and the plan goes on without it.
   await lockRow.locator('[data-op-keep]').click();
   await page.locator(dialog('.os-row.lock.off')).waitFor();
-  assert.match(await page.locator(dialog('.os-row.lock')).innerText(), /Keeping open · Lock instead/);
+  assert.match(await page.locator(dialog('.os-row.lock')).innerText(), /Keeping open[\s\S]*Open\s+Lock instead/i);
   assert.equal(await applyButton.textContent(), 'Apply all');
   await page.locator(dialog('[data-op-relock]')).click();
   await page.locator(dialog('.os-row.lock:not(.off)')).waitFor();

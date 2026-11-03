@@ -2184,13 +2184,23 @@ button.optimize:hover:not(:disabled) {
 }
 .os-act {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 3px;
   text-align: center;
 }
-/* Two states each. Apply change: teal trim, solid under the pointer; once nothing is left to change, "No change" is the solid one.
-   Lock: gold trim with an open padlock, shut under the pointer; once locked, solid gold. */
+.os-act-head {
+  text-align: center;
+}
+.os-row.nfl .os-act {
+  align-items: flex-end;
+}
+.os-row.nfl .os-apply {
+  min-width: 128px;
+}
+/* One filled button per row: what Apply all does for it. The link under it is the other choice.
+   Apply change: teal. Lock: gold, with an open padlock and a shut one under the pointer. All the same width, in the same place. */
 .os-apply,
 .os-lock,
 .os-status {
@@ -2208,9 +2218,8 @@ button.optimize:hover:not(:disabled) {
   text-transform: uppercase;
 }
 .os-apply {
-  min-width: 128px;
   border-color: var(--primary);
-  background: none;
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
   color: var(--primary);
 }
 button.os-apply:hover:not(:disabled) {
@@ -2218,13 +2227,13 @@ button.os-apply:hover:not(:disabled) {
   color: var(--ink);
 }
 .os-lock {
-  border-color: color-mix(in srgb, var(--lock) 70%, transparent);
-  background: none;
+  border-color: var(--lock);
+  background: color-mix(in srgb, var(--lock) 16%, transparent);
   color: var(--lock);
 }
 button.os-lock:hover:not(:disabled) {
-  border-color: var(--lock);
-  background: color-mix(in srgb, var(--lock) 14%, transparent);
+  background: var(--lock);
+  color: var(--ink);
 }
 .os-lock .ico {
   display: inline-flex;
@@ -2234,6 +2243,22 @@ button.os-lock:hover:not(:disabled) {
   display: none;
 }
 .os-lock:hover:not(:disabled) .ico.shut {
+  display: inline-flex;
+}
+.os-act .os-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.os-link.lock {
+  color: var(--lock);
+}
+.os-link .ico {
   display: inline-flex;
 }
 .os-status {

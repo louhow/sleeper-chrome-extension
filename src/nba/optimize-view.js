@@ -5,7 +5,7 @@
 (globalThis.SNP ||= {}).nbaOptimizeView = (() => {
   const { playerDays, scoreTier, applySlot, formBars } = globalThis.SNP.model;
   const { esc, f2, headshot, injuryTag, teamTag, slotBadge, weekday, gameTime, gameLabel, nextGame, lockIcon, shortName, real, playerOf, playerName,
-    optimizeDialog, planSummary, applyAll, applyChange, slotPlayer, tierClass, weekAhead } = globalThis.SNP.ui;
+    optimizeDialog, planSummary, applyAll, slotPlayer, tierClass, weekAhead } = globalThis.SNP.ui;
 
   // Plain text for the "How it picks" tooltip.
   const HOW = [
@@ -48,7 +48,8 @@
           <span class="dp-lock" title="A finished game's score you could lock in">Lock</span>
           <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span>
           <span class="dp-open" title="What leaving the slot open is worth over the games left this week">Open</span>
-          <span class="dp-form" title="Their last games' fantasy points, and the average. Hover a bar for its scores. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span><span></span></div>
+          <span class="dp-form" title="Their last games' fantasy points, and the average. Hover a bar for its scores. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span>
+          <span class="os-act-head" title="The filled button on each row is what Apply all does for it. The link under it is the other choice.">Action</span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
     const lockText = `Lock ${on.length === 1 ? 'in 1 game' : `in ${on.length} games`}`;
     const apply = on.length && !plan.changes.length ? lockText
@@ -101,14 +102,7 @@
         ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>${nextLock ? `<span class="sub">${lockIcon()}Then locks ${score(s, nextLock.actual)} ${esc(gameLabel(nextLock.game))} · ${openText(s, nextLock)}</span>` : ''}`)}
         ${player(s, cur, 'out', outSub)}
         ${numbers(s, plan, next, nextLock?.actual)}
-        <span class="os-act">
-          ${applyChange(m, i, others, { held: risky, title: risky ? BLOCKED : '' })}
-          ${plan.lockable && nextLock
-            ? lockButton(`data-op-lock-move="${i}"`, m, m.busy === `lockmove:${i}`,
-              `Apply this change and lock ${s.players[next]?.name || 'them'}'s ${f2(nextLock.actual)} (${gameLabel(nextLock.game)}). Locking is final.`)
-            : drops && plan.lockable ? lockButton(`data-op-lock-out="${esc(cur)}"`, m, m.busy === `lockout:${cur}`,
-              `Or keep ${s.players[cur]?.name || 'them'} and lock ${f2(drops.actual)} (${gameLabel(drops)}) instead. Locking is final${change.dropsUnsure ? '; Sleeper only allows it if they were starting at tip-off and haven\'t been benched since' : ''}.`) : ''}
-        </span>
+        <span class="os-act">${swapActions(s, m, plan, i, { cur, next, nextLock, drops, change, risky, others })}</span>
       </div>`;
     }
     const lock = plan.locks?.find((k) => k.id === cur);
@@ -132,10 +126,33 @@
     </div>`;
   }
 
+  // A swap row's buttons. The filled one is what Apply all does for the row;
+  // the link under it is the one other choice, named for who it affects:
+  // - the player coming in has a finished game to lock: "Apply + lock", or just the change;
+  // - the player going out has one: "Apply change" (it's lost), or keep them and lock it.
+  function swapActions(s, m, plan, i, { cur, next, nextLock, drops, change, risky, others }) {
+    const held = m.saving || risky;
+    const why = risky ? BLOCKED : others.length ? `Also changes ${others.join(', ')}` : '';
+    const apply = (label, cls, attr) => `<button class="${cls}" ${attr} ${held ? 'disabled' : ''}${why ? ` title="${esc(why)}"` : ''}>${label}</button>`;
+    const saving = (key) => m.busy === key;
+    if (plan.lockable && nextLock) {
+      const who = shortName(s.players[next]);
+      return `${lockButton(`data-op-lock-move="${i}"`, m, saving(`lockmove:${i}`), `Apply this change and lock ${who}'s ${f2(nextLock.actual)} (${gameLabel(nextLock.game)}). Locking is final.`,
+        `Apply + lock ${f2(nextLock.actual)}`, held)}
+        <button class="os-link" data-op-row="${i}" ${held ? 'disabled' : ''}${why ? ` title="${esc(why)}"` : ''}>${saving(`row:${i}`) ? 'Saving…' : 'Apply without locking'}</button>`;
+    }
+    const primary = apply(saving(`row:${i}`) ? 'Saving…' : 'Apply change', 'os-apply', `data-op-row="${i}"`);
+    if (!(drops && plan.lockable)) return primary;
+    const who = shortName(s.players[cur]);
+    return `${primary}
+      <button class="os-link lock" data-op-lock-out="${esc(cur)}" ${m.saving ? 'disabled' : ''} title="${esc(`Or keep ${s.players[cur]?.name || 'them'} and lock ${f2(drops.actual)} (${gameLabel(drops)}) instead. Locking is final${change.dropsUnsure ? '; Sleeper only allows it if they were starting at tip-off and haven\'t been benched since' : ''}.`)}">${saving(`lockout:${cur}`) ? 'Saving…'
+      : `<span class="ico">${lockIcon(true)}</span>Keep ${esc(who)}, lock ${f2(drops.actual)}`}</button>`;
+  }
+
   // The lock button: gold trim with an open padlock, a shut one under the pointer.
-  function lockButton(attr, m, busy, title) {
-    return `<button class="os-lock" ${attr} ${m.saving ? 'disabled' : ''} title="${esc(title)}">${busy ? 'Saving…'
-      : `<span class="ico open">${lockIcon(true)}</span><span class="ico shut">${lockIcon()}</span>Lock`}</button>`;
+  function lockButton(attr, m, busy, title, label = 'Lock', held = false) {
+    return `<button class="os-lock" ${attr} ${m.saving || held ? 'disabled' : ''} title="${esc(title)}">${busy ? 'Saving…'
+      : `<span class="ico open">${lockIcon(true)}</span><span class="ico shut">${lockIcon()}</span>${label}`}</button>`;
   }
 
   // A finished game worth locking in. "Keep open" leaves it out and plans
@@ -144,17 +161,17 @@
     const until = k.until ? ` until ${weekday(k.until)} ${gameTime(k.until)}` : '';
     const busy = m.busy === `lock:${k.id}`;
     const toggle = k.on
-      ? `<button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open</button>`
-      : `<button class="os-link" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
+      ? `<button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open instead</button>`
+      : `<button class="os-link lock" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
     const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameLabel(k.game))} · ${openText(s, k)}</span>
-      <span class="sub">${k.on ? `Lockable${esc(until)}` : 'Keeping open'} · ${toggle}</span>`;
+      <span class="sub">${k.on ? `Lockable${esc(until)}` : 'Keeping open'}</span>`;
     return `<div class="os-row nba lock${k.on ? '' : ' off'}">
       <span class="os-slot">${slotBadge(slot)}</span>
       ${player(s, k.id, 'keep', sub)}
       ${numbers(s, plan, k.id, k.actual)}
       <span class="os-act">${k.on
-        ? lockButton(`data-op-lock-row="${esc(k.id)}"`, m, busy, `Lock ${f2(k.actual)} (${gameLabel(k.game)}). Locking is final.`)
-        : '<span class="os-status">Open</span>'}</span>
+        ? `${lockButton(`data-op-lock-row="${esc(k.id)}"`, m, busy, `Lock ${f2(k.actual)} (${gameLabel(k.game)}). Locking is final.`, `Lock ${f2(k.actual)}`)}${toggle}`
+        : `<span class="os-status">Open</span>${toggle}`}</span>
     </div>`;
   }
 
