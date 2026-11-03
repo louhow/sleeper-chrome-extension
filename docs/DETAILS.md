@@ -494,7 +494,7 @@ The API log stays available, and once the page holds a new token (after logging 
 ```sh
 npm install
 npm test          # unit tests: scoring, data model, rendering
-npm run test:e2e  # headless Chromium with the extension loaded
+npm run test:e2e  # headless Chromium with the extension loaded, 6 shards in parallel (about 30s)
 ```
 
 Logged-out visitors get redirected away from league pages, so the e2e test serves a stand-in page that mirrors the empty Team tab's markup, and keeps public API calls live.

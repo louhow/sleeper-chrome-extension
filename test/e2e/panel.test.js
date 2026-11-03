@@ -1,7 +1,7 @@
 // Loads the unpacked extension into headless Chromium. sleeper.com redirects logged-out
 // visitors away from league pages, so the page document is a stand-in that mirrors the
 // markup of Sleeper's empty NBA Team tab; API calls stay live.
-import { test, after, before } from 'node:test';
+import { test as register, after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,29 @@ const LEAGUE = process.env.SLEEPER_LEAGUE_ID || '1374952493246611456';
 const TEAM_URL = `https://sleeper.com/leagues/${LEAGUE}/team`;
 const MATCHUP_URL = `https://sleeper.com/leagues/${LEAGUE}/matchup`;
 const PLAYERS_URL = `https://sleeper.com/leagues/${LEAGUE}/players`;
+// `npm run test:e2e` runs this file in several processes at once (test/e2e/run.js), each with its own
+// browser and its own share of the tests (E2E_SHARD=i/n). A test that carries on from the page the one
+// before it left (no page.goto of its own) is listed in CONTINUES: it stays in that test's chain, and a
+// chain always runs whole, in order, in one shard. The slowest chains are spread first, the rest take
+// turns. Run by hand, with no E2E_SHARD, it runs every test.
+const [SHARD, SHARDS] = (process.env.E2E_SHARD || '0/1').split('/').map(Number);
+const SLOW = [/^player card: clicking/, /^optimize lineup: proposes/, /^a week ahead/];
+const CONTINUES = [/^shows starters with a full week/, /^team picker: every team/, /^week navigation loads/, /^logs every API call/,
+  /^unmounts on other league/, /^logged in: a refused save/, /^logged in: the API log tags/, /^matchup: switching to Team/,
+  /^IR: Out players/, /^NFL players tab: a Last 5/, /^NFL team tab, logged in: a week ahead/, /^NFL team tab: a healthy player/,
+  /^the Premier League panel never/, /^chat: hovering an emoji/, /^waivers: the Team tab lists pending/,
+  /^NFL team tab, logged in: your lineup swaps/];
+let chain = -1;
+let turn = SLOW.length;
+let chainShard = 0;
+const test = (name, fn) => {
+  if (chain < 0 || !CONTINUES.some((re) => re.test(name))) {
+    chain++;
+    const slow = SLOW.findIndex((re) => re.test(name));
+    chainShard = (slow >= 0 ? slow : turn++) % SHARDS;
+  }
+  if (chainShard === SHARD) register(name, fn);
+};
 const panel = (sel = '') => `#sleeper-nba-panel ${sel}`;
 const dialog = (sel = '') => `#sleeper-nba-dialog ${sel}`;
 
@@ -729,7 +752,7 @@ before(async () => {
     for (const id of sleeper.injured) players[id].injury_status = 'Out';
     return route.fulfill({ response: res, json: players });
   });
-  // Player card game logs arrive late, as on a slow connection, so tests see the loading state.
+  // Player card game logs (and the Form column's) arrive late, as on a slow connection, so tests see the loading state.
   await context.route(/api\.sleeper\.app\/(stats|projections)\/nba\/player\//, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return route.fallback();
@@ -1919,12 +1942,6 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await pickRoster(myRoster.roster_id);
 
   const before = sleeper.mutations.length;
-  // Game logs come in slowly, so the Form column is seen waiting for them.
-  const slowLogs = async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 4000));
-    return route.fallback();
-  };
-  await page.route('**/stats/nba/player/**', slowLogs);
   await page.locator(panel('button.optimize')).click();
   await page.locator(dialog('.os-row')).first().waitFor();
   assert.ok(await page.locator(dialog('.form-wait')).count() > 0, 'form waits for the logs');
@@ -1984,7 +2001,6 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply all');
   // The Form column waits for every starter's game log, then draws the charts together (the locked score's bar in gold).
   await page.locator(dialog('.form-chart')).first().waitFor({ timeout: 15000 });
-  await page.unroute('**/stats/nba/player/**', slowLogs);
   assert.equal(await page.locator(dialog('.form-wait')).count(), 0, 'form shows once all starters are in');
   assert.ok(await lockRow.locator('.form-chart .bar.lock').count() === 1, 'the lock score is marked in the chart');
   // Hovering a bar shows its scores at once: whole numbers, the lock score exact in gold, no words.
