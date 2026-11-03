@@ -1612,9 +1612,7 @@ button.lk.cancel {
   font-size: 11px;
 }
 .dp-pts,
-.dp-avg,
-.dp-lock,
-.dp-open {
+.dp-avg {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -1909,6 +1907,14 @@ button.optimize:hover:not(:disabled) {
 .os-row.nba {
   grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 48px 46px 48px 148px 224px;
 }
+.os-head.nba > .dp-lock,
+.os-head.nba > .dp-pts,
+.os-head.nba > .dp-open,
+.os-row.nba > .dp-lock,
+.os-row.nba > .dp-pts,
+.os-row.nba > .dp-open {
+  text-align: center;
+}
 .os-row .dp-lock,
 .os-row .dp-open {
   color: var(--muted);
@@ -1916,20 +1922,20 @@ button.optimize:hover:not(:disabled) {
 .os-row .dp-lock .score-chip {
   padding-inline: 4px;
 }
-.os-head .dp-form {
-  text-align: left;
-}
 .dp-form {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 .os-row .dp-form {
-  align-items: center;
   color: var(--muted);
 }
 .form-chart {
   flex: none;
+}
+.form-chart .hit {
+  fill: transparent;
 }
 .form-chart .bar {
   fill: color-mix(in srgb, var(--muted) 55%, transparent);

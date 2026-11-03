@@ -72,7 +72,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
   - A lock is final and pins the player to their slot, so the one being locked takes the most specific slot they fit (SF before F, PG before G) and whoever was there moves to the flexible slot they leave; the row of the player coming in says "Then locks", its Lock button saves the move and the lock together, and so does Apply all.
   - A slot that stays is dimmed and says why: "No change", "Locked" (with the locked score), "Playing" or "Empty".
 - Numbers per row (NBA), for the player in the Starting column: **Lock** (the finished score you could lock), the next day's projection (**Fri** and so on), **Open** (what leaving the slot open is worth over the games left) and **Form**.
-  Form is a bar chart of the player's last 15 games' fantasy points in ten score buckets (taller is more games), with their average beside it; the lock score's bucket is gold, and a tick under a bar marks the day's projection.
+  Form is a bar chart of the player's last 15 games' fantasy points in ten score buckets (taller is more games), with their average beside it; the lock score's bucket is gold, and a tick under a bar marks the day's projection; hovering a bar (or the space above it) lists the scores in it.
   It reads each starter's game log (`/stats/nba/player/<id>?grouping=week`, the previous season too when there are fewer than 15 games) after the dialog opens, and draws every chart at once when the last one is in.
   Only the players the plan starts are read; the logs are kept for the session.
   Under 1000px wide, Lock and Open drop out (the sub lines carry both).

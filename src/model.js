@@ -654,8 +654,13 @@
     const step = (hi - lo) / bins;
     const bucket = (x) => Math.min(bins - 1, Math.max(0, Math.floor((x - lo) / step)));
     const counts = new Array(bins).fill(0);
-    for (const x of scores) counts[bucket(x)]++;
-    return { counts, at: marks.map((x) => (x == null ? null : bucket(x))), mean: scores.reduce((a, b) => a + b, 0) / scores.length, n: scores.length, lo, hi };
+    const inBin = Array.from({ length: bins }, () => []);
+    for (const x of scores) {
+      counts[bucket(x)]++;
+      inBin[bucket(x)].push(x);
+    }
+    for (const list of inBin) list.sort((a, b) => b - a);
+    return { counts, inBin, at: marks.map((x) => (x == null ? null : bucket(x))), mean: scores.reduce((a, b) => a + b, 0) / scores.length, n: scores.length, lo, hi };
   }
 
   function outlook(days, lockValue, starting, now, started) {
