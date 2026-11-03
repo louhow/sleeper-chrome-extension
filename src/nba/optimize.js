@@ -75,7 +75,7 @@
     const moved = movedText(plan.changes);
     const locks = lineup.lockable ? plan.locks.filter((k) => k.on) : [];
     m.busy = 'all';
-    if (!locks.length) return plan.changes.length ? modalSave(() => saveStarters(plan.starters), `Saved: ${moved}`) : undefined;
+    if (!locks.length) return plan.changes.length ? modalSave(() => saveStarters(plan.starters), `Saved${ui.forWeek(state)}: ${moved}`) : undefined;
     const lockedText = `Locked ${locks.map((k) => `${shortOf(k.id)} ${ui.f2(k.actual)}`).join(', ')}`;
     const startersGames = { ...lineup.locks, ...Object.fromEntries(locks.map((k) => [k.id, k.game.game.id])) };
     return modalSave(() => saveLeg('lock_in', lineup.roster.roster_id, plan.starters, startersGames),
@@ -92,7 +92,7 @@
     if (plan.changes.some((c) => c.goodScore && !starters.includes(c.id)) && !m.ack) return;
     const ids = new Set(slots.flatMap((k) => [plan.current[k], plan.starters[k]]));
     m.busy = `row:${i}`;
-    return modalSave(() => saveStarters(starters), `Saved: ${movedText(plan.changes.filter((c) => ids.has(c.id)))}`, replan);
+    return modalSave(() => saveStarters(starters), `Saved${ui.forWeek(state)}: ${movedText(plan.changes.filter((c) => ids.has(c.id)))}`, replan);
   }
 
   // A swap's secondary option: keep the starter going out and lock their

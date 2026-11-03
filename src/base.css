@@ -150,6 +150,22 @@ pre.error {
   font-size: 14px;
   font-weight: 900;
 }
+/* A week ahead of the one on now */
+.week-label .ahead {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 14px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
 
 /* Lineup swaps: slot buttons, the card being moved, where it can go, and the rest dimmed */
 button.slot {

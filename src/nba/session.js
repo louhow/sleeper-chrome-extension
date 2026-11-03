@@ -399,9 +399,9 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
     return data.legs(week, nbaWeek.LEG_FIELDS);
   }
 
-  // Reads the current week's legs again (lineups can change on Sleeper's apps too).
-  async function readLegs() {
-    const week = state.currentWeek;
+  // Reads a week's legs again (lineups can change on Sleeper's apps too): the
+  // current week's for Lock-In, or a week ahead's when it's shown again.
+  async function readLegs(week = state.currentWeek) {
     if (!state.weeks[week] || state.saving || state.modal?.saving || Date.now() - lastLegRead < LEG_READ_GAP_MS) return;
     const legs = await loadLegs(week);
     if (!legs || !state.weeks[week]) return;
@@ -576,7 +576,7 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
       if (reserveChanged && !same(benched, lineup.starters)) await saveStarters(benched);
       if (reserveChanged) await saveRosterList('reserve', lineup.roster.roster_id, next.reserve);
       if (startersChanged && !(reserveChanged && same(benched, next.starters))) await saveStarters(next.starters);
-    }, `Saved: ${moved}`, `Couldn't move ${moved}`);
+    }, `Saved${ui.forWeek(state)}: ${moved}`, `Couldn't move ${moved}${ui.forWeek(state)}`);
   }
 
   // Locks a starter's most recent finished game. Final, so it's confirmed first.
@@ -659,12 +659,16 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     swap(m.from, m.to);
   }
 
+  // Shows a week. A week ahead already loaded reads its lineups again (a
+  // lineup set for it on Sleeper's apps since shows up), the current week has
+  // its own reads, and a past week can't change.
   function setWeek(week) {
     state.week = week;
     state.swap = null;
     state.lockConfirm = null;
     state.notice = null;
-    loadWeek(week).catch(fail);
+    const loaded = Boolean(state.weeks[week]);
+    loadWeek(week).then(() => (loaded && week > state.currentWeek ? readLegs(week) : null)).catch(fail);
   }
 
   root.addEventListener('click', (e) => {

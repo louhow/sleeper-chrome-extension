@@ -116,3 +116,31 @@ test('team tab rows: swap hint, swap classes and open spots', () => {
   assert.equal(ui.swapClass({}, true, 's:0', targets), '');
   assert.equal(ui.emptyCard('<b>BN</b>', ' dim', 'nfl'), '<article class="card nfl empty dim"><b>BN</b><div class="headshot"></div><div class="info"><span class="name">Empty</span></div></article>');
 });
+
+test('lineup: a week ahead is yours to set, with Sleeper\'s leg or before it holds one; locks, taxi and IR stay on the week on now', () => {
+  const ahead = () => {
+    const s = { ...league(), me: 'u1', week: 2 };
+    s.weeks = { 2: { ...s.weeks[1] } };
+    return s;
+  };
+  const withLeg = pick(ui.lineup(ahead()));
+  assert.deepEqual([withLeg.starters, withLeg.editable, withLeg.lockable, withLeg.taxiEditable, withLeg.reserveEditable], [['a', '0', 'b'], true, false, false, false]);
+  assert.equal(ui.lineup(ahead()).ahead, true);
+  assert.equal(ui.lineup({ ...league(), me: 'u1' }).ahead, false);
+  const noLeg = ahead();
+  noLeg.weeks[2].legs = [];
+  const l = pick(ui.lineup(noLeg));
+  assert.deepEqual([l.starters, l.editable, l.lockable, l.locks], [['b', 'a', '0'], true, false, {}], 'no leg yet: the public matchup, and a save creates the leg');
+  const refused = ahead();
+  refused.weeks[2].legs = null;
+  assert.equal(ui.lineup(refused).editable, false, 'legs unanswered (logged out or refused): read-only');
+  assert.equal(ui.lineup({ ...ahead(), me: null }).editable, false, 'logged out');
+  assert.equal(ui.lineup({ ...noLeg, league: { ...noLeg.league, status: 'complete' } }).editable, true, 'off season: the roster, as ever');
+  assert.deepEqual([ui.weekAhead({ week: 2, currentWeek: 1 }), ui.weekAhead({ week: 1, currentWeek: 1 }), ui.weekAhead({ week: 2 }), ui.weekAhead({ week: 1, currentWeek: 2 })], [true, false, false, false]);
+  assert.deepEqual([ui.forWeek({ week: 5, currentWeek: 3 }), ui.forWeek({ week: 3, currentWeek: 3 })], [' for week 5', '']);
+  assert.equal(ui.swapHint({ week: 2, currentWeek: 1 }, true, null), 'Tap a position to set your lineup for week 2');
+  assert.equal(ui.swapHint({ week: 2, currentWeek: 1, swap: 's:2' }, true, null), 'Pick a player for this slot · Esc to cancel');
+  assert.match(ui.weekNav({ week: 2, currentWeek: 1, minWeek: 1, maxWeek: 9 }, null), /<b>Week 2<\/b><span><i class="ahead" title="[^"]+">Upcoming<\/i><\/span>/);
+  assert.doesNotMatch(ui.weekNav({ week: 1, currentWeek: 1, minWeek: 1, maxWeek: 9 }, null), /Upcoming/);
+  assert.doesNotMatch(ui.weekNav({ week: 2, minWeek: 1, maxWeek: 9 }, null), /Upcoming/, 'the week on now unknown: nothing to say');
+});

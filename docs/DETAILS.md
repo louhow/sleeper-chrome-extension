@@ -35,6 +35,11 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
 - Draft picks held, including picks acquired by trade.
 - Lineup swaps on your own roster: tap a slot badge, then one of the highlighted players (G takes PG/SG, F takes SF/PF, UTIL and bench take anyone).
 - A move that takes a score out of your starting lineup asks first, as Sleeper's mobile app does and its website doesn't: a dialog ("Take a score out of your lineup?") names the starter leaving, the score and game, and why it counts: locked in, their final game of the week (which counts once done), or a finished game still lockable (for sure, or maybe, when the extension didn't see the lineup at tip-off), then the move itself (`model.scoresAtStake`). "Yes, take it out" saves the move as any swap; "Keep in lineup", ✕ or Esc drops it, pick and all. A game played on the bench, or past locking with a game left, is nothing to lose, so those moves save straight away, as do swaps between two starters.
+- Weeks ahead: the week picker goes forward through the season, and your own lineup for a week ahead is yours to set, as on Sleeper's mobile app (its website has no NBA lineup at all).
+  The picker marks the week "Upcoming", the Starters hint says which week you're setting ("Tap a position to set your lineup for week 5") and a save says so ("Saved for week 5: …").
+  It saves to that week's matchup leg (`update_matchup_leg` at that round, as Sleeper's own Team component does for the week its tab shows), whether or not Sleeper holds a leg for the week yet: Sleeper's leg query must have answered (logged in), and a save creates the leg.
+  Lock-In, taxi and IR stay on the week on now (a week ahead has no games to lock, and taxi and IR belong to the roster).
+  Coming back to a week ahead reads its lineups again (never within a minute of the last leg read), so a lineup set from the app since shows up.
 - Taxi moves on your own roster, following the league's taxi settings (see below). Only badges with a legal move are clickable.
 - IR moves on your own roster: players whose injury status the league allows (`reserve_allow_out`, `_dtd`, `_dnr` and so on; IR and PUP always) can go onto IR from the bench or the lineup, or trade places with an IR player. Coming off IR into an open spot needs room on the active roster.
 - A player on IR the league no longer allows there (healthy, or a status it doesn't accept) freezes the lineup, NBA and NFL: Sleeper's apps check this on the client and its API doesn't, so the extension does. The only move left is taking that player off IR (onto an open bench spot, or trading places with an IR-eligible player: `model.canMove`), a red banner above the lineup names them ("You have 1 player no longer eligible in IR", as Sleeper's mobile app words it) and tints their row, the Optimize lineup button is disabled (its tooltip says why) and the Starters hint names who to move.
@@ -96,6 +101,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
   Without, the lineup saves in one `update_matchup_leg` (in season) or `roster_update_starters`, leaving Lock-In picks untouched.
 - The top of the dialog shows the starters' projected points for that day now and after the changes; each row shows that day's projection and points per game left.
 - The dialog's "How it picks" label sums these rules up in a few lines on hover or focus.
+- A week ahead (the picker's "Upcoming" weeks) works the same, for that week's first day of games and with nothing to lock; the dialog says "Week 5 · upcoming" and its saves "Saved for week 5". Run it again once the week is on.
 - Clicking a player in the dialog opens their player card over it; closing the card returns to the dialog.
 
 ### Score colors
@@ -437,8 +443,8 @@ It enables:
 
 - `league_rosters(league_id)`: rosters straight from Sleeper. The public `/rosters` endpoint is cached at the CDN for up to ~10 minutes, so after a save it can show (and a follow-up move could build on) the old roster.
 - `me`: which roster is yours (swaps are only offered there, for the current and future weeks).
-- `matchup_legs(league_id, round)`: the week's saved lineup, Sleeper's own points and Lock-In picks (`starters_games`, shown with a lock).
-- `update_matchup_leg(...)` during the season, `roster_update_starters(...)` outside it: saving a swap.
+- `matchup_legs(league_id, round)`: the week's saved lineup, Sleeper's own points and Lock-In picks (`starters_games`, shown with a lock). Asked for the week shown, a week ahead included.
+- `update_matchup_leg(...)` during the season, `roster_update_starters(...)` outside it: saving a swap. The leg is the week shown's (`leg` and `round`), a week ahead included; Sleeper creates it when it holds none yet.
 - `update_matchup_leg(..., starters: [...], subs: $subs)`: AutoSub (NFL). `$subs` (type `Map`) is a JSON string of starter id -> sub id, e.g. `"{\"4866\":\"13286\"}"`; the lineup goes along unchanged, and `matchup_legs` reads `subs` back. Found from the mobile app's HAR.
 - `update_matchup_leg(..., starters_games: $starters_games)`: Lock-In. The variable is the week's full player -> game map as JSON, with the new lock added.
 - `roster_update_taxi(league_id, roster_id, taxi)`: taxi moves. Saved before any starter change, like Sleeper's web app.

@@ -121,11 +121,14 @@
     return list?.length ? `<div class="dialog-errors" role="alert">${list.map((e) => `<p>${esc(e)}</p>`).join('')}</div>` : '';
   }
 
+  // The week picker. A week ahead of the one on now is marked, since what's
+  // shown (and any lineup set there) is for later.
   function weekNav(s, week) {
     const range = week?.days.length ? dateRange(week.days[0], week.days.at(-1)) : '';
+    const ahead = weekAhead(s) ? '<i class="ahead" title="A week ahead: a lineup set here waits for it">Upcoming</i>' : '';
     return `<div class="week-nav">
       <button class="icon" data-action="prev" aria-label="Previous week" ${s.week <= s.minWeek ? 'disabled' : ''}>‹</button>
-      <div class="week-label"><b>Week ${s.week ?? ''}</b><span>${range}</span></div>
+      <div class="week-label"><b>Week ${s.week ?? ''}</b><span>${range}${ahead}</span></div>
       <button class="icon" data-action="next" aria-label="Next week" ${s.week >= s.maxWeek ? 'disabled' : ''}>›</button>
     </div>`;
   }
@@ -184,11 +187,16 @@
     const parts = s.players ? rosterParts(s, rosterId) : null;
     if (!parts) return null;
     const { roster, week, leg, taxi, reserve } = parts;
-    // A lineup that saves to the week's matchup leg can only change once that leg has loaded.
+    // A lineup that saves to the week's matchup leg can only change once that
+    // leg has loaded. A week ahead is the exception: Sleeper may not hold a leg
+    // for it yet, and the save (update_matchup_leg at that round, as Sleeper's
+    // own Team component sends it) creates one; it only needs Sleeper to have
+    // answered the week's leg query (an array; null is logged out or refused).
     const onLeg = globalThis.SNP.model.lineupOnLeg(s.league);
     const current = Boolean(week) && s.week >= (s.currentWeek ?? s.week);
+    const ahead = weekAhead(s);
     const mine = owns(s, roster);
-    const editable = mine && current && (!onLeg || Boolean(leg));
+    const editable = mine && current && (!onLeg || Boolean(leg) || (ahead && Array.isArray(week.legs)));
     const settings = s.league.settings || {};
     // Active roster = everyone not on IR or taxi; it can hold one player per roster position.
     const active = (roster.players || []).length - reserve.length - taxi.length;
@@ -201,8 +209,10 @@
       started: mine && leg ? (id, game) => globalThis.SNP.model.startedAt(s.lineupHistory?.[s.week]?.[roster.roster_id], id, game.start) : null,
       mine,
       editable,
-      // Locks only exist on an in-season matchup leg. A lock is real points, so not under what-if scoring.
-      lockable: mine && current && onLeg && Boolean(leg) && !whatIfOn(s),
+      ahead,
+      // Locks only exist on an in-season matchup leg, and only the week on now has
+      // games to lock. A lock is real points, so not under what-if scoring.
+      lockable: mine && current && !ahead && onLeg && Boolean(leg) && !whatIfOn(s),
       // Taxi belongs to the roster, not a week, so it's edited from the current week.
       taxiEditable: editable && (settings.taxi_slots || 0) > 0 && s.week === s.currentWeek,
       taxiOpen: globalThis.SNP.model.taxiOpen(settings, s.seasonType, s.currentWeek, weekStarted(s)),
@@ -220,6 +230,13 @@
     const games = s.weeks?.[s.currentWeek]?.games || [];
     return games.some((g) => globalThis.SNP.model.gameState(g, s.now) !== 'left');
   }
+
+  // Whether the week shown is ahead of the week on now (a lineup set there
+  // waits for it, as on Sleeper's mobile app).
+  const weekAhead = (s) => s.currentWeek != null && s.week != null && s.week > s.currentWeek;
+
+  // " for week 5" when the week shown is ahead, so a save notice says which week it set; else "".
+  const forWeek = (s) => (weekAhead(s) ? ` for week ${s.week}` : '');
 
   // One-line summary of the league's taxi rules and whether taxi is open now.
   function taxiRule(l) {
@@ -469,6 +486,7 @@
       : picked ? `Pick a player to swap with ${esc(picked)} · Esc to cancel`
       : s.swap ? 'Pick a player for this slot · Esc to cancel'
       : blocked ? `Move ${esc(blocked)} off IR first`
+      : weekAhead(s) ? `Tap a position to set your lineup for week ${s.week}`
       : 'Tap a position to update your lineup';
   }
 
@@ -536,7 +554,7 @@
     const button = !optimize ? ''
       : irBlock ? `<button class="optimize" disabled title="${esc(irBlock)}">Optimize lineup</button>`
       : whatIfOn(s) ? '<button class="optimize" disabled title="Optimize uses your league\'s scoring. Switch what-if scoring off to use it.">Optimize lineup</button>'
-      : `<button class="optimize" data-action="optimize" title="Propose the best starting lineup for this week" ${s.saving ? 'disabled' : ''}>Optimize lineup</button>`;
+      : `<button class="optimize" data-action="optimize" title="Propose the best starting lineup for ${weekAhead(s) ? `week ${s.week}` : 'this week'}" ${s.saving ? 'disabled' : ''}>Optimize lineup</button>`;
     return `<nav class="toolbar">
       <div class="tabs" role="tablist">${tab('page', pageTitle(s))}</div>
       <div class="tools">
@@ -701,11 +719,12 @@
   // The dialog: summary, what the last row saved (until the next save), `notes`
   // (warnings), then a row per slot; Cancel and `apply` (applyAll) below.
   // Without anything to apply, it says the lineup is already the best.
-  function optimizeDialog(m, { week, how, summary, notes = '', rows, actionable, apply }) {
+  // `ahead`: the week is ahead of the one on now, which the title says.
+  function optimizeDialog(m, { week, ahead = false, how, summary, notes = '', rows, actionable, apply }) {
     const done = m.done ? `<p class="op-done" role="status">${esc(m.done)}</p>` : '';
     const body = actionable ? `${summary}${done}${notes}${rows}`
       : `${summary}${done}<p class="msg">This is already your best lineup for week ${esc(week)}.</p>${rows}`;
-    return dialog('Optimize Lineup', `Week ${week}`, `
+    return dialog('Optimize Lineup', `Week ${week}${ahead ? ' · upcoming' : ''}`, `
       <div class="dialog-body">
         ${dialogErrors(m.errors)}
         ${body}
@@ -783,7 +802,7 @@
     standingsTable, reserveRule, irBlockNames, irBlockTip, irBanner, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
     esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
-    lineup, rosterParts, opponentOf, taxiRule, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, ordinal, researchLine,
+    lineup, rosterParts, opponentOf, taxiRule, weekAhead, forWeek, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, ordinal, researchLine,
     dash, num, height, ago, newsSource, heat, scaler, tierClass,
     avatarImg, teamCard, teamSideOf, teamSide, matchupPair, medal, medianBanner, rowHead, swapHint, swapClass, emptyCard,
     muRow, muEmpty, muStarters, muSection,

@@ -29,6 +29,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 
 **NBA**
 - Team tab: roster, each player's last finished game as a box score under their name, weekly game strips that show what's locked, still lockable (only games the player started) or past locking, tinted by score (lock right from the cell), projections, lineup swaps (a move that takes a score out of your lineup asks first, as Sleeper's app does), taxi and IR moves, draft picks.
+- Weeks ahead: the week picker goes forward, and your lineup for an upcoming week is yours to set there, as in Sleeper's mobile app; it saves to that week.
 - Matchup tab: both lineups slot by slot, win probability, Lock-In status.
 - League tab: every matchup of the week, styled like the Matchup tab; click one to open it, or a team to see its roster.
 - Standings on the League tab (NBA and NFL): rank, record, PF, PA, Max PF and waiver, sortable by any column; Sleeper's "League is full" teams list is gone.
@@ -40,7 +41,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Team picker: every team with its avatar, A to Z, a "My team" shortcut, and team links from the Matchup and League tabs; on the Matchup tab it picks a matchup (both teams).
 - Healthy player stuck on IR: a red banner says so, and the only moves left take them off IR (to an open bench spot or swapped with an IR-eligible player); Optimize lineup stays off until they're out (Sleeper's API doesn't enforce this, its apps do).
 - NFL Team tab: IR and open bench spots are editable like on NBA.
-- Optimize lineup (on the Team and Matchup tabs): recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
+- Optimize lineup (on the Team and Matchup tabs, for the week shown, upcoming weeks included): recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order; apply one row or all of them.
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.
 - Players tab: remembers your last view; a week strip per player (games played in their score's color, games left, scores on hover); a team picker to scan any roster; team avatars on rostered players; in Stats, a week's Avg (with games played) / Best / Worst game and an optional Shooting group (FGM, FGA, 3PA, FTM, FTA).
 - Player card: bio, game logs, career, news, transaction history.

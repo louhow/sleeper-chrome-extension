@@ -497,6 +497,10 @@ const sleeper = {
   nflLegs: false, // answer the NFL league's matchup legs (your own, with nflSubs)
   nflSubs: null, // the AutoSubs on that leg: starter id -> sub id
   failNextMutation: false,
+  // When off, Sleeper holds no leg yet for any week past the first: its leg query
+  // answers with none until a lineup is saved there (`writtenAhead`).
+  legsAhead: true,
+  writtenAhead: new Set(),
   rosters: null, // league rosters as the mock's Sleeper currently has them
   rostersLoading: null,
   claims: [], // waiver claims submitted through the mock
@@ -685,9 +689,13 @@ async function answerGraphql(route) {
   const round = Number(query.match(/round: (\d+)/)?.[1]);
   if (!round) return json({ errors: [{ message: `unmocked: ${query.slice(0, 60)}` }] });
   await seedLegs(round);
-  if (/query matchup_legs\b/.test(query)) return json({ data: { matchup_legs: sleeper.legs[round] } });
+  if (/query matchup_legs\b/.test(query)) {
+    const none = round !== 1 && !sleeper.legsAhead && !sleeper.writtenAhead.has(round);
+    return json({ data: { matchup_legs: none ? [] : sleeper.legs[round] } });
+  }
   if (/mutation update_matchup_leg\b/.test(query)) {
     sleeper.mutations.push({ query, variables });
+    sleeper.writtenAhead.add(round);
     if (sleeper.failNextMutation) {
       sleeper.failNextMutation = false;
       return json({ errors: [{ message: 'Player is locked', path: ['update_matchup_leg'] }], data: null });
@@ -739,10 +747,11 @@ before(async () => {
   await context.route('https://api.sleeper.app/stats/nba/**', async (route) => {
     // Only the weekly stats are doctored; the player card's own stats go through.
     if (!/\/stats\/nba\/\d+\/\d+/.test(route.request().url())) return route.fallback();
+    // Before tip-off nothing this season has been played, whichever week is asked.
+    if (sleeper.beforeTipoff && /\/stats\/nba\/2026\/\d+/.test(route.request().url())) return route.fulfill({ json: [] });
     // The doctored weeks are week 1; the weeks before (last season's, for score colors) are Sleeper's.
     if (!/\/stats\/nba\/\d+\/1(\?|$)/.test(route.request().url())) return route.continue();
     if (sleeper.weekStats) return route.fulfill({ json: sleeper.weekStats });
-    if (sleeper.beforeTipoff) return route.fulfill({ json: [] });
     if (!sleeper.midWeek) return route.continue();
     const url = route.request().url().replace('/stats/', '/projections/');
     const raw = await (await fetch(url)).json();
@@ -841,6 +850,109 @@ test('week navigation loads the next week', async () => {
   await page.locator(panel('.card .days')).first().waitFor();
   await page.locator(panel('[data-action="prev"]')).click();
   await page.waitForFunction((b) => document.querySelector('#sleeper-nba-panel').shadowRoot.querySelector('.week-label b').textContent === b, before);
+});
+
+test('a week ahead: your lineup for it is yours to set and Optimize plans its first game day, both saved to that week\'s leg', async () => {
+  documentBody = LOGGED_IN;
+  sleeper.rosters = null;
+  sleeper.midWeek = false;
+  sleeper.beforeTipoff = true;
+  const myRoster = await openMyTeam(TEAM_URL);
+  const mine = sleeper.rosters.find((r) => r.roster_id === myRoster.roster_id);
+  const league = await (await fetch(`https://api.sleeper.app/v1/league/${LEAGUE}`)).json();
+  const players = await (await fetch('https://api.sleeper.app/v1/players/nba')).json();
+  // Week 2's first day of games (before tip-off, every game keeps its day), and a
+  // bench player of yours who plays that day: projected a monster game, Optimize must start them.
+  const { data } = await (await fetch('https://sleeper.com/graphql', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query: 'query scores { scores(sport: "nba", season_type: "regular", season: "2026", week: 2) { game_id date start_time status metadata } }' }),
+  })).json();
+  const firstDay = data.scores.map((g) => g.date).sort()[0];
+  const thatDay = new Set(data.scores.filter((g) => g.date === firstDay).flatMap((g) => [g.metadata?.home_team?.team, g.metadata?.away_team?.team]));
+  await seedLegs(2);
+  const leg2 = sleeper.legs[2].find((l) => l.roster_id === myRoster.roster_id);
+  const placed = new Set([...leg2.starters, ...(mine.taxi || []), ...(mine.reserve || [])]);
+  const star = mine.players.find((id) => !placed.has(id) && thatDay.has(players[id]?.team));
+  assert.ok(star, `a bench player plays on ${firstDay}`);
+  sleeper.projections = (rows) => rows.map((r) => (r.player_id === star ? { ...r, stats: { pts: 80 / league.scoring_settings.pts } } : r));
+  await page.reload();
+  await page.locator(panel('.taxi-head .hint')).waitFor({ timeout: 30000 });
+
+  // Forward a week: marked as upcoming, and your lineup there is yours to set; taxi and IR are not.
+  await page.locator(panel('[data-action="next"]')).click();
+  await page.locator(panel('.week-label .ahead')).waitFor();
+  assert.equal(await shadowText('.week-label b'), 'Week 2');
+  assert.equal(await shadowText('.week-label .ahead'), 'Upcoming');
+  await page.locator(panel('.card .days')).first().waitFor();
+  assert.equal(await page.locator(panel('.rhead .hint')).first().textContent(), 'Tap a position to set your lineup for week 2');
+  assert.ok(await page.locator(panel('button.slot[data-spot^="s:"]')).count(), 'starters can move');
+  assert.equal(await page.locator(panel('[data-spot^="t:"], [data-spot^="r:"], [data-spot^="te:"], [data-spot^="re:"]')).count(), 0, 'taxi and IR are set from the week on now');
+  assert.equal(await page.locator(panel('button.cell[data-lock]')).count(), 0, 'nothing to lock');
+  await page.screenshot({ path: `${OUT}team-ahead.png` });
+  await assertFitsAtWidths('team tab, a week ahead');
+
+  // A swap saves to week 2's leg, and says so.
+  const before = sleeper.mutations.length;
+  await page.locator(panel('button.slot[data-spot="s:0"]')).click();
+  await page.locator(panel(`.card.target button.slot:not([data-spot="b:${star}"])`)).first().click();
+  await page.locator(panel('.notice.ok')).waitFor();
+  assert.match(await shadowText('.notice.ok'), /^Saved for week 2: /);
+  assert.equal(sleeper.mutations.length, before + 1, 'one save');
+  assert.match(sleeper.mutations.at(-1).query, new RegExp(`update_matchup_leg\\(league_id: "${LEAGUE}", roster_id: ${myRoster.roster_id}, leg: 2, round: 2, starters: `));
+  assert.equal(await shadowText('.week-label b'), 'Week 2', 'stays on the week');
+  await page.locator(panel('.notice.ok')).waitFor({ state: 'detached', timeout: 5000 });
+
+  // Optimize plans week 2's first day of games, with nothing to lock, and saves to its leg.
+  const optimize = page.locator(panel('button.optimize'));
+  assert.equal(await optimize.getAttribute('title'), 'Propose the best starting lineup for week 2');
+  await optimize.click();
+  await page.locator(dialog('.os-row')).first().waitFor();
+  assert.equal(await dialogText('.dialog-head .sub'), 'Week 2 · upcoming');
+  const day = new Date(`${firstDay}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
+  assert.match(await dialogText('.op-sum'), new RegExp(`${day} projection\\s*Starters playing ${day}\\s*\\d+\\.\\d\\d\\s*→\\s*\\d+\\.\\d\\d\\s*\\+\\d+\\.\\d\\d`));
+  assert.equal(await page.locator(dialog('.os-row.lock')).count(), 0);
+  const starRow = page.locator(dialog('.os-row.swap')).filter({ has: page.locator(`.os-p.in [data-player="${star}"]`) });
+  assert.equal(await starRow.count(), 1, 'the must-start for that day comes in');
+  await page.screenshot({ path: `${OUT}optimize-ahead.png` });
+  await page.locator(dialog('[data-action="apply-lineup"]')).click();
+  await page.locator(dialog('.modal')).waitFor({ state: 'detached' });
+  await page.locator(panel('.notice.ok')).waitFor();
+  assert.match(await shadowText('.notice.ok'), /^Saved for week 2: /);
+  const applied = sleeper.mutations.at(-1);
+  assert.match(applied.query, /mutation update_matchup_leg/);
+  assert.match(applied.query, /, leg: 2, round: 2, starters: /);
+  assert.equal(applied.variables.starters_games, undefined, 'no locks in a week ahead');
+  assert.ok(JSON.parse(applied.query.match(/starters: (\[[^\]]*\])/)[1]).includes(star), 'the star starts');
+  await page.locator(panel('.notice.ok')).waitFor({ state: 'detached', timeout: 5000 });
+
+  // Before Sleeper holds a leg for the week (its leg query answers with none), the
+  // lineup is still yours to set: the save creates the leg, which then reads back.
+  sleeper.legsAhead = false;
+  sleeper.writtenAhead = new Set();
+  await page.reload();
+  await page.locator(panel('.taxi-head .hint')).waitFor({ timeout: 30000 });
+  await page.locator(panel('[data-action="next"]')).click();
+  await page.locator(panel('.week-label .ahead')).waitFor();
+  await page.locator(panel('button.slot[data-spot="s:0"]')).waitFor();
+  assert.ok(await page.locator(panel('button.optimize')).count(), 'Optimize too');
+  const noLeg = sleeper.mutations.length;
+  await page.locator(panel('button.slot[data-spot="s:0"]')).click();
+  await page.locator(panel('.card.target button.slot')).first().click();
+  await page.locator(panel('.notice.ok')).waitFor();
+  assert.match(await shadowText('.notice.ok'), /^Saved for week 2: /);
+  assert.equal(sleeper.mutations.length, noLeg + 1);
+  assert.match(sleeper.mutations.at(-1).query, /, leg: 2, round: 2, starters: /);
+  assert.ok(sleeper.writtenAhead.has(2), 'the leg now exists');
+  await page.keyboard.press('Escape');
+
+  sleeper.legsAhead = true;
+  sleeper.projections = null;
+  sleeper.beforeTipoff = false;
+  // Back to the logged-out page the tests around this one run on.
+  documentBody = LOGGED_OUT;
+  await page.goto(TEAM_URL);
+  await page.locator(panel('.card .days')).first().waitFor({ timeout: 30000 });
 });
 
 test('logs every API call, including the GraphQL query', async () => {

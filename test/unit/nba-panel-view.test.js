@@ -293,3 +293,21 @@ test('the API calls tab is a debug button with a tooltip, not a tab', () => {
   assert.match(html, /<button class="icon debug" data-tab="api" aria-pressed="false" title="Debug: API calls \(1\)"/);
   assert.match(render(state({ tab: 'api' }), []), /class="icon debug active" data-tab="api" aria-pressed="true"/);
 });
+
+test('a week ahead: your lineup is yours to set, the hint names the week, the picker marks it and Optimize is for it', () => {
+  const legs = [{ roster_id: 1, matchup_id: 1, starters: ['a', 'b', '0'], starters_games: {} }];
+  const season = { ...state().league, status: 'in_season' };
+  const s = state({ me: 'u1', tab: 'page', ready: true, week: 2, currentWeek: 1, weeks: { 2: { ...week, legs } }, league: season });
+  const html = render(s, []);
+  assert.match(html, /<button class="slot pg" data-spot="s:0"/, 'starters can move');
+  assert.doesNotMatch(html, /data-spot="r:/, 'IR stays on the week on now');
+  assert.doesNotMatch(html, /data-spot="[rt]e:/, 'no open IR or taxi spots to fill either');
+  assert.match(text(html), /Tap a position to set your lineup for week 2/);
+  assert.match(html, /<b>Week 2<\/b><span>[^<]*<i class="ahead"[^>]*>Upcoming<\/i>/);
+  assert.match(html, /<button class="optimize" data-action="optimize" title="Propose the best starting lineup for week 2"/);
+  assert.doesNotMatch(html, /data-lock=/, 'nothing to lock in a week ahead');
+  const now = render(state({ me: 'u1', tab: 'page', ready: true, currentWeek: 1, weeks: { 1: { ...week, legs } }, league: season }), []);
+  assert.doesNotMatch(now, /Upcoming/);
+  assert.match(now, /title="Propose the best starting lineup for this week"/);
+  assert.match(text(now), /Tap a position to update your lineup/);
+});

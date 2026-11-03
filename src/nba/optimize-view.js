@@ -5,7 +5,7 @@
 (globalThis.SNP ||= {}).nbaOptimizeView = (() => {
   const { playerDays, scoreTier, applySlot } = globalThis.SNP.model;
   const { esc, f2, headshot, injuryTag, teamTag, slotBadge, weekday, gameTime, gameLabel, nextGame, lockIcon, shortName, real, playerOf, playerName,
-    optimizeDialog, planSummary, applyAll, applyChange, slotPlayer, tierClass } = globalThis.SNP.ui;
+    optimizeDialog, planSummary, applyAll, applyChange, slotPlayer, tierClass, weekAhead } = globalThis.SNP.ui;
 
   // Plain text for the "How it picks" tooltip.
   const HOW = [
@@ -53,6 +53,7 @@
       : good.length ? `Apply all and lose ${f2(goodTotal)} pts` : 'Apply all';
     return optimizeDialog(m, {
       week: s.week,
+      ahead: weekAhead(s),
       how: HOW,
       summary: summary(plan),
       notes: warning,
