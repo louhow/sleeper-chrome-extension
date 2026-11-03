@@ -2167,10 +2167,19 @@ button.optimize:hover:not(:disabled) {
   text-decoration: underline;
 }
 /* No action: the slot stays as it is. */
-.os-row.same > :not(.os-act) {
+.os-row.same > :not(.os-act, .dp-form) {
   opacity: 0.5;
 }
-.os-row.same.locked > :not(.os-act) {
+.os-row.same.locked > :not(.os-act, .dp-form) {
+  opacity: 0.7;
+}
+/* The form column dims its chart and average, never its tooltip, which reads the same on every row. */
+.os-row.same > .dp-form > :not(.form-chart),
+.os-row.same > .dp-form .fcol > :not(.form-tip) {
+  opacity: 0.5;
+}
+.os-row.same.locked > .dp-form > :not(.form-chart),
+.os-row.same.locked > .dp-form .fcol > :not(.form-tip) {
   opacity: 0.7;
 }
 .os-act {

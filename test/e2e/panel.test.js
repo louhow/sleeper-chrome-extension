@@ -1919,14 +1919,26 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await pickRoster(myRoster.roster_id);
 
   const before = sleeper.mutations.length;
+  // Game logs come in slowly, so the Form column is seen waiting for them.
+  const slowLogs = async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+    return route.fallback();
+  };
+  await page.route('**/stats/nba/player/**', slowLogs);
   await page.locator(panel('button.optimize')).click();
   await page.locator(dialog('.os-row')).first().waitFor();
+  assert.ok(await page.locator(dialog('.form-wait')).count() > 0, 'form waits for the logs');
   assert.match(await page.locator(dialog('.op-sum')).textContent(), /(\w{3}) projection\s*Starters playing \1\s*\d+\.\d\d\s*→\s*\d+\.\d\d\s*\+\d+\.\d\d/);
   // The tooltip shows on hover, inside the dialog.
   assert.equal(await page.locator(dialog('.how-tip')).isVisible(), false);
   await page.locator(dialog('.how')).hover();
   assert.match(await page.locator(dialog('.how-tip')).innerText(), /^How it picks:\nStarts your best projected players/);
   await page.screenshot({ path: `${OUT}optimize-how.png` });
+  // On a row that stays as it is the chart dims, the tooltip doesn't: it looks the same on every row.
+  const sameCol = page.locator(dialog('.os-row.same .form-chart .fcol:has(.bar)')).first();
+  await sameCol.hover();
+  assert.ok(await sameCol.locator('.form-tip').evaluate((el) => { let o = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) o *= Number(getComputedStyle(n).opacity); return o === 1; }), 'tooltip is opaque on a dimmed row');
+  await page.screenshot({ path: `${OUT}optimize-form-hover-same.png` });
   await page.mouse.move(0, 0);
   // One row per starting slot, in lineup order, each showing who's there now.
   const slots = league.roster_positions.filter((p) => p !== 'BN');
@@ -1971,8 +1983,8 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
   assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply all');
   // The Form column waits for every starter's game log, then draws the charts together (the locked score's bar in gold).
-  assert.ok(await page.locator(dialog('.form-wait')).count() > 0, 'form waits for the logs');
   await page.locator(dialog('.form-chart')).first().waitFor({ timeout: 15000 });
+  await page.unroute('**/stats/nba/player/**', slowLogs);
   assert.equal(await page.locator(dialog('.form-wait')).count(), 0, 'form shows once all starters are in');
   assert.ok(await lockRow.locator('.form-chart .bar.lock').count() === 1, 'the lock score is marked in the chart');
   // Hovering a bar shows its scores at once: whole numbers, the lock score exact in gold, no words.
