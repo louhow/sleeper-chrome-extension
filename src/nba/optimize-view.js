@@ -48,7 +48,7 @@
           <span class="dp-lock" title="A finished game's score you could lock in">Lock</span>
           <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span>
           <span class="dp-open" title="What leaving the slot open is worth over the games left this week">Open</span>
-          <span class="dp-form" title="Their last games' fantasy points, and the average. Hover a bar for its scores, no wait. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span><span></span></div>
+          <span class="dp-form" title="Their last games' fantasy points, and the average. Hover a bar for its scores. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span><span></span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
     const lockText = `Lock ${on.length === 1 ? 'in 1 game' : `in ${on.length} games`}`;
     const apply = on.length && !plan.changes.length ? lockText
@@ -193,8 +193,14 @@
     // Each bucket is a full-height column, so a short bar is easy to hover; its tooltip (CSS, no delay) lists the scores.
     const cols = bars.counts.map((n, i) => {
       const h = n ? Math.max(4, Math.round((n / peak) * HEIGHT)) : i === lockAt ? 5 : 2;
-      const tip = [n ? bars.inBin[i].map(f2).join(', ') : 'No games', i === lockAt ? `Lock ${f2(lock)}` : '', i === projAt ? `${day(plan)} projection ${f2(proj)}` : ''].filter(Boolean).join(' · ');
-      return `<span class="fcol" data-tip="${esc(tip)}"><span class="${i === lockAt ? 'bar lock' : 'bar'}" style="height:${h}px"></span>${i === projAt ? '<span class="tick"></span>' : ''}</span>`;
+      // Scores rise left to right, whole numbers; the lock score stays exact, in the lock color.
+      const chip = (x) => `<span class="lk">${f2(x)}</span>`;
+      const list = [...bars.inBin[i]].sort((x, y) => x - y);
+      const at = i === lockAt ? list.findIndex((x) => Math.abs(x - lock) < 0.005) : -1;
+      const items = list.map((x, j) => (j === at ? chip(x) : Math.round(x)));
+      if (i === lockAt && at < 0) items.push(chip(lock));
+      const tip = items.join(' · ') || 'No games';
+      return `<span class="fcol"><span class="${i === lockAt ? 'bar lock' : 'bar'}" style="height:${h}px"></span>${i === projAt ? '<span class="tick"></span>' : ''}<span class="form-tip">${tip}</span></span>`;
     }).join('');
     const title = `Last ${bars.n} games: ${f2(bars.lo)} to ${f2(bars.hi)}, average ${f2(bars.mean)}`;
     return `<span class="dp-form"><span class="form-chart" role="img" aria-label="${esc(title)}">${cols}</span><span class="form-avg">${f2(bars.mean)}</span></span>`;

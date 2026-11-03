@@ -1966,8 +1966,8 @@ button.optimize:hover:not(:disabled) {
   background: var(--text);
   opacity: 0.55;
 }
-.form-chart .fcol:hover::after {
-  content: attr(data-tip);
+.form-chart .form-tip {
+  display: none;
   position: absolute;
   bottom: calc(100% + 4px);
   left: 50%;
@@ -1984,6 +1984,16 @@ button.optimize:hover:not(:disabled) {
   line-height: 1.3;
   white-space: normal;
   pointer-events: none;
+}
+.form-chart .fcol:hover .form-tip {
+  display: block;
+}
+.form-tip .lk {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--lock);
+  color: #1a1400;
+  font-weight: 700;
 }
 .form-avg {
   min-width: 36px;

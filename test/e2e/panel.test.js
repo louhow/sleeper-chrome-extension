@@ -1975,6 +1975,16 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await page.locator(dialog('.form-chart')).first().waitFor({ timeout: 15000 });
   assert.equal(await page.locator(dialog('.form-wait')).count(), 0, 'form shows once all starters are in');
   assert.ok(await lockRow.locator('.form-chart .bar.lock').count() === 1, 'the lock score is marked in the chart');
+  // Hovering a bar shows its scores at once: whole numbers, the lock score exact in gold, no words.
+  const lockCol = lockRow.locator('.form-chart .fcol:has(.bar.lock)');
+  await lockCol.hover();
+  const tip = lockCol.locator('.form-tip');
+  assert.ok(await tip.isVisible(), 'the tooltip shows on hover');
+  assert.match(await lockCol.locator('.form-tip .lk').textContent(), /^\d+\.\d\d$/);
+  assert.doesNotMatch(await tip.innerText(), /Lock|projection/i);
+  assert.doesNotMatch((await tip.innerText()).replace(/\d+\.\d\d/, ''), /\./, 'the other scores are whole');
+  await page.screenshot({ path: `${OUT}optimize-form-hover.png` });
+  await page.mouse.move(0, 0);
   // Every slot fits on screen, with no scrolling.
   assert.ok(await page.locator(dialog('.dialog-body')).evaluate((el) => el.scrollHeight <= el.clientHeight), 'no scroll');
   await page.screenshot({ path: `${OUT}optimize-dialog.png` });
