@@ -3062,6 +3062,23 @@ test('NFL team tab: a healthy player stuck on IR gets a red banner, and swapping
   const healthy = mine.players.find((id) => !mine.starters.includes(id) && !all[id]?.injury_status && all[id]?.status === 'Active');
   assert.ok(healthy, 'a healthy bench player to put on IR');
   sleeper.nflReserve[NFL_LEAGUE] = { [mine.roster_id]: [healthy] };
+  // The way out needs an IR-eligible bench player to trade places with him, which the live
+  // roster can't be counted on for: the mock's projections report one bench player as on IR
+  // (a status every league allows there), with a row of his own if the week has none for him.
+  const hurt = mine.players.find((id) => id !== healthy && !mine.starters.includes(id) && !(mine.taxi || []).includes(id));
+  assert.ok(hurt, 'a bench player to report hurt');
+  const projections = /api\.sleeper\.app\/projections\/nfl\/\d+\/\d+/;
+  await context.route(projections, async (route) => {
+    const res = await route.fetch();
+    const rows = (await res.json()).map((r) => (String(r.player_id) === hurt ? { ...r, player: { ...r.player, injury_status: 'IR' } } : r));
+    if (!rows.some((r) => String(r.player_id) === hurt)) {
+      const p = all[hurt];
+      rows.push({ player_id: hurt, team: p.team, player: { first_name: p.first_name, last_name: p.last_name, position: p.position, fantasy_positions: p.fantasy_positions, team: p.team, injury_status: 'IR' }, stats: {} });
+    }
+    return route.fulfill({ response: res, json: rows });
+  });
+  // Week 8's games are all still to come, so no player is locked in his spot.
+  sleeper.beforeTipoff = true;
   await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
   documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: 8, token: true });
   try {
@@ -3093,6 +3110,8 @@ test('NFL team tab: a healthy player stuck on IR gets a red banner, and swapping
     await page.screenshot({ path: `${OUT}nfl-ir-blocked-done.png` });
   } finally {
     delete sleeper.nflReserve[NFL_LEAGUE];
+    sleeper.beforeTipoff = false;
+    await context.unroute(projections);
     await context.unroute('https://api.sleeper.app/v1/state/nfl');
     sleeper.me = null;
     documentBody = LOGGED_OUT;
