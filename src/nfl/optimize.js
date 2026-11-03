@@ -2,10 +2,12 @@
 // TRADE buttons on its Team tab, and the dialog (optimize-view.js draws it), which
 // the compact Team tab's toolbar opens too. It saves through Sleeper's own
 // Team component (page-hook.js reads and writes the lineup).
-//   ctx: { lineup(full), nflSave(detail), notify(text) }; notify shows a save
-//   notice where the user is (the compact tab) and says whether it did, else
-//   the dialog's own layer shows it.
-(globalThis.SNP ||= {}).nflOptimize = ({ lineup, nflSave, notify }) => {
+//   ctx: { lineup(full), nflSave(detail), notify(text), saved(lineup, starters) };
+//   notify shows a save notice where the user is (the compact tab) and says
+//   whether it did, else the dialog's own layer shows it; saved tells the
+//   compact tab what a save wrote. A lineup for a week ahead of Sleeper's
+//   component (`ahead`, with `round` that week) comes with its points (`proj`).
+(globalThis.SNP ||= {}).nflOptimize = ({ lineup, nflSave, notify, saved = null }) => {
   const { model, scoring, nflOptimizeView, ui, shared } = globalThis.SNP;
   const BUTTON_ID = 'snp-optimize';
   const state = { modal: null, notice: null };
@@ -17,9 +19,12 @@
   // Sleeper's projections, scored with the league's settings exactly as its
   // Team tab shows them, and the best lineup from them.
   function plan(l) {
-    const proj = Object.fromEntries(Object.entries(l.projections).map(([id, p]) => [id, scoring.scoreStats(l.scoring || {}, p.stats)]));
+    const proj = l.proj ?? Object.fromEntries(Object.entries(l.projections).map(([id, p]) => [id, scoring.scoreStats(l.scoring || {}, p.stats)]));
     return { plan: model.bestNflLineup({ ...l, proj }), proj };
   }
+
+  // " for week 10" on a week ahead's notices, so they say which week they set.
+  const forWeek = (l) => (l.ahead ? ` for week ${l.round}` : '');
 
   function render() {
     if (destroyed || !layer.styled) return;
@@ -80,6 +85,7 @@
     if (destroyed) return;
     m.saving = false;
     m.busy = null;
+    if (result.ok) saved?.(l, starters);
     if (!result.ok) {
       m.errors = [result.error];
     } else if (stay) {
@@ -97,7 +103,7 @@
 
   function apply() {
     const f = fresh();
-    if (f) save(f.m, f.l, f.next.plan.starters, `Saved: ${movedText(f.l, f.next.plan.changes)}`, 'all', false);
+    if (f) save(f.m, f.l, f.next.plan.starters, `Saved${forWeek(f.l)}: ${movedText(f.l, f.next.plan.changes)}`, 'all', false);
   }
 
   // One slot's change (and any slot tied to it); the dialog stays open.
@@ -107,7 +113,7 @@
     const { starters, slots } = model.applySlot(f.l.starters, f.next.plan.starters, i);
     if (!slots.length) return;
     const ids = new Set(slots.flatMap((k) => [f.l.starters[k], f.next.plan.starters[k]]));
-    save(f.m, f.l, starters, `Saved: ${movedText(f.l, f.next.plan.changes.filter((c) => ids.has(c.id)))}`, `row:${i}`, true);
+    save(f.m, f.l, starters, `Saved${forWeek(f.l)}: ${movedText(f.l, f.next.plan.changes.filter((c) => ids.has(c.id)))}`, `row:${i}`, true);
   }
 
   // The OPTIMIZE button, first in the Team tab's header actions while the lineup is yours to edit.
@@ -118,7 +124,8 @@
     if (!actions || !lineup(false)?.editable) return button?.remove();
     const full = lineup(true);
     const blocked = full?.irBlocked || [];
-    const tip = blocked.length ? ui.irBlockTip(blocked.map((id) => full.reserve[id].name).join(', ')) : 'Propose the best starting lineup for this week';
+    const tip = blocked.length ? ui.irBlockTip(blocked.map((id) => full.reserve[id].name).join(', '))
+      : `Propose the best starting lineup for ${full?.ahead ? `week ${full.round}` : 'this week'}`;
     const el = button || Object.assign(document.createElement('div'), {
       id: BUTTON_ID,
       className: 'btn-container space',

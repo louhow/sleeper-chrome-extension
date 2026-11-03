@@ -289,6 +289,10 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
 - Matchup: a row is the player and their points (a finished game's in its score color as text, not a chip), with the game under them in muted text as on Sleeper's own tab ("Final L 21-35 vs LAR", the clock and score while it's on, or kickoff) and the box score below it.
 - Sleeper's own tab is hidden as soon as the league is known to be NFL, and ours stays blank until its first load is in, as on the NBA tabs, so nothing shifts.
 - Your own lineup, for the week Sleeper's Team tab shows: tap a slot badge, then one of the highlighted players. Players whose game has kicked off stay put, as Sleeper locks them. Saves go through Sleeper's own Team component (`updateMatchupLeg`), as Optimize's do.
+- Weeks ahead: the week picker goes past the week Sleeper's Team tab is on, and your lineup for a week ahead is yours to set there too, as on Sleeper's mobile app, once that week's legs have loaded (logged in).
+  The picker marks it "Upcoming", the Starters hint names the week and a save says so ("Saved for week 10: …").
+  It saves through the same Sleeper action, at that week's round (page-hook takes any round at or past the one Sleeper's tab shows). IR stays on the week that's on.
+  Optimize lineup works on that week from the panel's own data (its projections, scored with the league's settings, and its games) instead of Sleeper's component, and the dialog says "Week 10 · upcoming"; the OPTIMIZE button in Sleeper's header follows the week the compact tab shows.
 - AutoSub: tap a starter's badge and a "Set an AutoSub for <name> · 1/1 avail" button appears under the Starters header (only when a bench player can take the spot).
   It lights the eligible bench players; tap one to save.
   A chip on the starter ("AutoSub J. Price ✕") takes it off, and the sub's row says who they cover.

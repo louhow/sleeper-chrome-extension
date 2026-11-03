@@ -16,18 +16,25 @@
   const nflSave = (detail) => bridge.call('snp:nfl-lineup-save', { leagueId, ...detail });
   // The tab's handlers go first, so an Escape that closes the dialog doesn't also cancel a swap under it.
   const chopped = model.isChopped(league);
+  let optimizer = null;
   const panel = nflPanel({
     leagueId, api, league, info, lineup, nflSave, openDialog: () => optimizer.open(), dialogOpen: () => optimizer.isOpen(),
-    livePages: chopped ? ['league'] : [], onUpdate: () => { (chop ?? standings).refresh(); leagueCards.refresh(); },
+    livePages: chopped ? ['league'] : [],
+    // The OPTIMIZE button in Sleeper's header follows the week the compact tab shows.
+    onUpdate: () => { (chop ?? standings).refresh(); leagueCards.refresh(); optimizer?.attachButton(page); },
   });
   const chop = chopped ? nflChop({ info, panel }) : null;
   const standings = chopped ? null : nflStandings({ info, panel });
   if (chopped) nav?.feed(leagueId, () => (info.currentWeek == null ? null : panel.weekView(info.currentWeek)));
+  // The compact Team tab on a week ahead of the one Sleeper's component edits: that week's lineup, from the panel.
   const optimizeLineup = (full) => {
-    const l = lineup(full);
+    const l = panel.aheadLineup() ?? lineup(full);
     return l?.reserve ? { ...l, irBlocked: model.illegalReserve(Object.keys(l.reserve), l.reserve, league.settings) } : l;
   };
-  const optimizer = nflOptimize({ lineup: optimizeLineup, nflSave, notify: (text) => panel.notify(text) });
+  optimizer = nflOptimize({
+    lineup: optimizeLineup, nflSave, notify: (text) => panel.notify(text),
+    saved: (l, starters) => panel.applySaved(l.rosterId, l.round, starters),
+  });
   const leagueCards = nflLeague(league, { weekView: panel.weekView, currentWeek: () => info.currentWeek, openTeam: panel.openTeam, rosterOf: panel.rosterOf, myRosterId: panel.myRosterId });
   const playersTab = nflPlayers({ api, league, info });
   let page = initialPage;

@@ -266,7 +266,7 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
     const next = model.applyMove(state.swap, ref, ml);
     const moves = model.describeMove(ml, next);
     state.swap = null;
-    saveMove(l, next, `Saved: ${shared.movedText(moves, (id) => ui.playerName(state.players, id))}`);
+    saveMove(l, next, `Saved${ui.forWeek(state)}: ${shared.movedText(moves, (id) => ui.playerName(state.players, id))}`);
   }
 
   // Saves a move's starters and IR. As in Sleeper's apps, no save ever has a player both
@@ -411,6 +411,41 @@ update_matchup_leg(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(r
     }
   }
 
+  // A lineup Optimize saved for the week shown shows at once too.
+  function applySaved(rosterId, round, starters) {
+    if (round !== state.week) return;
+    setStarters(rosterId, starters);
+    schedule();
+  }
+
+  // Your lineup for a week ahead of the one Sleeper's Team component edits, in
+  // the shape Optimize reads off that component (page-hook's nflLineup), built
+  // from the panel's own week data: null unless the compact Team tab shows such a
+  // week and it's yours to edit. Its projections are the week's, already scored.
+  function aheadLineup() {
+    if (!shown() || state.page !== 'team' || !state.ready) return null;
+    const l = nflPanelView.lineup(state);
+    if (!l?.editable || !l.ahead) return null;
+    const week = state.weeks[state.week];
+    const starters = l.starters.map((id) => id || '0');
+    const ids = [...starters, ...l.bench].filter(ui.real);
+    const of = (list) => Object.fromEntries(list.filter(ui.real).map((id) => [id, ui.playerOf(state.players, id)]));
+    // Who has kicked off (no one, a week ahead, unless its first game is on), and each player's opponent.
+    const ml = nflPanelView.moveLineup(state, l);
+    const played = Object.fromEntries(ids.filter((id) => ml.lockedRefs.has(starters.includes(id) ? `s:${starters.indexOf(id)}` : `b:${id}`)).map((id) => [id, true]));
+    const projections = Object.fromEntries(ids.map((id) => {
+      const team = week.teamOf[id] ?? state.players[id]?.team;
+      const g = team && week.games[team];
+      return [id, { stats: null, opponent: g ? (g.home === team ? g.away : g.home) : null }];
+    }));
+    return {
+      leagueId, rosterId: l.roster.roster_id, round: state.week, editable: true, ahead: true,
+      slots: l.slots, starters, bench: l.bench, players: of(ids), reserve: of(l.reserve), played, projections,
+      scoring: league.scoring_settings || {},
+      proj: Object.fromEntries(ids.map((id) => [id, week.proj[id] ?? 0])),
+    };
+  }
+
   root.addEventListener('click', (e) => {
     // The team picker's menu closes on any click outside it.
     if (state.rosterMenu && !e.target.closest('.team-pick')) state.rosterMenu = false;
@@ -520,5 +555,5 @@ update_matchup_leg(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(r
   }
   const pendingWeeks = new Set();
 
-  return { load: () => load().catch(fail), fail, attach, show, notify, refresh: schedule, destroy, weekView, openTeam, rosterOf, myRosterId };
+  return { load: () => load().catch(fail), fail, attach, show, notify, refresh: schedule, destroy, weekView, openTeam, rosterOf, myRosterId, aheadLineup, applySaved };
 };

@@ -2984,6 +2984,91 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
   documentBody = LOGGED_OUT;
 });
 
+test('NFL team tab, logged in: a week ahead of the one Sleeper edits is yours to set and to Optimize, saved to that week', async () => {
+  const live = await (await fetch('https://api.sleeper.app/v1/state/nfl')).json();
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
+  const me = users.find((u) => u.display_name === 'louhow');
+  const mine = rosters.find((r) => r.owner_id === me.user_id);
+  sleeper.me = me.user_id;
+  sleeper.nflLegs = true;
+  sleeper.nflSubs = null;
+  const next = live.week + 1;
+  // Sleeper's Team tab is on the week that's on; next week's games are all still to come.
+  sleeper.beforeTipoff = true;
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: live.season, season_type: 'regular', week: live.week, display_week: live.week, leg: live.week } }));
+  // A bench player of yours projected a monster game next week, so Optimize must start him.
+  const bench = mine.players.filter((id) => !mine.starters.includes(id) && !(mine.taxi || []).includes(id));
+  let star = null;
+  const projections = new RegExp(`api\\.sleeper\\.app/projections/nfl/${live.season}/${next}\\b`);
+  await context.route(projections, async (route) => {
+    const res = await route.fetch();
+    const rows = await res.json();
+    star ??= bench.find((id) => rows.some((r) => String(r.player_id) === id && !['K', 'DEF'].includes(r.player?.position)));
+    return route.fulfill({ response: res, json: rows.map((r) => (String(r.player_id) === star
+      ? { ...r, player: { ...r.player, injury_status: null }, stats: { pass_yd: 1000, pass_td: 20, rush_yd: 1000, rush_td: 20, rec: 50, rec_yd: 1000, rec_td: 20 } } : r)) });
+  });
+  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, round: live.week, token: true });
+  try {
+    await page.goto(NFL_TEAM_URL);
+    await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+    const myName = (me.metadata?.team_name || me.display_name).trim();
+    if (!(await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: myName }).count())) await page.locator(nflPanel('.my-team')).click();
+    await page.locator(nflPanel('.team-card .team-name')).filter({ hasText: myName }).waitFor();
+    // Forward a week: marked upcoming, and yours to set; IR is not.
+    await page.locator(nflPanel('.week-nav [data-action="next"]')).click();
+    await page.locator(nflPanel('.week-label .ahead')).waitFor({ timeout: 30000 });
+    assert.equal(await page.locator(nflPanel('.week-label b')).textContent(), `Week ${next}`);
+    await page.locator(nflPanel('button.slot')).first().waitFor({ timeout: 30000 });
+    assert.ok(star, 'a bench player with a projection next week');
+    assert.equal(await page.locator(nflPanel('.rhead .hint')).first().textContent(), `Tap a position to set your lineup for week ${next}`);
+    assert.equal(await page.locator(nflPanel('[data-spot^="r:"], [data-spot^="re:"]')).count(), 0, 'IR stays on the week that is on');
+    await page.screenshot({ path: `${OUT}nfl-team-ahead.png` });
+    // A swap saves through Sleeper's own action, at next week's round, and says so.
+    await page.locator(nflPanel('.card.nfl button.slot[data-spot^="s:"]')).first().click();
+    await page.locator(nflPanel('.card.nfl.target')).first().waitFor();
+    const before = await page.evaluate(() => window.__nflSaves.length);
+    let target = page.locator(nflPanel(`.card.nfl.target button.slot:not([data-spot="b:${star}"])`));
+    if (!(await target.count())) target = page.locator(nflPanel('.card.nfl.target button.slot'));
+    await target.first().click();
+    await page.locator(nflPanel('.notice.ok')).waitFor({ timeout: 30000 });
+    assert.match(await page.locator(nflPanel('.notice.ok')).textContent(), new RegExp(`^Saved for week ${next}: `));
+    const saves = await page.evaluate(() => window.__nflSaves);
+    assert.equal(saves.length, before + 1);
+    assert.deepEqual(saves.at(-1).slice(0, 4), [NFL_LEAGUE, mine.roster_id, next, next], "through Sleeper's own updateMatchupLeg, at that round");
+    await page.locator(nflPanel('.notice.ok')).waitFor({ state: 'detached', timeout: 5000 });
+    // Optimize plans that week from the panel's own projections and saves to it; both buttons say which week.
+    const optimize = page.locator(nflPanel('.tools button.optimize'));
+    assert.equal(await optimize.getAttribute('title'), `Propose the best starting lineup for week ${next}`);
+    assert.equal(await page.locator('#snp-optimize').getAttribute('title'), `Propose the best starting lineup for week ${next}`, "Sleeper's header button too");
+    await optimize.click();
+    await page.locator(nflDialog('.os-row')).first().waitFor();
+    assert.equal(await page.locator(nflDialog('.dialog-head .sub')).textContent(), `Week ${next} · upcoming`);
+    const starRow = page.locator(nflDialog('.os-row.swap')).filter({ has: page.locator(`.os-p.in [data-player="${star}"]`) });
+    assert.equal(await starRow.count(), 1, `the monster projection (${star}) comes in`);
+    assert.match(await starRow.locator('.os-p.in .sub').first().textContent(), /^From bench · (Opp \w+|No game this week)$/);
+    await page.screenshot({ path: `${OUT}nfl-optimize-ahead.png` });
+    await page.locator(nflDialog('[data-action="apply-lineup"]')).click();
+    await page.locator(nflDialog('.modal')).waitFor({ state: 'detached' });
+    await page.locator(nflPanel('.notice.ok')).waitFor({ timeout: 30000 });
+    assert.match(await page.locator(nflPanel('.notice.ok')).textContent(), new RegExp(`^Saved for week ${next}: `));
+    const applied = (await page.evaluate(() => window.__nflSaves)).at(-1);
+    assert.deepEqual(applied.slice(0, 4), [NFL_LEAGUE, mine.roster_id, next, next]);
+    assert.ok(applied[4].includes(star), 'the star starts');
+    // The tab shows the saved lineup at once.
+    const starCard = page.locator(nflPanel('.card.nfl')).filter({ has: page.locator(`.line1 [data-player="${star}"]`) }).first();
+    assert.doesNotMatch(await starCard.locator('.slot').first().getAttribute('class'), /\bbn\b/, 'shown starting at once');
+  } finally {
+    await context.unroute(projections);
+    await context.unroute('https://api.sleeper.app/v1/state/nfl');
+    sleeper.beforeTipoff = false;
+    sleeper.nflLegs = false;
+    sleeper.nflSubs = null;
+    sleeper.me = null;
+    documentBody = LOGGED_OUT;
+  }
+});
+
 test('NFL team tab, logged in: an AutoSub is set from a picked starter and taken off from its chip', async () => {
   const live = await (await fetch('https://api.sleeper.app/v1/state/nfl')).json();
   const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();

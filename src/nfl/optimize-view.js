@@ -31,6 +31,7 @@
       `<b>${esc(playerName(lineup.players, c.id))}</b> is ${esc(lineup.players[c.id].injury)}`).join(', ')}. Check the news before kickoff.</p></div>` : '';
     return optimizeDialog(m, {
       week: lineup.round,
+      ahead: Boolean(lineup.ahead),
       how: HOW,
       summary: planSummary(plan, 'Lineup projection', 'Starters\' projected points'),
       notes: watchNote,

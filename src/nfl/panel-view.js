@@ -39,12 +39,16 @@
     if (!parts) return null;
     const mine = owns(s, parts.roster);
     const settings = s.league.settings || {};
-    const editable = mine && s.editableWeek === s.week;
+    // Yours to edit for the week Sleeper's Team component edits (its round), and for any
+    // week past it once that week's legs are in: a week ahead saves to its own leg,
+    // through Sleeper's own save action at that round, as on Sleeper's mobile app.
+    const ahead = s.editableWeek != null && s.week > s.editableWeek;
+    const editable = mine && s.editableWeek != null && (s.week === s.editableWeek || (ahead && Array.isArray(parts.week.legs)));
     // Active roster = everyone not on IR or taxi; it holds one player per roster position.
     const active = (parts.roster.players || []).length - parts.reserve.length - parts.taxi.length;
-    return { ...parts, mine, players: s.players, editable,
+    return { ...parts, mine, players: s.players, editable, ahead,
       // IR belongs to the roster, so like Sleeper it's edited from the week that's on.
-      reserveEditable: editable && (settings.reserve_slots || 0) > 0,
+      reserveEditable: editable && !ahead && (settings.reserve_slots || 0) > 0,
       reserveRoom: Math.max(0, (settings.reserve_slots || 0) - parts.reserve.length),
       benchRoom: Math.max(0, (s.league.roster_positions || []).length - active),
       irBlocked: globalThis.SNP.model.illegalReserve(parts.reserve, s.players, settings) };

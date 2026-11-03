@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSnp } from './load.js';
-import { state } from './nfl-fixture.js';
+import { state, week } from './nfl-fixture.js';
 
 const { nflPanelView, nflOptimizeView, nflLeagueView } = loadSnp();
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
@@ -189,4 +189,20 @@ test('optimize lineup is on your own Matchup tab, which opens the Team tab for i
   assert.doesNotMatch(render({ me: 'u1', page: 'matchup', tab: 'api' }), /data-action="optimize"/);
   assert.doesNotMatch(render({ page: 'matchup' }), /data-action="optimize"/, 'logged out');
   assert.doesNotMatch(render({ me: 'u3', page: 'matchup' }), /data-action="optimize"/, 'not in this matchup');
+});
+
+test('a week ahead of the one Sleeper edits is yours to set once its legs are in; IR stays on the week that is on', () => {
+  const ahead = (legs, extra = {}) => state({ me: 'u1', optimizable: true, week: 8, currentWeek: 7, editableWeek: 7, weeks: { 8: { ...week(), legs } }, ...extra });
+  const html = nflPanelView.render(ahead([]), []);
+  assert.match(html, /data-spot="s:2"/, 'Aiyuk has yet to play');
+  assert.doesNotMatch(html, /data-spot="s:0"/, 'Mahomes has kicked off');
+  assert.doesNotMatch(html, /data-spot="re?:/, 'no IR moves or open IR spots');
+  assert.match(text(html), /Tap a position to set your lineup for week 8/);
+  assert.match(html, /<b>Week 8<\/b><span>[^<]*<i class="ahead"[^>]*>Upcoming<\/i>/);
+  assert.match(html, /title="Propose the best starting lineup for week 8"/);
+  assert.doesNotMatch(nflPanelView.render(ahead(null), []), /data-spot=/, 'legs unanswered (logged out or refused): read-only');
+  assert.doesNotMatch(nflPanelView.render(ahead([], { editableWeek: 9 }), []), /data-spot=/, 'a week before the one Sleeper edits is over');
+  assert.doesNotMatch(nflPanelView.render(ahead([], { editableWeek: null, optimizable: false }), []), /data-spot=/, 'not yours to edit at all');
+  const l = nflPanelView.lineup(ahead([]));
+  assert.deepEqual([l.editable, l.ahead, l.reserveEditable], [true, true, false]);
 });

@@ -1543,7 +1543,9 @@
     try {
       const p = teamFiber()?.memoizedProps;
       const rid = p && (p.roster?.roster_id ?? p.rosterId);
-      if (!p || String(p.leagueId) !== leagueId || rid !== rosterId || p.round !== round) {
+      // The round may be ahead of the one Sleeper's tab shows (the extension's own
+      // tab goes forward, and Sleeper's action takes any round); one behind it is over.
+      if (!p || String(p.leagueId) !== leagueId || rid !== rosterId || !(round >= p.round)) {
         throw new Error('The Team tab changed; open Optimize again');
       }
       const res = lineupOnLeg(p.league)
