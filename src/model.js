@@ -640,6 +640,24 @@
       (i === projections.length - 1 ? mean : expectedMax(mean, GAME_SPREAD * mean, after)), 0);
   }
 
+  // The Optimize dialog's form chart: a player's recent game scores in `bins`
+  // equal-width buckets from their lowest to highest (the marks included, so a
+  // score outside the range still has a bar to sit in). Each mark is a score
+  // (or null); its bucket is returned in `at`, in the same order.
+  function formBars(scores, marks = [], bins = 10) {
+    const known = marks.filter((x) => x != null);
+    const all = [...scores, ...known];
+    if (!scores.length) return null;
+    let lo = Math.min(...all);
+    let hi = Math.max(...all);
+    if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
+    const step = (hi - lo) / bins;
+    const bucket = (x) => Math.min(bins - 1, Math.max(0, Math.floor((x - lo) / step)));
+    const counts = new Array(bins).fill(0);
+    for (const x of scores) counts[bucket(x)]++;
+    return { counts, at: marks.map((x) => (x == null ? null : bucket(x))), mean: scores.reduce((a, b) => a + b, 0) / scores.length, n: scores.length, lo, hi };
+  }
+
   function outlook(days, lockValue, starting, now, started) {
     const st = lockState(days, lockValue, now, started);
     const left = st.games.filter((d) => d.game.status === 'pre_game' && !gameLive(d.game, now));
@@ -918,6 +936,7 @@
       today: o.left.find((d) => d.date === date)?.proj ?? null,
       perGame: o.perGame,
       gamesLeft: o.gamesLeft,
+      open: o.open,
       fixed: o.fixed,
       locked: o.locked,
     }]));
@@ -1329,7 +1348,7 @@
     taxiEligible, taxiOpen, reserveEligible, illegalReserve,
     lockedGameId, lockState, lockCheck, scoresAtStake, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
-    openValue, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
+    openValue, formBars, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
     isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, chopLeagueAvg, graveyard,
   };

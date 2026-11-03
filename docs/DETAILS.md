@@ -71,6 +71,11 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
   - A finished game worth locking shows its score, the open value and when the window closes, with a Lock button.
   - A lock is final and pins the player to their slot, so the one being locked takes the most specific slot they fit (SF before F, PG before G) and whoever was there moves to the flexible slot they leave; the row of the player coming in says "Then locks", its Lock button saves the move and the lock together, and so does Apply all.
   - A slot that stays is dimmed and says why: "No change", "Locked" (with the locked score), "Playing" or "Empty".
+- Numbers per row (NBA), for the player in the Starting column: **Lock** (the finished score you could lock), the next day's projection (**Fri** and so on), **Open** (what leaving the slot open is worth over the games left) and **Form**.
+  Form is a bar chart of the player's last 15 games' fantasy points in ten score buckets (taller is more games), with their average beside it; the lock score's bucket is gold, and a tick under a bar marks the day's projection.
+  It reads each starter's game log (`/stats/nba/player/<id>?grouping=week`, the previous season too when there are fewer than 15 games) after the dialog opens, and draws every chart at once when the last one is in.
+  Only the players the plan starts are read; the logs are kept for the session.
+  Under 1000px wide, Lock and Open drop out (the sub lines carry both).
 - Buttons have two states each, so what's done reads apart from what's left: Apply change (teal trim, solid under the pointer) and a solid "No change"; Lock (gold trim with an open padlock, a shut one under the pointer) and a solid gold "Locked". Apply change and Lock sit side by side, and the dialog takes the height of the window, its rows tightening before the list scrolls.
 - Applying one row saves just that slot and keeps the dialog open on the plan from the new lineup, with a note saying what saved.
   When moves tie slots together (the player coming in leaves another starting slot, or the one going out takes one), they apply together; the button's tooltip says which slots ("Also changes F").

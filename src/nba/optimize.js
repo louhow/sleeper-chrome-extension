@@ -2,11 +2,40 @@
 // for the shown week, worked out again right before every save, saved all at
 // once or a row at a time, with the finished games worth locking in.
 //   ctx: { state, schedule, modalSave, saveStarters, saveLeg }
-(globalThis.SNP ||= {}).nbaOptimize = ({ state, schedule, modalSave, saveStarters, saveLeg }) => {
+(globalThis.SNP ||= {}).nbaOptimize = ({ state, api, schedule, modalSave, saveStarters, saveLeg }) => {
   const { model, ui, shared } = globalThis.SNP;
   const shortOf = (id) => ui.shortName(ui.playerOf(state.players, id));
   // Names a few moves; past that, just the count, so the notice stays one line.
   const movedText = (changes) => shared.movedText(changes, shortOf, 3);
+
+  // The Form column's data: each starting player's last games' fantasy points
+  // (state.form[id], oldest first; null when the log wouldn't load), read after
+  // the dialog is up and kept for the session. Only the players the plan starts.
+  const FORM_GAMES = 15;
+  const loading = new Set();
+  async function seasonScores(id, season) {
+    const data = await api.get(`/stats/nba/player/${encodeURIComponent(id)}?season_type=regular&season=${season}&grouping=week`);
+    return Object.values(data || {}).flat()
+      .filter((r) => r?.stats && Object.keys(r.stats).length && (r.stats.gp ?? 1) > 0)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .map((r) => globalThis.SNP.scoring.scoreStats(state.league.scoring_settings || {}, r.stats));
+  }
+  function loadForm() {
+    const m = state.modal;
+    if (m?.kind !== 'optimize') return;
+    const season = Number(state.league?.season);
+    for (const id of m.plan.starters) {
+      if (!ui.real(id) || id in state.form || loading.has(id)) continue;
+      loading.add(id);
+      seasonScores(id, season)
+        .then(async (now) => (now.length >= FORM_GAMES ? now : [...await seasonScores(id, season - 1).catch(() => []), ...now]))
+        .then((list) => { state.form[id] = list.slice(-FORM_GAMES); }, () => { state.form[id] = null; })
+        .finally(() => {
+          loading.delete(id);
+          schedule();
+        });
+    }
+  }
 
   // Proposes the best lineup for the shown week; nothing saves until it's applied.
   function open() {
@@ -16,6 +45,7 @@
     state.lockConfirm = null;
     state.notice = null;
     state.modal = { kind: 'optimize', plan: model.bestLineup(lineup, Date.now()), noLock: [], ack: false, errors: [], saving: false, busy: null, done: null };
+    loadForm();
     schedule();
   }
 
@@ -27,6 +57,7 @@
     m.noLock = on ? m.noLock.filter((id) => id !== playerId) : [...new Set([...m.noLock, playerId])];
     m.plan = model.bestLineup(lineup, Date.now(), { noLock: m.noLock });
     m.ack = false;
+    loadForm();
     schedule();
   }
 
@@ -46,6 +77,7 @@
     const plan = model.bestLineup(lineup, Date.now(), { noLock: m.noLock });
     if (!model.samePlan(plan, m.plan)) {
       m.plan = plan;
+      loadForm();
       m.ack = false;
       m.errors = ['Games have tipped off since this opened. Review the updated changes.'];
       schedule();
@@ -59,6 +91,7 @@
     m.plan = model.bestLineup(ui.lineup(state), Date.now(), { noLock: m.noLock });
     m.ack = false;
     m.done = okText;
+    loadForm();
   }
 
   // Locks one game now, on the lineup as it stands; the dialog stays open.

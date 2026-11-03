@@ -1612,7 +1612,9 @@ button.lk.cancel {
   font-size: 11px;
 }
 .dp-pts,
-.dp-avg {
+.dp-avg,
+.dp-lock,
+.dp-open {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -1872,6 +1874,9 @@ button.optimize:hover:not(:disabled) {
   width: min(900px, 100%);
   max-height: calc(100vh - 48px);
 }
+.dialog:has(.os-row.nba) {
+  width: min(1120px, 100%);
+}
 /* The rows flex into the height there is: they tighten before the list scrolls. */
 .dialog:has(.os-row) .dialog-body {
   display: flex;
@@ -1898,6 +1903,67 @@ button.optimize:hover:not(:disabled) {
   padding: clamp(2px, 0.6vh, 5px) 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
+}
+/* NBA: lock, day's projection, open value and form (a bar chart of recent scores) before the buttons. */
+.os-head.nba,
+.os-row.nba {
+  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 48px 46px 48px 148px 224px;
+}
+.os-row .dp-lock,
+.os-row .dp-open {
+  color: var(--muted);
+}
+.os-row .dp-lock .score-chip {
+  padding-inline: 4px;
+}
+.os-head .dp-form {
+  text-align: left;
+}
+.dp-form {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.os-row .dp-form {
+  align-items: center;
+  color: var(--muted);
+}
+.form-chart {
+  flex: none;
+}
+.form-chart .bar {
+  fill: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.form-chart .bar.lock {
+  fill: var(--lock);
+}
+.form-chart .tick {
+  fill: var(--text);
+  opacity: 0.55;
+}
+.form-avg {
+  min-width: 36px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.form-wait {
+  width: 98px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--cell);
+}
+/* Not enough room for the lock and open columns: the sub lines already say both. */
+@media (max-width: 1000px) {
+  .os-head.nba,
+  .os-row.nba {
+    grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 46px 148px 224px;
+  }
+  .os-head.nba > .dp-lock,
+  .os-head.nba > .dp-open,
+  .os-row.nba > .dp-lock,
+  .os-row.nba > .dp-open {
+    display: none;
+  }
 }
 /* NFL: one number (this week's projection). */
 .os-head.nfl,

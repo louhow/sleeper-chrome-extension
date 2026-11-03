@@ -72,6 +72,7 @@
     sessionExpired: false,
     claims: null, // the logged-in owner's pending waiver claims
     cards: {}, // player card data by player id, kept for the session
+    form: {}, // Optimize lineup's Form column: player id -> last games' fantasy points (null: couldn't load)
     tiers: null, // score colors from the league's own games (see model.scoreTiers)
     // { kind: 'bid', playerId, status, bid, drops, errors, saving } | { kind: 'claims', errors, saving } | { kind: 'player', playerId, season }
     // | { kind: 'optimize', plan, noLock, ack, errors, saving, busy } (noLock: locks kept open; busy: 'all', 'row:<slot>' or 'lock:<player>' while it saves; done: what the last row saved); a player card can open over it (`back`).

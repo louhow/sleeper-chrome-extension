@@ -3,7 +3,7 @@
 // finished games worth locking in, and any score benching would throw away.
 // Nothing saves until the owner applies a row or all of them. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nbaOptimizeView = (() => {
-  const { playerDays, scoreTier, applySlot } = globalThis.SNP.model;
+  const { playerDays, scoreTier, applySlot, formBars } = globalThis.SNP.model;
   const { esc, f2, headshot, injuryTag, teamTag, slotBadge, weekday, gameTime, gameLabel, nextGame, lockIcon, shortName, real, playerOf, playerName,
     optimizeDialog, planSummary, applyAll, applyChange, slotPlayer, tierClass, weekAhead } = globalThis.SNP.ui;
 
@@ -44,8 +44,11 @@
     const on = locks.filter((k) => k.on);
     const actionable = plan.changes.length > 0 || on.length > 0;
     const rows = plan.slots.length ? `
-        <div class="os-head"><span>Slot</span><span>Starting</span><span>Replaces</span>
-          <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span><span class="dp-avg" title="Projected points per game left this week">Pts/G</span><span></span></div>
+        <div class="os-head nba"><span>Slot</span><span>Starting</span><span>Replaces</span>
+          <span class="dp-lock" title="A finished game's score you could lock in">Lock</span>
+          <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span>
+          <span class="dp-open" title="What leaving the slot open is worth over the games left this week">Open</span>
+          <span class="dp-form" title="Their last games' fantasy points, and the average. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span><span></span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
     const lockText = `Lock ${on.length === 1 ? 'in 1 game' : `in ${on.length} games`}`;
     const apply = on.length && !plan.changes.length ? lockText
@@ -93,11 +96,11 @@
       const outWhy = !real(cur) ? '' : ` · ${outToday == null ? `no game ${esc(day(plan))}` : `${esc(day(plan))} ${f2(outToday)}`} · ${f2(plan.info[cur]?.perGame ?? 0)}/g`;
       const outSub = `<span class="sub move">${moveText(plan, cur, 'out')}<span class="why">${outWhy}</span></span>${drops
         ? `<span class="sub drops ${tone}"${change.dropsUnsure ? ' title="If they were starting when it tipped off; the extension didn\'t see your lineup then"' : ''}>${change.dropsUnsure ? 'May drop' : 'Drops'} lock-in ${score(s, drops.actual)} ${esc(gameLabel(drops))}</span>` : ''}`;
-      return `<div class="os-row swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
+      return `<div class="os-row nba swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
         <span class="os-slot">${slotBadge(slot)}</span>
         ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>${nextLock ? `<span class="sub">${lockIcon()}Then locks ${score(s, nextLock.actual)} ${esc(gameLabel(nextLock.game))} · ${openText(s, nextLock)}</span>` : ''}`)}
         ${player(s, cur, 'out', outSub)}
-        ${numbers(plan, next)}
+        ${numbers(s, plan, next, nextLock?.actual)}
         <span class="os-act">
           ${applyChange(m, i, others, { held: risky, title: risky ? BLOCKED : '' })}
           ${plan.lockable && nextLock
@@ -121,10 +124,10 @@
       : notYet ? `${score(s, notYet.actual)} ${esc(gameLabel(notYet.game))} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
       : maybe ? `<span title="Lockable only if they were starting when it tipped off; the extension didn't see your lineup then">${score(s, maybe.actual)} ${esc(gameLabel(maybe.game))} · lockable if started</span> · ${esc(upcoming(s, cur))}`
       : esc(upcoming(s, cur));
-    return `<div class="os-row same${info.fixed === 'locked' ? ' locked' : ''}">
+    return `<div class="os-row nba same${info.fixed === 'locked' ? ' locked' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>
       ${player(s, cur, 'keep', `<span class="sub">${sub}</span>`)}
-      ${numbers(plan, cur)}
+      ${numbers(s, plan, cur, info.fixed === 'locked' ? info.locked?.actual : (notYet || maybe)?.actual)}
       <span class="os-act"><span class="os-status">${status}</span></span>
     </div>`;
   }
@@ -145,10 +148,10 @@
       : `<button class="os-link" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
     const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameLabel(k.game))} · ${openText(s, k)}</span>
       <span class="sub">${k.on ? `Lockable${esc(until)}` : 'Keeping open'} · ${toggle}</span>`;
-    return `<div class="os-row lock${k.on ? '' : ' off'}">
+    return `<div class="os-row nba lock${k.on ? '' : ' off'}">
       <span class="os-slot">${slotBadge(slot)}</span>
       ${player(s, k.id, 'keep', sub)}
-      ${numbers(plan, k.id)}
+      ${numbers(s, plan, k.id, k.actual)}
       <span class="os-act">${k.on
         ? lockButton(`data-op-lock-row="${esc(k.id)}"`, m, busy, `Lock ${f2(k.actual)} (${gameLabel(k.game)}). Locking is final.`)
         : '<span class="os-status">Open</span>'}</span>
@@ -161,12 +164,42 @@
     return slotPlayer(id, p, kind, sub, { photo: headshot(id), tags: `${teamTag(p, { chips: true })}${injuryTag(p)}` });
   }
 
-  // What the player in the slot is projected to score: that day, and per game left.
-  function numbers(plan, id) {
+  // What the player in the slot is worth: the finished score they could lock,
+  // the projection that day, what keeping the slot open is worth and their form.
+  function numbers(s, plan, id, lock) {
     const info = (real(id) && plan.info[id]) || {};
-    if (!real(id)) return '<span class="dp-pts"></span><span class="dp-avg"></span>';
-    if (info.fixed === 'locked') return '<span class="dp-pts">–</span><span class="dp-avg" title="Locked in, so later games don\'t count">–</span>';
-    return `<span class="dp-pts">${pts(info.today)}</span><span class="dp-avg" title="${esc(games(info.gamesLeft ?? 0))} left">${f2(info.perGame ?? 0)}</span>`;
+    if (!real(id)) return '<span class="dp-lock"></span><span class="dp-pts"></span><span class="dp-open"></span><span class="dp-form"></span>';
+    const locked = info.fixed === 'locked';
+    const lockCell = lock != null && lock > 0 ? score(s, lock) : '–';
+    if (locked) return `<span class="dp-lock">${lockCell}</span><span class="dp-pts">–</span><span class="dp-open" title="Locked in, so later games don't count">–</span>${form(s, plan, id, lock)}`;
+    return `<span class="dp-lock">${lockCell}</span><span class="dp-pts">${pts(info.today)}</span>`
+      + `<span class="dp-open" title="${esc(games(info.gamesLeft ?? 0))} left">${info.gamesLeft ? f2(info.open ?? 0) : '–'}</span>${form(s, plan, id, lock)}`;
+  }
+
+  // The Form cell: a bar per score bucket over the player's last games (taller
+  // is more games), the lock score's bucket in the lock color, a tick under
+  // the day's projection, and their average beside it. It fills in once every
+  // starter's log is in, so the column doesn't fill row by row.
+  const BAR = 8;
+  const GAP = 2;
+  const HEIGHT = 24;
+  function form(s, plan, id, lock) {
+    const ids = plan.starters.filter(real);
+    if (!ids.every((x) => x in s.form)) return '<span class="dp-form"><span class="form-wait"></span></span>';
+    const scores = s.form[id];
+    const proj = plan.info[id]?.today;
+    const bars = scores?.length ? formBars(scores, [lock > 0 ? lock : null, proj > 0 ? proj : null]) : null;
+    if (!bars) return '<span class="dp-form"><span class="form-none">–</span></span>';
+    const [lockAt, projAt] = bars.at;
+    const peak = Math.max(...bars.counts);
+    const width = bars.counts.length * (BAR + GAP) - GAP;
+    const rects = bars.counts.map((n, i) => {
+      const h = n ? Math.max(4, Math.round((n / peak) * HEIGHT)) : i === lockAt ? 5 : 2;
+      return `<rect class="${i === lockAt ? 'bar lock' : 'bar'}" x="${i * (BAR + GAP)}" y="${HEIGHT - h}" width="${BAR}" height="${h}" rx="2"/>`;
+    }).join('');
+    const tick = projAt == null ? '' : `<rect class="tick" x="${projAt * (BAR + GAP)}" y="${HEIGHT + 3}" width="${BAR}" height="2" rx="1"/>`;
+    const title = `Last ${bars.n} games: ${f2(bars.lo)} to ${f2(bars.hi)}, average ${f2(bars.mean)}`;
+    return `<span class="dp-form"><svg class="form-chart" viewBox="0 0 ${width} ${HEIGHT + 5}" width="${width}" height="${HEIGHT + 5}" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${rects}${tick}</svg><span class="form-avg">${f2(bars.mean)}</span></span>`;
   }
 
   // Where a player in a changed slot goes to, or comes from.

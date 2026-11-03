@@ -1963,13 +1963,18 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.equal(await lockRow.count(), 1, 'one game worth locking');
   assert.equal(await lockRow.locator('.os-p [data-player]').first().getAttribute('data-player'), locker);
   assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm) · Keep open/);
-  assert.ok(Number(await lockRow.locator('.score-chip.tier-green').textContent()) >= 70, 'the score, in its tier color');
+  assert.ok(Number(await lockRow.locator('.sub .score-chip.tier-green').textContent()) >= 70, 'the score, in its tier color');
   // The live week's projections set the open value, so it's judged against the score, not a fixed number.
-  const locked = Number(await lockRow.locator('.score-chip.tier-green').textContent());
+  const locked = Number(await lockRow.locator('.sub .score-chip.tier-green').textContent());
   assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < locked / 2, 'keeping it open is worth far less');
   assert.equal(await lockRow.locator('[data-op-lock-row]').textContent(), 'Lock');
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
   assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply all');
+  // The Form column waits for every starter's game log, then draws the charts together (the locked score's bar in gold).
+  assert.ok(await page.locator(dialog('.form-wait')).count() > 0, 'form waits for the logs');
+  await page.locator(dialog('.form-chart')).first().waitFor({ timeout: 15000 });
+  assert.equal(await page.locator(dialog('.form-wait')).count(), 0, 'form shows once all starters are in');
+  assert.ok(await lockRow.locator('.form-chart .bar.lock').count() === 1, 'the lock score is marked in the chart');
   // Every slot fits on screen, with no scrolling.
   assert.ok(await page.locator(dialog('.dialog-body')).evaluate((el) => el.scrollHeight <= el.clientHeight), 'no scroll');
   await page.screenshot({ path: `${OUT}optimize-dialog.png` });

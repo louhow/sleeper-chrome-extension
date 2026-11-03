@@ -1062,3 +1062,19 @@ test('standings rows carry PF, PA, Max PF and waiver, and sort by any column wit
   assert.deepEqual(ids('record', -1), [1, 2, 3]);
   assert.deepEqual(ids('rank', -1), [3, 2, 1]);
 });
+
+test('formBars buckets recent scores and places the lock and projection marks', () => {
+  const { formBars } = model;
+  const bars = formBars([10, 12, 20, 30, 30, 30], [30, 18], 4);
+  assert.deepEqual([...bars.counts], [2, 0, 1, 3]);
+  assert.deepEqual([...bars.at], [3, 1]);
+  assert.equal(bars.n, 6);
+  assert.equal(bars.mean, 22);
+  // A mark outside the range stretches it instead of falling off.
+  const wide = formBars([10, 20], [40, null], 4);
+  assert.equal(wide.hi, 40);
+  assert.deepEqual([...wide.at], [3, null]);
+  assert.equal(formBars([], [5]), null);
+  // Identical scores still get a range to sit in.
+  assert.equal(formBars([7, 7, 7], [], 4).counts.reduce((a, b) => a + b), 3);
+});
