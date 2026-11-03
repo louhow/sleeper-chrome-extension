@@ -48,7 +48,7 @@
           <span class="dp-lock" title="A finished game's score you could lock in">Lock</span>
           <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span>
           <span class="dp-open" title="What leaving the slot open is worth over the games left this week">Open</span>
-          <span class="dp-form" title="Their last games' fantasy points, and the average. Hover a bar for its scores. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span><span></span></div>
+          <span class="dp-form" title="Their last games' fantasy points, and the average. Hover a bar for its scores, no wait. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span><span></span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
     const lockText = `Lock ${on.length === 1 ? 'in 1 game' : `in ${on.length} games`}`;
     const apply = on.length && !plan.changes.length ? lockText
@@ -180,8 +180,6 @@
   // is more games), the lock score's bucket in the lock color, a tick under
   // the day's projection, and their average beside it. It fills in once every
   // starter's log is in, so the column doesn't fill row by row.
-  const BAR = 8;
-  const GAP = 2;
   const HEIGHT = 24;
   function form(s, plan, id, lock) {
     const ids = plan.starters.filter(real);
@@ -192,18 +190,14 @@
     if (!bars) return '<span class="dp-form"><span class="form-none">–</span></span>';
     const [lockAt, projAt] = bars.at;
     const peak = Math.max(...bars.counts);
-    const width = bars.counts.length * (BAR + GAP) - GAP;
-    // Each bucket's bar sits in a full-height hit area, so a short bar is easy to hover; its tooltip lists the scores.
-    const rects = bars.counts.map((n, i) => {
+    // Each bucket is a full-height column, so a short bar is easy to hover; its tooltip (CSS, no delay) lists the scores.
+    const cols = bars.counts.map((n, i) => {
       const h = n ? Math.max(4, Math.round((n / peak) * HEIGHT)) : i === lockAt ? 5 : 2;
-      const x = i * (BAR + GAP);
-      const tip = [n ? bars.inBin[i].map(f2).join(', ') : 'No games', i === lockAt ? `Lock ${f2(lock)}` : '', i === projAt ? `${esc(day(plan))} projection ${f2(proj)}` : ''].filter(Boolean).join(' · ');
-      return `<g><title>${esc(tip)}</title><rect class="hit" x="${x - GAP / 2}" y="0" width="${BAR + GAP}" height="${HEIGHT + 5}"/>`
-        + `<rect class="${i === lockAt ? 'bar lock' : 'bar'}" x="${x}" y="${HEIGHT - h}" width="${BAR}" height="${h}" rx="2"/></g>`;
+      const tip = [n ? bars.inBin[i].map(f2).join(', ') : 'No games', i === lockAt ? `Lock ${f2(lock)}` : '', i === projAt ? `${day(plan)} projection ${f2(proj)}` : ''].filter(Boolean).join(' · ');
+      return `<span class="fcol" data-tip="${esc(tip)}"><span class="${i === lockAt ? 'bar lock' : 'bar'}" style="height:${h}px"></span>${i === projAt ? '<span class="tick"></span>' : ''}</span>`;
     }).join('');
-    const tick = projAt == null ? '' : `<rect class="tick" x="${projAt * (BAR + GAP)}" y="${HEIGHT + 3}" width="${BAR}" height="2" rx="1"/>`;
     const title = `Last ${bars.n} games: ${f2(bars.lo)} to ${f2(bars.hi)}, average ${f2(bars.mean)}`;
-    return `<span class="dp-form"><svg class="form-chart" viewBox="0 0 ${width} ${HEIGHT + 5}" width="${width}" height="${HEIGHT + 5}" role="img" aria-label="${esc(title)}">${rects}${tick}</svg><span class="form-avg">${f2(bars.mean)}</span></span>`;
+    return `<span class="dp-form"><span class="form-chart" role="img" aria-label="${esc(title)}">${cols}</span><span class="form-avg">${f2(bars.mean)}</span></span>`;
   }
 
   // Where a player in a changed slot goes to, or comes from.
