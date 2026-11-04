@@ -72,6 +72,7 @@
     sessionExpired: false,
     claims: null, // the logged-in owner's pending waiver claims
     cards: {}, // player card data by player id, kept for the session
+    draftBoards: {}, // a season's finished draft ({ slotToRoster, picks }, null: none yet), for what traded picks became
     form: {}, // Optimize lineup's Form column: player id -> last games' fantasy points (null: couldn't load)
     tiers: null, // score colors from the league's own games (see model.scoreTiers)
     // { kind: 'bid', playerId, status, bid, drops, errors, saving } | { kind: 'claims', errors, saving } | { kind: 'player', playerId, season }
@@ -744,6 +745,8 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     if (waivers.click(e.target, layer.root) || optimizer.click(e.target)) return;
     const player = e.target.closest('[data-player]');
     if (player && state.modal?.kind === 'optimize' && !state.modal.saving) return playerCard.open(player.dataset.player, state.modal);
+    // A player in a card's trade opens their card over this one; closing it comes back here.
+    if (player && state.modal?.kind === 'player') return playerCard.open(player.dataset.player, state.modal);
     const season = e.target.closest('[data-card-season]');
     if (season && state.modal?.kind === 'player') return playerCard.showSeason(Number(season.dataset.cardSeason));
     const action = e.target.closest('[data-action]')?.dataset.action;

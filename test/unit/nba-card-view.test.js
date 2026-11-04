@@ -137,3 +137,25 @@ test('career strip: Exp beside the draft, the pick fading with its age, a contra
   const flagged = { status: 'found', text: 'FA 2027 · Contract year · $33M', main: 'FA 2027', flag: 'Contract year', detail: '$33M', tone: 'expiring' };
   assert.match(html({ contract: flagged }), /<div class="pc-contract" data-tone="expiring">[\s\S]*<b>FA 2027<\/b><em class="pc-flag">Contract year<\/em><\/span><span class="pc-sub"[^>]*>\$33M<\/span>/);
 });
+
+test('a trade in the history lists both sides, each player opens a card, and a pick says what it became', () => {
+  const players = { 1974: { name: 'Deandre Ayton', positions: ['C'] }, 2086: { name: 'Tyler Herro', positions: ['SG'] }, 4881: { name: 'Yaxel Lendeborg', positions: ['PF'] } };
+  const trade = {
+    type: 'trade', status: 'complete', created: 1752514206707, roster_ids: [5, 10], adds: { 1974: 10, 2086: 5 }, drops: { 1974: 5, 2086: 10 },
+    draft_picks: ['5,2026,1,10,5', '10,2026,3,5,10'],
+  };
+  const state = (draftBoards) => ({
+    modal: { kind: 'player', playerId: '1974' }, players, draftBoards,
+    rosters: [{ roster_id: 5, owner_id: 'a' }, { roster_id: 10, owner_id: 'b' }], usersById: { a: { display_name: 'badonkeyds' }, b: { display_name: 'louhow' } },
+    cards: { 1974: { history: [trade] } }, league: { season: '2026' },
+  });
+  const board = { slotToRoster: { 1: 5, 2: 10 }, picks: [{ round: 1, draft_slot: 1, pick_no: 1, player_id: '4881', roster_id: 10 }, { round: 3, draft_slot: 2, pick_no: 4, player_id: null }] };
+  const html = card.render(state({ 2026: board }));
+  assert.match(html, /louhow<\/b> got/);
+  assert.match(html, /data-player="2086">Tyler Herro/);
+  assert.doesNotMatch(html, /data-player="1974"/, 'the card\'s own player is not a link');
+  assert.match(html, /badonkeyds'<\/span> 2026 1st Rd[\s\S]*data-player="4881"[\s\S]*1\.01/);
+  assert.match(html, /2026 3rd Rd[\s\S]*not drafted yet/);
+  assert.match(card.render(state({ 2026: undefined })), /2026 1st Rd <span class="pc-chip-via">…/);
+  assert.match(card.render(state({ 2026: null })), /not drafted yet/);
+});

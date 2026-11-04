@@ -1328,6 +1328,39 @@
     return Array.from({ length: count }, (_, i) => String(first + i));
   }
 
+  // A traded pick as {original, season, round, to, from} roster ids. Sleeper's GraphQL sends
+  // "original,season,round,to,from"; its public API sends an object.
+  function tradedPick(pick) {
+    if (typeof pick === 'string') {
+      const [original, season, round, to, from] = pick.split(',');
+      return { original: Number(original), season: String(season), round: Number(round), to: Number(to), from: Number(from) };
+    }
+    return { original: Number(pick.roster_id), season: String(pick.season), round: Number(pick.round), to: Number(pick.owner_id), from: Number(pick.previous_owner_id) };
+  }
+
+  // What each team in a trade gets: its players and its picks (a player dropped to make room is not one).
+  function tradeSides(t) {
+    const sides = (t.roster_ids || []).map((id) => ({ rosterId: Number(id), players: [], picks: [] }));
+    const side = (id) => sides.find((x) => x.rosterId === Number(id));
+    for (const [playerId, rosterId] of Object.entries(t.adds || {})) side(rosterId)?.players.push(playerId);
+    for (const pick of t.draft_picks || []) {
+      const p = tradedPick(pick);
+      side(p.to)?.picks.push(p);
+    }
+    return sides;
+  }
+
+  // The player a traded pick turned into, from its draft (`slotToRoster` and the draft's `picks`): the slot
+  // the pick's original team held, in the pick's round. Null while that slot hasn't picked.
+  function pickBecame(pick, { slotToRoster, picks }) {
+    const slots = Object.keys(slotToRoster || {});
+    const slot = slots.find((k) => Number(slotToRoster[k]) === pick.original);
+    const made = slot && picks.find((x) => x.round === pick.round && x.draft_slot === Number(slot) && x.player_id);
+    if (!made) return null;
+    const roundPick = made.pick_no - (pick.round - 1) * slots.length;
+    return { playerId: String(made.player_id), pickNo: made.pick_no, label: `${pick.round}.${String(roundPick).padStart(2, '0')}`, rosterId: made.roster_id, pickedBy: made.picked_by };
+  }
+
   // Whether a week's lineup saves to its matchup leg (else to the roster), as
   // Sleeper's web Team component (_updateRoster) decides: the leg once the
   // draft is done, until the league is complete.
@@ -1348,7 +1381,7 @@
 
   return {
     ranks, rankShift, shiftTint, adminDeltas,
-    weekDays, sideTeam, gameState, gamesByTeam, pointsByGame, statLine, playerDays, lockInDefault, ownedPicks, pickSeasons, PICK_SEASONS, lastWeek,
+    weekDays, sideTeam, gameState, gamesByTeam, pointsByGame, statLine, playerDays, lockInDefault, ownedPicks, pickSeasons, PICK_SEASONS, tradedPick, tradeSides, pickBecame, lastWeek,
     spotRefs, swapTargets, autosubOptions, withAutosub, liveSubs, applyMove, describeMove, lineupOnLeg, nextTeam,
     taxiEligible, taxiOpen, reserveEligible, illegalReserve,
     lockedGameId, lockState, lockCheck, scoresAtStake, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,

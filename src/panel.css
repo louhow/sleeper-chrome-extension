@@ -2806,6 +2806,62 @@ ul.pc-history {
   color: var(--muted);
   font-size: 10px;
 }
+.pc-trade {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.pc-trade-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.pc-trade-who {
+  color: var(--muted);
+  font-size: 11px;
+}
+.pc-trade-assets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+.pc-chip {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+button.pc-chip { cursor: pointer; }
+button.pc-chip:hover, button.pc-chip:focus-visible { background: rgba(255, 255, 255, 0.18); }
+.pc-chip.me { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); }
+.pc-chip-via {
+  color: var(--muted);
+  font-size: 10px;
+}
+.pc-pick {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pc-became {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .pc-news {
   margin-bottom: 10px;
   padding: 14px 16px;

@@ -513,6 +513,7 @@ let documentBody = LOGGED_OUT;
 // Stand-in for Sleeper's authenticated GraphQL: everything that carries the
 // session token is answered here and recorded, so tests never touch a real lineup.
 const sleeper = {
+  history: null, // (playerId) -> the card's transactions; none when null
   me: null, // user id of the roster under test
   legs: {}, // round -> matchup legs
   mutations: [],
@@ -708,7 +709,10 @@ async function answerGraphql(route) {
     roster.taxi = JSON.parse(query.match(/taxi: (\[[^\]]*\])/)[1]);
     return json({ data: { roster_update_taxi: roster } });
   }
-  if (/query league_transactions_by_player\b/.test(query)) return json({ data: { league_transactions_by_player: [] } });
+  if (/query league_transactions_by_player\b/.test(query)) {
+    const history = sleeper.history ? sleeper.history(query.match(/player_id: "([^"]+)"/)[1]) : [];
+    return json({ data: { league_transactions_by_player: history } });
+  }
   const round = Number(query.match(/round: (\d+)/)?.[1]);
   if (!round) return json({ errors: [{ message: `unmocked: ${query.slice(0, 60)}` }] });
   await seedLegs(round);
@@ -1761,6 +1765,40 @@ test('player card: clicking a player opens bio, game logs, career, news and dept
 
   await page.keyboard.press('Escape');
   await page.locator(dialog('.pc')).waitFor({ state: 'detached' });
+});
+
+test('player card: a trade lists both sides, a pick says what it became, and a player in it opens over the card', async () => {
+  documentBody = LOGGED_IN;
+  // The league's finished 2026 draft: roster 5's first-round slot picked Yaxel Lendeborg 12th.
+  sleeper.history = (id) => [{
+    status: 'complete', type: 'trade', created: 1752514206707, transaction_id: 't1', roster_ids: [5, 12],
+    adds: { [id]: 12, 2086: 5 }, drops: { [id]: 5, 2086: 12 }, draft_picks: ['5,2026,1,12,5'],
+  }];
+  try {
+    await page.goto(TEAM_URL);
+    const name = page.locator(panel('.card button.name')).first();
+    await name.waitFor({ timeout: 30000 });
+    const playerName = await name.textContent();
+    await name.click();
+    await page.locator(dialog('.pc-trade')).waitFor({ timeout: 15000 });
+    const sides = await page.locator(dialog('.pc-trade-side')).allTextContents();
+    assert.equal(sides.length, 2);
+    assert.match(sides.join('|'), /Tyler Herro/);
+    const became = page.locator(dialog('.pc-became'));
+    await became.waitFor({ timeout: 15000 });
+    assert.match(await became.textContent(), /Yaxel Lendeborg\s*1\.12/);
+    await page.locator(dialog('.pc-main')).evaluate((m) => { m.scrollTop = m.scrollHeight; });
+    await page.screenshot({ path: `${OUT}player-card-trade.png` });
+    await page.locator(dialog('.pc-became button.pc-chip')).click();
+    await page.waitForFunction(() => document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('h2.pc-name')?.textContent === 'Yaxel Lendeborg');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction((n) => document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('h2.pc-name')?.textContent === n, playerName);
+    await page.keyboard.press('Escape');
+    await page.locator(dialog('.pc')).waitFor({ state: 'detached' });
+  } finally {
+    sleeper.history = null;
+    documentBody = LOGGED_OUT;
+  }
 });
 
 test('player card: opens from the Players and Trend tabs instead of Sleeper\'s card', async () => {

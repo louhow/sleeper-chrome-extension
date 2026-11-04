@@ -1078,3 +1078,29 @@ test('formBars buckets recent scores and places the lock and projection marks', 
   // Identical scores still get a range to sit in.
   assert.equal(formBars([7, 7, 7], [], 4).counts.reduce((a, b) => a + b), 3);
 });
+
+test('a trade splits into what each team gets, players and picks, from either pick format', () => {
+  const trade = {
+    roster_ids: [5, 10], adds: { 1974: 10, 2086: 5 },
+    draft_picks: ['5,2026,1,10,5', { round: 3, season: '2026', roster_id: 10, owner_id: 5, previous_owner_id: 10 }],
+  };
+  const [five, ten] = plain(model.tradeSides(trade));
+  assert.deepEqual(five, { rosterId: 5, players: ['2086'], picks: [{ original: 10, season: '2026', round: 3, to: 5, from: 10 }] });
+  assert.deepEqual(ten, { rosterId: 10, players: ['1974'], picks: [{ original: 5, season: '2026', round: 1, to: 10, from: 5 }] });
+});
+
+test('a traded pick became the player its original team\'s slot drafted in that round', () => {
+  const board = {
+    slotToRoster: { 1: 7, 2: 5, 3: 9 },
+    picks: [
+      { round: 1, draft_slot: 2, pick_no: 2, player_id: '4882', roster_id: 10, picked_by: 'u10' },
+      { round: 2, draft_slot: 2, pick_no: 5, player_id: '4900', roster_id: 5, picked_by: 'u5' },
+      { round: 2, draft_slot: 3, pick_no: 6, player_id: null, roster_id: 9 },
+    ],
+  };
+  const pick = (round, original) => ({ original, season: '2026', round, to: 10, from: original });
+  assert.deepEqual(plain(model.pickBecame(pick(1, 5), board)), { playerId: '4882', pickNo: 2, label: '1.02', rosterId: 10, pickedBy: 'u10' });
+  assert.equal(model.pickBecame(pick(2, 5), board).label, '2.02');
+  assert.equal(model.pickBecame(pick(2, 9), board), null, 'a slot that has not picked yet');
+  assert.equal(model.pickBecame(pick(1, 4), board), null, 'a team with no slot');
+});

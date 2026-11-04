@@ -231,6 +231,9 @@ Clicking a player's name or headshot on the Team or Matchup tab, a player on the
 - Game logs per season (tabs): projected and actual fantasy points with the league's scoring, minutes, box score and shooting, shaded like Sleeper's tables. Fantasy points are colored by [score tier](#score-colors). The current season lists upcoming games with projections.
 - Career: one row per season with fantasy points, position rank, per-game averages and shooting.
 - Transaction history in this league (logged in), latest news, and the team's depth chart.
+- A trade in the history lists what each team got. Players are links that open their card over this one (closing returns here). A traded pick says what it turned into once its draft is done ("2026 1st Rd ➔ Yaxel Lendeborg 1.12"), else "not drafted yet".
+  - The trade itself costs nothing extra: it comes with the history query (`adds`, `drops`, `draft_picks`, the last as `"original,season,round,to,from"` strings).
+  - Each season's draft is found by walking back through `previous_league_id` to the league of that season, then two small calls: `/v1/draft/<id>` (`slot_to_roster_id`) and `/v1/draft/<id>/picks`. The slot of the pick's original team, in its round, is the pick that was made. Kept for the session.
 
 ### Real-life draft and contract (player cards)
 

@@ -2,7 +2,7 @@
 // career, news, depth chart and transaction history, each part loading on its own and rendering as it
 // arrives (card-view.js draws it). Kept for the session in `state.cards`.
 (globalThis.SNP ||= {}).nbaCard = ({ state, api, leagueId, schedule }) => {
-  const { loaders, espnClient } = globalThis.SNP;
+  const { loaders, espnClient, model } = globalThis.SNP;
   // Career seasons fetched for the player card (one request each).
   const CAREER_SEASONS = 10;
   const CARD_SEASON_TABS = 6;
@@ -64,10 +64,49 @@
   league_transactions_by_player(league_id: ${JSON.stringify(leagueId)}, player_id: ${JSON.stringify(playerId)}) {
     ${loaders.TRANSACTION_FIELDS} metadata draft_picks
   }
-}`, { auth: true }), (data) => { c.history = data?.league_transactions_by_player ?? []; }, () => { c.historyError = true; });
+}`, { auth: true }), (data) => {
+        c.history = data?.league_transactions_by_player ?? [];
+        loadBoards(c.history);
+      }, () => { c.historyError = true; });
     } else {
       c.historyError = true;
     }
+  }
+
+  // Every pick in the card's trades turns into a player once its draft is done: that draft's slots and picks,
+  // one small pair of calls per season, kept for the session in `state.draftBoards` (null: nothing drafted yet).
+  function loadBoards(history) {
+    const seasons = new Set(history.filter((t) => t.type === 'trade').flatMap((t) => (t.draft_picks || []).map((p) => model.tradedPick(p).season)));
+    for (const season of seasons) {
+      if (season in state.draftBoards) continue;
+      state.draftBoards[season] = undefined; // asked
+      draftBoard(season)
+        .catch((err) => {
+          console.warn('[sleeper-nba-panel] draft board', err);
+          return null;
+        })
+        .then((board) => {
+          state.draftBoards[season] = board;
+          schedule();
+        });
+    }
+  }
+
+  // A season's finished draft: it lives in the league of that season, found by walking back from this one.
+  async function draftBoard(season) {
+    let league = state.league;
+    for (let hop = 0; league && hop < 5; hop++) {
+      if (Number(league.season) < Number(season)) return null;
+      if (Number(league.season) === Number(season)) {
+        const drafts = (await api.get(`/v1/league/${league.league_id}/drafts`)).filter((d) => d.status === 'complete' && d.season === String(season));
+        const draft = drafts.find((d) => d.draft_id === league.draft_id) || drafts[drafts.length - 1];
+        if (!draft) return null;
+        const [info, picks] = await Promise.all([api.get(`/v1/draft/${draft.draft_id}`), api.get(`/v1/draft/${draft.draft_id}/picks`)]);
+        return info?.slot_to_roster_id ? { slotToRoster: info.slot_to_roster_id, picks } : null;
+      }
+      league = Number(league.previous_league_id) ? await api.get(`/v1/league/${league.previous_league_id}`) : null;
+    }
+    return null;
   }
 
   // One season of a player's game log: played games plus projections.

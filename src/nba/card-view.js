@@ -3,9 +3,9 @@
 // and latest news and the depth chart on the right. Pure: state -> HTML.
 (globalThis.SNP ||= {}).nbaCardView = (() => {
   const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, ownerOf, pct: share, tierClass,
-    dash, num, height, ago, newsSource, heat, scaler } = globalThis.SNP.ui;
+    dash, num, height, ago, newsSource, heat, scaler, ordinal } = globalThis.SNP.ui;
   const { scoreStats } = globalThis.SNP.scoring;
-  const { scoreTier } = globalThis.SNP.model;
+  const { scoreTier, tradeSides, pickBecame } = globalThis.SNP.model;
 
   // NBA team nicknames and primary colors, for the hero ("KINGS #9").
   const TEAMS = {
@@ -290,18 +290,35 @@
         const pick = `${md.round}.${String(md.round_pick_no).padStart(2, '0')}`;
         return [['drafted', 'Drafted', `by <b>${esc(user(md.picked_by) || byRoster[to] || '')}</b> with pick ${esc(pick)}`]];
       }
-      if (t.type === 'trade') return [['traded', 'Traded', `to ${who(to)} from ${who(from)}`]];
+      if (t.type === 'trade') return [['traded', 'Traded', `to ${who(to)} from ${who(from)}`, tradeDetail(t)]];
       const bid = t.type === 'waiver' && t.settings?.waiver_bid != null ? ` for $${esc(t.settings.waiver_bid)}` : '';
       return [
         ...(to != null ? [['added', t.type === 'waiver' ? 'Claimed' : 'Added', `by ${who(to)}${bid}`]] : []),
         ...(from != null ? [['dropped', 'Dropped', `to Waivers by ${who(from)}`]] : []),
       ];
     };
+    // The whole trade, each team's side: players open their card, and a pick says what it turned into.
+    const player = (pid) => (pid === id ? `<b class="pc-chip me">${esc(playerName(s.players, pid))}</b>`
+      : `<button class="pc-chip" data-player="${esc(pid)}">${esc(playerName(s.players, pid))}</button>`);
+    const pick = (p, rosterId) => {
+      const board = s.draftBoards?.[p.season];
+      const made = board && pickBecame(p, board);
+      const owner = byRoster[p.original] || `Team ${p.original}`;
+      const via = p.original === rosterId ? '' : `<span class="pc-chip-via">${esc(owner)}${owner.endsWith('s') ? "'" : "'s"}</span> `;
+      const became = made ? ` <span class="pc-became">➔ ${player(made.playerId)} <span class="pc-chip-via">${esc(made.label)}</span></span>`
+        : board === undefined ? ' <span class="pc-chip-via">…</span>'
+        : ' <span class="pc-chip-via">not drafted yet</span>';
+      return `<span class="pc-pick">${via}${esc(p.season)} ${ordinal(p.round)} Rd${became}</span>`;
+    };
+    const tradeDetail = (t) => `<div class="pc-trade">${tradeSides(t).map((x) => `<div class="pc-trade-side">
+        <span class="pc-trade-who">${who(x.rosterId)} got</span>
+        <span class="pc-trade-assets">${x.players.map(player).join('')}${x.picks.map((p) => pick(p, x.rosterId)).join('')}</span>
+      </div>`).join('')}</div>`;
     const items = c.history
       .filter((t) => t.status === 'complete')
       .sort((a, b) => b.created - a.created)
-      .flatMap((t) => lines(t).map(([cls, label, text]) => `<li class="pc-tx ${cls}">
-        <span class="pc-tx-label">${label}</span><span class="pc-tx-text">${text}</span><span class="pc-tx-date">${date(t.created)}</span>
+      .flatMap((t) => lines(t).map(([cls, label, text, detail = '']) => `<li class="pc-tx ${cls}">
+        <span class="pc-tx-label">${label}</span><span class="pc-tx-text">${text}</span><span class="pc-tx-date">${date(t.created)}</span>${detail}
       </li>`))
       .join('');
     return `<section class="pc-section">
