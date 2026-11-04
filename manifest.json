@@ -41,6 +41,7 @@
         "src/shared.js",
         "src/chat-view.js",
         "src/chat.js",
+        "src/claims.js",
         "src/settings-view.js",
         "src/settings.js",
         "src/loaders.js",

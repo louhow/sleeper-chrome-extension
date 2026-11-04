@@ -1,16 +1,17 @@
 // The content scripts' entry: follows Sleeper's in-page navigation and keeps
 // one session per league, an NBA one to start with (nba/session.js), which
 // hands an NFL league over to nfl/session.js once its sport is known; the
-// sidebar's lines for NBA leagues (nba/nav.js) and the chat's emoji reactions
-// (chat.js), the settings dialog (settings.js) and the NFL player card's draft and contract (espn-client.js), on every page. Also the admin switch (?snp-admin), saved for the whole browser.
+// sidebar's lines for NBA leagues (nba/nav.js), the chat's emoji reactions
+// (chat.js), Sleeper's My Waivers dialog (claims.js), the settings dialog (settings.js) and the NFL player card's draft and contract (espn-client.js), on every page. Also the admin switch (?snp-admin), saved for the whole browser.
 (() => {
-  const { nbaSession, nbaNav, chat, bridge, espnClient } = globalThis.SNP;
+  const { nbaSession, nbaNav, chat, claims, bridge, espnClient } = globalThis.SNP;
   const settings = globalThis.SNP.settings();
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
 
   let active = null;
   const nav = nbaNav();
   chat();
+  claims();
   // Sleeper's NFL player card asks for the player's real-life draft and contract
   // (page-hook.js); the ESPN calls go in the open league's API tab.
   bridge.answerLater('snp:espn', ({ kind, ...player }) => (espnClient[kind] ? espnClient[kind](active?.api ?? null, player) : { status: 'none' }));

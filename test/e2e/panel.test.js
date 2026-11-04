@@ -3980,3 +3980,115 @@ test('chat: hovering an emoji reaction opens its rows below, in place, moves not
   await page.screenshot({ path: `${OUT}chat-reactions-last.png`, clip: { x: 380, y: 40, width: 560, height: 400 } });
   documentBody = LOGGED_OUT;
 });
+
+// Sleeper's My Waivers dialog (its markup and rules from its bundle, 2026-11-04):
+// `n` pending claims, each an add and a drop with the clear time and bid.
+const claimsPage = (n) => {
+  const avatar = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><circle cx="18" cy="18" r="18" fill="#8a6"/></svg>')}`;
+  const adds = [['D. Singletary', 'RB - NYG', 9], ['D. Sampson', 'RB - CLE', 3], ['O. Hampton', 'RB - LAC', 2]];
+  const drops = [['X. Worthy', 'WR - KC'], ['B. Young', 'QB - CAR']];
+  const claim = (i) => {
+    const [name, pos, bid] = adds[i % adds.length];
+    const [dname, dpos] = drops[i % drops.length];
+    return `<div class="trans-item"><i class="fa fa-bars"></i><div class="trans-item-wrapper"><div class="league-activity-item"><div class="league-transaction-item-waiver-container"><div class="league-transaction-item-waiver">
+      <div class="meta"><div class="team-owner-with-description" style="cursor: pointer;"><div class="avatar-container"><div class="avatar" style="background-image: url(&quot;${avatar}&quot;); width: 36px; height: 36px; flex: 0 0 36px; background-size: contain; position: relative;"></div></div><div class="meta"><p class="name">badonkeyds</p><p class="description">Nov 3rd, 6:25 am</p></div></div></div>
+      <div class="transactions">
+        <div class="add-player" style="cursor: pointer;"><div class="action-label"><i class="fa fa-plus"></i></div><div class="name">${name} </div><div class="position">${pos}</div><div class="clear"><div class="waiver-clear"><div class="clear-day">Wed</div><div class="clear-time">2:05 am CST</div><div class="bid">$${bid}</div></div><div class="bid"><div class="status-text" style="margin-left: 2px;"> $${bid} </div></div></div></div>
+        <div class="drop-player" style="cursor: pointer;"><div class="action-label"><i class="fa fa-minus"></i></div><div class="name">${dname} </div><div class="position">${dpos}</div><div></div></div>
+      </div></div></div></div></div>
+      <div class="action-btns"><div><i class="fa fa-gear"></i>Edit</div></div><div class="action-btns"><div><i class="fa fa-trash"></i>Cancel</div></div></div>`;
+  };
+  return `<!doctype html><meta charset="utf-8"><title>Sleeper</title>
+<style>
+  body { margin: 0; background: rgb(16,33,49); font-family: Arial, sans-serif; font-size: 13px; color: #fff; }
+  p { margin: 0; }
+  .fa-bars::before { content: '☰'; } .fa-plus::before { content: '+'; } .fa-minus::before { content: '−'; } .fa-gear::before { content: '⚙'; } .fa-trash::before { content: '🗑'; }
+  .modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
+  .waivers-panel { width: 700px; min-width: 560px !important; box-shadow: 1px 1px 15px #18202f; border-radius: 10px; max-height: 80vh; overflow: auto; background: #283245; color: #fff; }
+  .channel-settings .channel-settings-header { display: flex; padding: 20px 25px; align-items: center; flex: 0 0 24px; }
+  .channel-settings .channel-settings-header > .meta { flex-grow: 1; }
+  .channel-settings .channel-settings-header .title { font-weight: bold; font-size: 16px; }
+  .channel-settings .channel-settings-header .description { margin-top: 5px; font-size: 12px; color: #a3bbd3; }
+  .waivers-panel .channel-settings-header { flex: 0 0 46px; }
+  .waivers-panel .channel-settings-header .description { line-height: 1.3; }
+  .waivers-panel .waiver-channel-settings-body { padding: 0 15px; }
+  .waivers-panel .fa-bars { padding-right: 20px; font-size: 20px; color: #ccc; align-self: center; }
+  .waivers-panel .trans-item { padding: 15px 0; display: flex; border-bottom: 1px solid #3a465b; cursor: move; }
+  .waivers-panel .trans-item .transactions { width: 290px; flex: 0 0 290px; }
+  .waivers-panel .trans-item .trans-item-wrapper { flex-grow: 1; }
+  .waivers-panel .trans-item .action-btns { flex: 0 0 auto; margin-left: 12px; color: #58a7ff; cursor: pointer; font-size: 13px; align-self: center; }
+  .waivers-panel .trans-item .action-btns i { padding-right: 4px; }
+  .waivers-panel .no-trades { padding: 40px 10px 80px; font-size: 14px; color: #999; }
+  .league-transaction-item-waiver-container { position: relative; display: flex; flex-direction: column; padding-bottom: 16px; border-bottom: 1px solid rgba(163,187,211,0.05); }
+  .league-transaction-item-waiver-container .clear { position: absolute; top: 24px; right: 4px; display: flex; flex-direction: row; border-radius: 16px; padding: 4px 4px 4px 8px; background-color: #a3bbd3; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; }
+  .league-transaction-item-waiver-container .waiver-clear .clear-time { font-weight: normal; }
+  .league-transaction-item-waiver-container .waiver-clear .bid { font-weight: bold; }
+  .league-transaction-item-waiver-container .fa-plus { color: #00ceb8; font-size: 14px; }
+  .league-transaction-item-waiver-container .fa-minus { color: #ff2a6d; font-size: 14px; }
+  .league-transaction-item-waiver-container .status-text { font-size: 10px; color: #022047; padding: 2px 6px; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver { position: relative; font-size: 13px; display: flex; flex-direction: row; padding-top: 16px; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver .meta .team-owner-with-description { padding-top: 8px; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver .meta .team-owner-with-description .meta .name { font-size: 16px; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver .transactions { display: flex; flex-direction: column; margin-left: 32px; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver .action-label { margin-right: 10px; text-transform: uppercase; width: 15px; font-size: 10px; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver .add-player { display: flex; flex-direction: row; align-items: center; color: #fff; margin-top: 8px; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver .name { overflow: hidden; font-weight: 600; font-size: 12px; line-height: 16px; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver .drop-player { color: #fff; margin-top: 8px; display: flex; flex-direction: row; align-items: center; }
+  .league-transaction-item-waiver-container .league-transaction-item-waiver .position { color: #a3bbd3; font-weight: normal; font-size: 10px; margin-left: 4px; }
+  .team-owner-with-description { display: flex; align-items: center; }
+  .team-owner-with-description .avatar-container { margin-right: 10px; }
+  .team-owner-with-description > .meta > .name { font-weight: bold; color: #fff; font-size: 12px; position: relative; }
+  .team-owner-with-description > .meta > .description { font-size: 11px; color: #aaa; margin-top: 3px; margin-bottom: 1px; }
+</style>
+<div class="modal"><div class="waivers-panel channel-settings">
+  <div class="channel-settings-header"><div class="meta"><div class="title">My Waivers</div><div class="description">The waiver priorities are based on the bid amount.  You can only update the waivers with the same bid amount by dragging your claims up and down.</div></div></div>
+  <div class="waiver-channel-settings-body"><div class="validation"></div><div><div class="sortable-section"><div>${Array.from({ length: n }, (_, i) => claim(i)).join('')}</div></div></div></div>
+  <div class="channel-settings-header"><div class="meta"><div class="title">My Trades</div></div></div>
+  <div class="waiver-channel-settings-body"><div class="trade-content"><div class="no-trades">No outstanding trades</div></div></div>
+</div></div>`;
+};
+
+test('claims: Sleeper\'s My Waivers dialog shows its claims two lines each, the clear time and bid once on the add\'s line, with Edit and Cancel in reach', async () => {
+  documentBody = claimsPage(16);
+  const look = async () => {
+    await page.goto(`https://sleeper.com/leagues/${LEAGUE}/league`);
+    await page.locator('.trans-item').first().waitFor();
+    return page.evaluate(() => {
+      const panel = document.querySelector('.waivers-panel').getBoundingClientRect();
+      const rows = [...document.querySelectorAll('.trans-item')].map((el) => el.getBoundingClientRect());
+      const first = document.querySelector('.trans-item');
+      const clear = first.querySelector('.clear').getBoundingClientRect();
+      const add = first.querySelector('.add-player').getBoundingClientRect();
+      const actions = [...first.querySelectorAll('.action-btns')].map((el) => el.getBoundingClientRect());
+      return {
+        inView: rows.filter((r) => r.bottom <= panel.bottom).length,
+        row: Math.round(rows[0].height),
+        bids: (first.innerText.match(/\$9/g) || []).length,
+        pill: { lines: Math.round(clear.height / 14), onAddLine: clear.top >= add.top - 1 && clear.bottom <= add.bottom + 1 },
+        actionsIn: actions.every((a) => a.right <= panel.right && a.left >= panel.left),
+        scrollsSideways: document.querySelector('.waivers-panel').scrollWidth > document.querySelector('.waivers-panel').clientWidth,
+      };
+    });
+  };
+
+  // Sleeper's own (the extension's switch kept off on this page): four claims in view, the bid twice, the pill three lines high.
+  await page.addInitScript(() => new MutationObserver(() => document.documentElement?.removeAttribute('data-snp-claims')).observe(document, { attributes: true, subtree: true, attributeFilter: ['data-snp-claims'] }));
+  const sleeper = await look();
+  assert.ok(sleeper.inView <= 5, `Sleeper: ${sleeper.inView} claims in view`);
+  assert.equal(sleeper.bids, 2, 'Sleeper: the bid twice');
+  assert.equal(sleeper.pill.lines, 3, 'Sleeper: the pill three lines high');
+
+  // With the extension: more than twice as many claims, the bid once, the pill on the add's line.
+  await page.close();
+  page = await context.newPage();
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+  const fixed = await look();
+  assert.ok(fixed.inView >= 10 && fixed.inView > 2 * sleeper.inView, `${fixed.inView} claims in view against Sleeper's ${sleeper.inView}`);
+  assert.ok(fixed.row <= 56, `a claim is ${fixed.row}px tall`);
+  assert.equal(fixed.bids, 1, 'the bid once');
+  assert.deepEqual(fixed.pill, { lines: 1, onAddLine: true });
+  assert.equal(fixed.actionsIn, true, 'Edit and Cancel in the dialog');
+  assert.equal(fixed.scrollsSideways, false);
+  await page.screenshot({ path: `${OUT}claims.png`, clip: { x: 360, y: 80, width: 720, height: 740 } });
+  assert.deepEqual(pageErrors, []);
+});

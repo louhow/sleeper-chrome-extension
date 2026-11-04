@@ -389,6 +389,16 @@ The same stylesheet (`src/chat.js`, switched on by `data-snp-chat`) tightens it,
 - Weekly report: tighter cards (a card for each manager, and for each position of the week in football) and a 36px avatar.
 - Reaction rows are untouched (below).
 
+### My Waivers, compact
+
+Sleeper's My Waivers dialog (its pending claims, any sport) draws each claim as a league-activity row inside a sortable one, padded three times over, with a 36px avatar, the owner's name at 16px and the clear time and bid stacked three lines high in a pill floating over the players, so a claim stands some 115px tall and four fit the dialog before it scrolls.
+A stylesheet (`src/claims.js`, switched on by `data-snp-claims`) makes a claim two lines, the add and the drop, some 53px tall, so twelve fit a 900px window.
+
+- Only padding, margins, sizes and where the pill sits change; every element stays Sleeper's, so dragging claims, Edit and Cancel work as before.
+- The pill sits at the end of the add's line, one line, and shows the bid once (Sleeper writes it in the pill and again after it).
+- The owner is a fixed column (a 32px avatar, name and time on short lines), so the players line up from row to row.
+- The e2e test draws the dialog from Sleeper's markup and rules and checks claims in view against Sleeper's own.
+
 ### Chat trades
 
 Sleeper's web chat shows a trade as a card with two of a side's players and a VIEW button; its mobile app writes the whole trade out.
