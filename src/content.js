@@ -4,7 +4,7 @@
 // sidebar's lines for NBA leagues (nba/nav.js), the chat's emoji reactions
 // (chat.js), Sleeper's My Waivers dialog (claims.js), the settings dialog (settings.js) and the NFL player card's draft and contract (espn-client.js), on every page. Also the admin switch (?snp-admin), saved for the whole browser.
 (() => {
-  const { nbaSession, nbaNav, chat, claims, bridge, espnClient } = globalThis.SNP;
+  const { nbaSession, nbaNav, chat, claims, bridge, espnClient, loaders, model } = globalThis.SNP;
   const settings = globalThis.SNP.settings();
   const ROUTE = /^\/leagues\/(\d+)(?:\/([^/]+))?/;
 
@@ -15,6 +15,28 @@
   // Sleeper's NFL player card asks for the player's real-life draft and contract
   // (page-hook.js); the ESPN calls go in the open league's API tab.
   bridge.answerLater('snp:espn', ({ kind, ...player }) => (espnClient[kind] ? espnClient[kind](active?.api ?? null, player) : { status: 'none' }));
+  // The trades in Sleeper's NFL player card (page-hook.js) ask what each traded pick turned into, once its
+  // draft is done: two small calls per season, in the open league's API tab, kept for the page's life.
+  const boards = new Map();
+  bridge.answerLater('snp:trade-picks', async ({ leagueId, picks }) => {
+    const api = active?.api;
+    const results = {};
+    if (!api) return { results };
+    const league = await api.get(`/v1/league/${encodeURIComponent(leagueId)}`).catch(() => null);
+    for (const pick of picks || []) {
+      const key = `${leagueId}:${pick.season}`;
+      if (!boards.has(key)) boards.set(key, loaders.draftBoard(api, league, pick.season).catch(() => null));
+      const board = await boards.get(key);
+      if (!board) {
+        boards.delete(key);
+        continue;
+      }
+      const made = model.pickBecame({ original: Number(pick.original), round: Number(pick.round) }, board);
+      const meta = made && board.picks.find((x) => x.pick_no === made.pickNo)?.metadata;
+      if (made) results[`${pick.season}:${pick.round}:${pick.original}`] = { playerId: made.playerId, label: made.label, first_name: meta?.first_name, last_name: meta?.last_name, position: meta?.position, team: meta?.team };
+    }
+    return { results };
+  });
   // A setting changed: each league's session starts over with it.
   settings.onChange(() => {
     active?.destroy();

@@ -1218,6 +1218,19 @@
       min-width: 28px; padding: 2px 6px; border-radius: 4px; box-sizing: border-box;
       font-size: 12px; font-weight: 700; text-align: center; color: rgba(255, 255, 255, 0.45); font-variant-numeric: tabular-nums;
     }
+    /* A trade in Sleeper's NFL player card (cardTrades): each team's side, players that open their card, and
+       what a traded pick turned into, in place of Sleeper's own trade detail. */
+    .body-column:has(> .snp-tradebox) > .trade-detail { display: none; }
+    .snp-tradebox { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .snp-tradeside { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+    .snp-tradewho { color: rgba(255, 255, 255, 0.55); font-size: 12px; }
+    .snp-tradeassets { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+    .snp-chip { padding: 2px 8px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: #fff; font: inherit; font-size: 12px; font-weight: 700; }
+    button.snp-chip { cursor: pointer; }
+    button.snp-chip:hover, button.snp-chip:focus-visible { background: rgba(255, 255, 255, 0.2); }
+    .snp-chip.me { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); }
+    .snp-tradevia { color: rgba(255, 255, 255, 0.55); font-size: 11px; }
+    .snp-tradepick { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 12px; font-weight: 700; }
     /* Sleeper's NFL player card's DRAFT and CONTRACT blocks (cardEspn): in a row of their own under
        PLAYER RANKINGS, as on the NBA card (Sleeper's label over its row, each of ours likewise);
        one under another when the card is too narrow (fitEspn). */
@@ -1355,14 +1368,15 @@
     const owner = row && props(row, (x) => typeof x.openModal === 'function' && x.playersMap);
     return click && owner ? catchCard(owner, () => click({ stopPropagation() {}, preventDefault() {} })) : null;
   }
-  bridge.on('snp:nfl-player-card', ({ playerId, player: basics }) => {
+  bridge.on('snp:nfl-player-card', ({ playerId, player: basics }) => openNflCard(playerId, basics));
+  function openNflCard(playerId, basics) {
     const caught = sleeperCard();
     // Sleeper's own record of the player when it has one; Sleeper's card fetches the rest either way.
     const player = caught && (caught.playersMap[playerId] || basics);
     if (!caught || !player) return;
     const { card, open } = caught;
     open({ ...card, key: null, props: { ...card.props, playerIds: [playerId], selectedPlayerId: playerId, playersMap: { ...caught.playersMap, [playerId]: player } } });
-  });
+  }
 
   // Sleeper's NFL player card: DRAFT and CONTRACT blocks under its PLAYER
   // RANKINGS, the player's real-life draft and contract from ESPN (the
@@ -1429,6 +1443,83 @@
       if (right <= room + 0.5) return;
     }
   }
+  // A trade in Sleeper's NFL player card's Transaction History: both teams' sides (Sleeper shows one team's
+  // players and the picks it sent), each player a chip that opens their card, and each traded pick with the
+  // player it turned into once its draft is done (the extension looks that up: 'snp:trade-picks').
+  const TRADE_WAIT_MS = 15e3;
+  function cardTrades() {
+    for (const item of document.querySelectorAll('.player-transaction-history-item .transaction-history-trade')) {
+      const body = item.querySelector(':scope > .body-column');
+      const p = body && props(item, (x) => x.transaction && x.rostersInLeagueArray);
+      const tx = p?.transaction;
+      if (!tx || tx.type !== 'trade') continue;
+      const key = `${tx.transaction_id}:${p.playerId}`;
+      if (item.dataset.snpTrade === key) continue;
+      item.dataset.snpTrade = key;
+      body.querySelector(':scope > .snp-tradebox')?.remove();
+      const team = (rosterId) => {
+        const owner = p.rostersInLeagueArray.find((r) => Number(r.roster_id) === Number(rosterId))?.owner_id;
+        return p.usersInLeagueArray.find((u) => u.user_id === owner)?.display_name || `Team ${rosterId}`;
+      };
+      const make = (tag, className, text) => Object.assign(document.createElement(tag), { className, textContent: text ?? '' });
+      const chip = (id, basics) => {
+        const name = `${basics.first_name || ''} ${basics.last_name || ''}`.trim() || `Player ${id}`;
+        if (String(id) === String(p.playerId)) return make('b', 'snp-chip me', name);
+        const button = make('button', 'snp-chip', name);
+        button.type = 'button';
+        button.dataset.snpPlayer = id;
+        button.dataset.snpBasics = JSON.stringify({ player_id: id, sport: 'nfl', first_name: basics.first_name, last_name: basics.last_name, position: basics.position, team: basics.team });
+        return button;
+      };
+      // "original,season,round,to,from" in Sleeper's GraphQL, an object in its public API.
+      const picks = (tx.draft_picks || []).map((x) => {
+        if (typeof x !== 'string') return { original: Number(x.roster_id), season: String(x.season), round: Number(x.round), to: Number(x.owner_id) };
+        const [original, season, round, to] = x.split(',');
+        return { original: Number(original), season, round: Number(round), to: Number(to) };
+      });
+      const box = make('div', 'snp-tradebox');
+      const became = {};
+      for (const rosterId of tx.roster_ids || []) {
+        const side = make('div', 'snp-tradeside');
+        const assets = make('span', 'snp-tradeassets');
+        side.append(make('span', 'snp-tradewho', `${team(rosterId)} got`), assets);
+        for (const [id, to] of Object.entries(tx.adds || {})) {
+          if (Number(to) === Number(rosterId)) assets.append(chip(id, tx.player_map?.[id] || {}));
+        }
+        for (const pick of picks.filter((x) => x.to === Number(rosterId))) {
+          const wrap = make('span', 'snp-tradepick');
+          if (pick.original !== pick.to) wrap.append(make('span', 'snp-tradevia', `${team(pick.original)}${/s$/.test(team(pick.original)) ? "'" : "'s"}`));
+          const ordinal = ['th', 'st', 'nd', 'rd'][pick.round % 100 >= 11 && pick.round % 100 <= 13 ? 0 : pick.round % 10] || 'th';
+          wrap.append(` ${pick.season} ${pick.round}${ordinal} Rd`, make('span', 'snp-tradevia', ' …'));
+          became[`${pick.season}:${pick.round}:${pick.original}`] = wrap;
+          assets.append(wrap);
+        }
+        box.append(side);
+      }
+      body.append(box);
+      if (!picks.length) continue;
+      Promise.race([bridge.call('snp:trade-picks', { leagueId: tx.league_id, picks }), new Promise((resolve) => setTimeout(resolve, TRADE_WAIT_MS, null))]).then((reply) => {
+        for (const [pickKey, wrap] of Object.entries(became)) {
+          const made = reply?.results?.[pickKey];
+          const note = wrap.lastElementChild;
+          if (!made) {
+            note.textContent = reply ? ' not drafted yet' : '';
+            continue;
+          }
+          note.remove();
+          wrap.append(' ➔ ', chip(made.playerId, made), make('span', 'snp-tradevia', made.label));
+        }
+      });
+    }
+  }
+  // A click on one of those chips opens that player's card.
+  document.addEventListener('click', (e) => {
+    const chip = e.target instanceof Element && e.target.closest('.snp-chip[data-snp-player]');
+    if (!chip) return;
+    e.stopPropagation();
+    openNflCard(chip.dataset.snpPlayer, JSON.parse(chip.dataset.snpBasics));
+  }, true);
+
   // A trade in the chat: the whole of it, off the props of Sleeper's card (any
   // sport), for the extension to write out (chat.js). Told again only when it changes.
   const toldTrades = new WeakMap();
@@ -1493,6 +1584,7 @@
     cardFrame ||= requestAnimationFrame(() => {
       cardFrame = 0;
       cardEspn();
+      cardTrades();
       chatTrades();
     });
   }).observe(document.documentElement, { childList: true, subtree: true });

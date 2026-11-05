@@ -45,6 +45,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.
 - Players tab: remembers your last view; a week strip per player (games played in their score's color, games left, scores on hover); a team picker to scan any roster; team avatars on rostered players; in Stats, a week's Avg (with games played) / Best / Worst game and an optional Shooting group (FGM, FGA, 3PA, FTM, FTA).
 - Player card: bio, game logs, career, news, transaction history (a trade shows both sides, players open their card, a traded pick shows the player it became).
+- NFL player card: a trade in its transaction history shows both sides, players open their card, a traded pick shows the player it became.
 - Admin tools (off unless `?snp-admin=1`): what-if scoring on the Team and Matchup tabs and player card, adminFPTS and adminDelta columns on the Players tab.
 
 **NFL**

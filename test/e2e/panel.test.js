@@ -3585,6 +3585,66 @@ test('NFL player card: DRAFT and CONTRACT blocks under PLAYER RANKINGS, from ESP
   documentBody = LOGGED_OUT;
 });
 
+// A trade in Sleeper's own NFL player card (its web bundle, 2026-11-05): the history item holds the
+// transaction on a fiber above it, Sleeper's `.trade-detail` inside `.body-column`.
+const nflTradeCard = `<!doctype html><title>Sleeper</title>
+<style>body { margin: 0; background: rgb(16, 33, 49); color: #fff; font-family: Lato, Arial, sans-serif; } .panel { width: 620px; margin: 40px; padding: 16px; background: #233; }
+  .transaction-history-trade { display: flex; gap: 12px; padding: 10px; font-size: 13px; background: rgba(255, 255, 255, 0.04); } .action-column { width: 80px; font-weight: 800; color: #f5c451; }</style>
+<div class="panel"><div class="player-transaction-history"><div class="player-transaction-history-list-item"><div class="player-transaction-history-item"><div class="transaction-history-trade">
+  <div class="action-column">Traded</div>
+  <div class="body-column"><span class="team-name">badonkeyds</span> from <span class="team-name">PavScore</span>
+    <div class="trade-detail"><div class="trade-detail-for-roster"><div class="trade-receive"><div class="trade-detail-item">S. Diggs</div></div><div class="trade-sent"><div class="trade-detail-item">2026 1st Rd</div></div></div></div></div>
+  <div class="date-time">Sep 22 2026</div></div></div></div></div>
+  <div class="matchup-player-row-container"><div class="row"></div></div></div>
+<script>
+  window.__opens = [];
+  const season = String(new Date().getFullYear());
+  const trade = document.querySelector('.transaction-history-trade');
+  trade.__reactInternalInstance$test = { memoizedProps: {
+    playerId: '2449', usersInLeagueArray: [{ user_id: 'a', display_name: 'badonkeyds' }, { user_id: 'b', display_name: 'PavScore' }],
+    rostersInLeagueArray: [{ roster_id: 3, owner_id: 'a' }, { roster_id: 2, owner_id: 'b' }],
+    transaction: { type: 'trade', transaction_id: 't1', league_id: '__LEAGUE__', roster_ids: [2, 3], adds: { 2449: 3, 3198: 3 },
+      player_map: { 2449: { first_name: 'Stefon', last_name: 'Diggs', position: 'WR', team: 'NE' }, 3198: { first_name: 'Derrick', last_name: 'Henry', position: 'RB', team: 'BAL' } },
+      draft_picks: ['2,__SEASON__,1,2,3'] } } };
+  const owner = { openModal: (card) => window.__opens.push(card.props.selectedPlayerId), playersMap: {} };
+  document.querySelector('.matchup-player-row-container .row').__reactInternalInstance$test = { memoizedProps: { onClick: () => owner.openModal({ props: {} }) }, return: { memoizedProps: owner } };
+</script>`;
+
+test("NFL player card: a trade shows both sides, each player opens a card, and a traded pick shows the player it became", async () => {
+  const season = String((await (await page.request.get(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}`)).json()).season);
+  // The league's finished draft: roster 2's first-round slot (slot 5) picked pick 5 of round 1.
+  await page.route(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/drafts`, (route) => route.fulfill({ json: [{ draft_id: 'e2e-draft', season, status: 'complete' }] }));
+  await page.route('https://api.sleeper.app/v1/draft/e2e-draft', (route) => route.fulfill({ json: { draft_id: 'e2e-draft', slot_to_roster_id: { 5: 2, 6: 3 } } }));
+  await page.route('https://api.sleeper.app/v1/draft/e2e-draft/picks', (route) => route.fulfill({ json: [
+    { round: 1, draft_slot: 5, pick_no: 5, player_id: '9999', roster_id: 3, metadata: { first_name: 'Rookie', last_name: 'Receiver', position: 'WR', team: 'DAL' } },
+  ] }));
+  documentBody = nflTradeCard.replace('__LEAGUE__', NFL_LEAGUE).replace('__SEASON__', season);
+  try {
+    await page.goto(NFL_TEAM_URL);
+    const box = page.locator('.snp-tradebox');
+    await box.waitFor({ timeout: 30000 });
+    assert.equal(await page.locator('.trade-detail').isVisible(), false, "Sleeper's own detail gives way");
+    const sides = await page.locator('.snp-tradeside').allTextContents();
+    assert.equal(sides.length, 2);
+    assert.match(sides[0], /^PavScore got/);
+    assert.deepEqual(await page.locator('.snp-tradeside', { hasText: 'badonkeyds got' }).locator('.snp-chip').allTextContents(), ['Stefon Diggs', 'Derrick Henry']);
+    await page.locator('.snp-tradepick .snp-chip').waitFor({ timeout: 15000 });
+    assert.match(await page.locator('.snp-tradepick').textContent(), /1st Rd ➔ Rookie Receiver1\.05/);
+    await page.screenshot({ path: `${OUT}nfl-card-trade.png` });
+    // The card's own player isn't a link; the others open their card.
+    assert.equal(await page.locator('button.snp-chip', { hasText: 'Stefon Diggs' }).count(), 0);
+    await page.locator('button.snp-chip', { hasText: 'Derrick Henry' }).click();
+    await page.waitForFunction(() => window.__opens.includes('3198'));
+    await page.locator('.snp-tradepick button.snp-chip').click();
+    await page.waitForFunction(() => window.__opens.includes('9999'));
+  } finally {
+    await page.unroute(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/drafts`);
+    await page.unroute('https://api.sleeper.app/v1/draft/e2e-draft');
+    await page.unroute('https://api.sleeper.app/v1/draft/e2e-draft/picks');
+    documentBody = LOGGED_OUT;
+  }
+});
+
 test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes and saves through Sleeper', async () => {
   documentBody = nflTeamTab();
   await page.goto(NFL_TEAM_URL);

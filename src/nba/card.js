@@ -80,7 +80,7 @@
     for (const season of seasons) {
       if (season in state.draftBoards) continue;
       state.draftBoards[season] = undefined; // asked
-      draftBoard(season)
+      loaders.draftBoard(api, state.league, season)
         .catch((err) => {
           console.warn('[sleeper-nba-panel] draft board', err);
           return null;
@@ -90,23 +90,6 @@
           schedule();
         });
     }
-  }
-
-  // A season's finished draft: it lives in the league of that season, found by walking back from this one.
-  async function draftBoard(season) {
-    let league = state.league;
-    for (let hop = 0; league && hop < 5; hop++) {
-      if (Number(league.season) < Number(season)) return null;
-      if (Number(league.season) === Number(season)) {
-        const drafts = (await api.get(`/v1/league/${league.league_id}/drafts`)).filter((d) => d.status === 'complete' && d.season === String(season));
-        const draft = drafts.find((d) => d.draft_id === league.draft_id) || drafts[drafts.length - 1];
-        if (!draft) return null;
-        const [info, picks] = await Promise.all([api.get(`/v1/draft/${draft.draft_id}`), api.get(`/v1/draft/${draft.draft_id}/picks`)]);
-        return info?.slot_to_roster_id ? { slotToRoster: info.slot_to_roster_id, picks } : null;
-      }
-      league = Number(league.previous_league_id) ? await api.get(`/v1/league/${league.previous_league_id}`) : null;
-    }
-    return null;
   }
 
   // One season of a player's game log: played games plus projections.

@@ -155,5 +155,23 @@
     return tiers;
   }
 
-  return { TRANSACTION_FIELDS, myRoster, usersById, scoresQuery, players, leagueData, loadTiers };
+  // A season's finished draft ({ slotToRoster, picks }, or null before it's done): it lives in the league of
+  // that season, found by walking back through `previous_league_id` from `league`. What a traded pick became
+  // comes from it (model.pickBecame), for the NBA card and Sleeper's NFL card alike.
+  async function draftBoard(api, league, season) {
+    for (let hop = 0; league && hop < 5; hop++) {
+      if (Number(league.season) < Number(season)) return null;
+      if (Number(league.season) === Number(season)) {
+        const drafts = (await api.get(`/v1/league/${league.league_id}/drafts`)).filter((d) => d.status === 'complete' && d.season === String(season));
+        const draft = drafts.find((d) => d.draft_id === league.draft_id) || drafts[drafts.length - 1];
+        if (!draft) return null;
+        const [info, picks] = await Promise.all([api.get(`/v1/draft/${draft.draft_id}`), api.get(`/v1/draft/${draft.draft_id}/picks`)]);
+        return info?.slot_to_roster_id ? { slotToRoster: info.slot_to_roster_id, picks } : null;
+      }
+      league = Number(league.previous_league_id) ? await api.get(`/v1/league/${league.previous_league_id}`) : null;
+    }
+    return null;
+  }
+
+  return { TRANSACTION_FIELDS, draftBoard, myRoster, usersById, scoresQuery, players, leagueData, loadTiers };
 })();

@@ -235,6 +235,13 @@ Clicking a player's name or headshot on the Team or Matchup tab, a player on the
   - The trade itself costs nothing extra: it comes with the history query (`adds`, `drops`, `draft_picks`, the last as `"original,season,round,to,from"` strings).
   - Each season's draft is found by walking back through `previous_league_id` to the league of that season, then two small calls: `/v1/draft/<id>` (`slot_to_roster_id`) and `/v1/draft/<id>/picks`. The slot of the pick's original team, in its round, is the pick that was made. Kept for the session.
 
+### Trades in Sleeper's NFL player card
+
+In the card's Transaction History, a trade shows both teams' sides in place of Sleeper's own detail (which lists one team's players and the picks it sent).
+Each player is a chip that opens their card (Sleeper's own card, as from the tabs), and a traded pick reads "2026 1st Rd ➔ Player 1.05" once its draft is done, else "not drafted yet".
+- page-hook.js (`cardTrades`) reads the transaction off the history item's props (`adds`, `player_map`, `draft_picks`, `roster_ids`) and draws the chips; it asks the extension for the picks over the bridge (`snp:trade-picks`, answered in content.js).
+- The lookup is the NBA card's: `loaders.draftBoard` (the season's league through `previous_league_id`, then `/v1/draft/<id>` and `/v1/draft/<id>/picks`), `model.pickBecame` for the slot. Two small calls per season, in the open league's API tab, kept for the page's life.
+
 ### Real-life draft and contract (player cards)
 
 Sleeper doesn't carry where a player was drafted in real life or his contract, so the player cards get them from ESPN's public API: the NBA card (the extension's own) and Sleeper's own NFL card both show DRAFT and CONTRACT blocks under PLAYER RANKINGS. On the NBA card they sit in one strip with EXP (moved out of the AGE ... COLLEGE row), so the pick is read beside the years that say how much it still counts.
