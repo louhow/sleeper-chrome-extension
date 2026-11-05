@@ -90,10 +90,12 @@
       <div class="backdrop" data-action="close-modal"></div>
       <div class="pc${whatIfOn(s) ? ' whatif' : ''}" role="dialog" aria-modal="true" aria-label="${esc(p.name)}" style="--team:${color}">
         <div class="pc-top">
-          <div class="pc-tab">
-            <div><b>${esc(shortName(p))}</b><span>${esc((p.positions || []).join(', '))} - ${esc(team || 'FA')}</span></div>
-            <button class="close" data-action="close-modal" aria-label="Close">✕</button>
-          </div>
+          ${(m.tabs || [id]).map((tid) => {
+            const tp = playerOf(s.players, tid);
+            const body = `<div><b>${esc(shortName(tp))}</b><span>${esc((tp.positions || []).join(', '))} - ${esc((tid === id ? team : tp.team) || 'FA')}</span></div>`;
+            return tid === id ? `<div class="pc-tab on">${body}<button class="close" data-card-untab="${esc(tid)}" aria-label="Close">✕</button></div>`
+              : `<button class="pc-tab" data-card-tab="${esc(tid)}">${body}</button>`;
+          }).join('')}
         </div>
         <div class="pc-panel">
           ${whatIfBanner(s)}
@@ -313,7 +315,7 @@
     // Held back (a soft bar of the same size) until every pick's draft is known, so nothing shifts when it lands.
     const tradeDetail = (t) => `<div class="pc-trade${(t.draft_picks || []).some((x) => s.draftBoards?.[tradedPick(x).season] === undefined) ? ' loading' : ''}">${tradeSides(t).map((x) => `<div class="pc-trade-side">
         <span class="pc-trade-who">${who(x.rosterId)} got</span>
-        <span class="pc-trade-assets">${x.players.map(player).join('')}${x.picks.map((p) => pick(p, x.rosterId)).join('')}</span>
+        <span class="pc-trade-assets">${x.players.length ? `<span class="pc-trade-players">${x.players.map(player).join('')}</span>` : ''}${x.picks.map((p) => pick(p, x.rosterId)).join('')}</span>
       </div>`).join('')}</div>`;
     const items = c.history
       .filter((t) => t.status === 'complete')

@@ -1242,23 +1242,18 @@
     }
     /* A trade in Sleeper's NFL player card (cardTrades): each team's side, players that open their card, and
        what a traded pick turned into, in place of Sleeper's own trade detail. */
-    .transaction-history-trade .trade-detail { visibility: hidden; }
-    .body-column:has(> .snp-tradebox) > .trade-detail { display: none; }
-    /* While the picks' drafts load: the real layout kept for its size, hidden under a soft bar. */
-    .snp-tradebox.loading { position: relative; }
-    .snp-tradebox.loading > * { visibility: hidden; }
-    .snp-tradebox.loading::before { content: ''; position: absolute; inset: 2px auto 2px 0; width: min(360px, 70%); border-radius: 6px; background: rgba(255, 255, 255, 0.12); animation: snp-espn-fade 1.2s ease-in-out infinite; }
-    @media (prefers-reduced-motion: reduce) { .snp-tradebox.loading::before { animation: none; } }
+    .transaction-history-trade .trade-detail { display: none; }
     .snp-tradebox { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
     .snp-tradeside { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
     .snp-tradewho { color: rgba(255, 255, 255, 0.55); font-size: 12px; }
-    .snp-tradeassets { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-    .snp-chip { padding: 2px 8px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: #fff; font: inherit; font-size: 12px; font-weight: 700; }
+    .snp-tradeassets { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    .snp-tradeplayers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+    .snp-chip { white-space: nowrap; padding: 2px 8px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: #fff; font: inherit; font-size: 12px; font-weight: 700; }
     button.snp-chip { cursor: pointer; }
     button.snp-chip:hover, button.snp-chip:focus-visible { background: rgba(255, 255, 255, 0.2); }
     .snp-chip.me { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); }
     .snp-tradevia { color: rgba(255, 255, 255, 0.55); font-size: 11px; }
-    .snp-tradepick { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 12px; font-weight: 700; }
+    .snp-tradepick { white-space: nowrap; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 12px; font-weight: 700; }
     /* Sleeper's NFL player card's DRAFT and CONTRACT blocks (cardEspn): in a row of their own under
        PLAYER RANKINGS, as on the NBA card (Sleeper's label over its row, each of ours likewise);
        one under another when the card is too narrow (fitEspn). */
@@ -1511,9 +1506,11 @@
         const side = make('div', 'snp-tradeside');
         const assets = make('span', 'snp-tradeassets');
         side.append(make('span', 'snp-tradewho', `${team(rosterId)} got`), assets);
+        const players = make('span', 'snp-tradeplayers');
         for (const [id, to] of Object.entries(tx.adds || {})) {
-          if (Number(to) === Number(rosterId)) assets.append(chip(id, tx.player_map?.[id] || {}));
+          if (Number(to) === Number(rosterId)) players.append(chip(id, tx.player_map?.[id] || {}));
         }
+        if (players.children.length) assets.append(players);
         for (const pick of picks.filter((x) => x.to === Number(rosterId))) {
           const wrap = make('span', 'snp-tradepick');
           if (pick.original !== pick.to) wrap.append(make('span', 'snp-tradevia', `${team(pick.original)}${/s$/.test(team(pick.original)) ? "'" : "'s"}`));
@@ -1542,12 +1539,18 @@
       });
     }
   }
-  // A click on one of those chips opens that player's card.
+  // A click on one of those chips adds that player as a tab in the open card, as Sleeper's own search does
+  // (its card component's `_onPressPlayer`); a card without it opens as from the tabs.
   document.addEventListener('click', (e) => {
     const chip = e.target instanceof Element && e.target.closest('.snp-chip[data-snp-player]');
     if (!chip) return;
     e.stopPropagation();
-    openNflCard(chip.dataset.snpPlayer, JSON.parse(chip.dataset.snpBasics));
+    const item = chip.closest('.player-transaction-history-item');
+    const key = item && Object.keys(item).find((k) => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+    let f = key && item[key];
+    for (let i = 0; f && i < 120 && typeof f.stateNode?._onPressPlayer !== 'function'; i++) f = f.return;
+    if (f) f.stateNode._onPressPlayer(chip.dataset.snpPlayer);
+    else openNflCard(chip.dataset.snpPlayer, JSON.parse(chip.dataset.snpBasics));
   }, true);
 
   // A trade in the chat: the whole of it, off the props of Sleeper's card (any
@@ -1614,10 +1617,12 @@
     cardFrame ||= requestAnimationFrame(() => {
       cardFrame = 0;
       cardEspn();
-      cardTrades();
       chatTrades();
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
+  // A trade in the card is drawn in the same frame as Sleeper's row (a mutation callback runs before the
+  // next paint, a frame callback after it), so its detail never shifts the rows below it.
+  new MutationObserver(cardTrades).observe(document.documentElement, { childList: true, subtree: true });
 
   // NFL League tab: Sleeper's own matchup cards, read as they show (so the
   // extension's cards carry Sleeper's exact live numbers), and which is yours.

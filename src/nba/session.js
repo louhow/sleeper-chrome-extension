@@ -745,8 +745,12 @@ ${name}(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(rosterId)}, 
     if (waivers.click(e.target, layer.root) || optimizer.click(e.target)) return;
     const player = e.target.closest('[data-player]');
     if (player && state.modal?.kind === 'optimize' && !state.modal.saving) return playerCard.open(player.dataset.player, state.modal);
-    // A player in a card's trade opens their card over this one; closing it comes back here.
-    if (player && state.modal?.kind === 'player') return playerCard.open(player.dataset.player, state.modal);
+    // A player in a card's trade is a new tab in the card.
+    if (player && state.modal?.kind === 'player') return playerCard.open(player.dataset.player);
+    const tab = e.target.closest('[data-card-tab]');
+    if (tab && state.modal?.kind === 'player') return playerCard.showTab(tab.dataset.cardTab);
+    const untab = e.target.closest('[data-card-untab]');
+    if (untab && state.modal?.kind === 'player') return playerCard.closeTab(untab.dataset.cardUntab, closeModal);
     const season = e.target.closest('[data-card-season]');
     if (season && state.modal?.kind === 'player') return playerCard.showSeason(Number(season.dataset.cardSeason));
     const action = e.target.closest('[data-action]')?.dataset.action;

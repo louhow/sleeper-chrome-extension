@@ -15,7 +15,14 @@
       pending = playerId;
       return;
     }
-    state.modal = { kind: 'player', playerId, season: null, back };
+    const m = state.modal;
+    if (m?.kind === 'player') {
+      // Another player from inside a card is a new tab in it (as in Sleeper's own card).
+      if (!m.tabs.includes(playerId)) m.tabs.push(playerId);
+      Object.assign(m, { playerId, season: null, prevSeason: null });
+    } else {
+      state.modal = { kind: 'player', playerId, season: null, back, tabs: [playerId] };
+    }
     state.notice = null;
     schedule();
     if (state.cards[playerId]) return;
@@ -122,11 +129,29 @@
     schedule();
   }
 
+  // A tab of the open card: its player shows; closing one shows its neighbor, and the last one closes the card.
+  function showTab(playerId) {
+    const m = state.modal;
+    if (m?.kind !== 'player' || !m.tabs.includes(playerId)) return;
+    Object.assign(m, { playerId, season: null, prevSeason: null });
+    schedule();
+  }
+  function closeTab(playerId, close) {
+    const m = state.modal;
+    if (m?.kind !== 'player') return;
+    const at = m.tabs.indexOf(playerId);
+    if (at < 0) return;
+    m.tabs.splice(at, 1);
+    if (!m.tabs.length) return close();
+    if (m.playerId === playerId) showTab(m.tabs[Math.min(at, m.tabs.length - 1)]);
+    else schedule();
+  }
+
   // The league is in: the card asked for meanwhile opens.
   function ready() {
     if (pending) open(pending);
     pending = null;
   }
 
-  return { open, showSeason, ready };
+  return { open, showSeason, showTab, closeTab, ready };
 };

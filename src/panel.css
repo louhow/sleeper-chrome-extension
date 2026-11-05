@@ -2393,6 +2393,17 @@ img.headshot[data-player] {
   border-radius: 10px 10px 0 0;
   background: color-mix(in srgb, var(--team) 35%, #10151d);
 }
+/* More than one player: the others sit beside the open one, dimmer, each a button to bring it forward. */
+button.pc-tab {
+  min-width: 0;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  background: color-mix(in srgb, var(--text) 8%, #10151d);
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+}
+button.pc-tab:hover, button.pc-tab:focus-visible { color: #fff; }
 .pc-tab b {
   display: block;
   font-size: 14px;
@@ -2838,7 +2849,14 @@ ul.pc-history {
   color: var(--muted);
   font-size: 11px;
 }
+/* Players in a row of their own and each pick on a line of its own, so what a pick turns into never rewraps the rest. */
 .pc-trade-assets {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.pc-trade-players {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2848,6 +2866,7 @@ ul.pc-history {
   padding: 2px 8px;
   border: 0;
   border-radius: 10px;
+  white-space: nowrap;
   background: rgba(255, 255, 255, 0.08);
   color: inherit;
   font: inherit;
@@ -2862,6 +2881,7 @@ button.pc-chip:hover, button.pc-chip:focus-visible { background: rgba(255, 255, 
   font-size: 10px;
 }
 .pc-pick {
+  white-space: nowrap;
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;

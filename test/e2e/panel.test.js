@@ -1796,11 +1796,17 @@ test('player card: a trade lists both sides, a pick says what it became, and a p
     assert.match(await became.textContent(), /Yaxel Lendeborg\s*1\.12/);
     await page.locator(dialog('.pc-main')).evaluate((m) => { m.scrollTop = m.scrollHeight; });
     await page.screenshot({ path: `${OUT}player-card-trade.png` });
+    // A new tab in the same card: the first player's tab stays beside it and brings them back.
     await page.locator(dialog('.pc-became button.pc-chip')).click();
     await page.waitForFunction(() => document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('h2.pc-name')?.textContent === 'Yaxel Lendeborg');
-    await page.keyboard.press('Escape');
+    assert.equal(await page.locator(dialog('.pc-tab')).count(), 2);
+    await page.screenshot({ path: `${OUT}player-card-tabs.png`, clip: { x: 0, y: 0, width: 1440, height: 300 } });
+    await page.locator(dialog('button.pc-tab')).click();
     await page.waitForFunction((n) => document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('h2.pc-name')?.textContent === n, playerName);
-    await page.keyboard.press('Escape');
+    // Closing a tab shows its neighbor; the last one closes the card.
+    await page.locator(dialog('.pc-tab.on .close')).click();
+    await page.waitForFunction(() => document.querySelector('#sleeper-nba-dialog').shadowRoot.querySelector('h2.pc-name')?.textContent === 'Yaxel Lendeborg');
+    await page.locator(dialog('.pc-tab.on .close')).click();
     await page.locator(dialog('.pc')).waitFor({ state: 'detached' });
   } finally {
     sleeper.history = null;
@@ -3629,6 +3635,9 @@ const nflTradeCard = `<!doctype html><title>Sleeper</title>
     transaction: { type: 'trade', transaction_id: 't1', league_id: '__LEAGUE__', roster_ids: [2, 3], adds: { 2449: 3, 3198: 3 },
       player_map: { 2449: { first_name: 'Stefon', last_name: 'Diggs', position: 'WR', team: 'NE' }, 3198: { first_name: 'Derrick', last_name: 'Henry', position: 'RB', team: 'BAL' } },
       draft_picks: ['2,__SEASON__,1,2,3'] } } };
+  window.__tabs = [];
+  // Sleeper's card component, above the history item: _onPressPlayer adds a tab.
+  document.querySelector('.player-transaction-history-item').__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: {}, return: { memoizedProps: {}, stateNode: { _onPressPlayer: (id) => window.__tabs.push(id) } } } };
   const owner = { openModal: (card) => window.__opens.push(card.props.selectedPlayerId), playersMap: {} };
   document.querySelector('.matchup-player-row-container .row').__reactInternalInstance$test = { memoizedProps: { onClick: () => owner.openModal({ props: {} }) }, return: { memoizedProps: owner } };
 </script>`;
@@ -3656,10 +3665,12 @@ test("NFL player card: a trade shows both sides, each player opens a card, and a
     await page.screenshot({ path: `${OUT}nfl-card-trade.png` });
     // The card's own player isn't a link; the others open their card.
     assert.equal(await page.locator('button.snp-chip', { hasText: 'Stefon Diggs' }).count(), 0);
+    // A new tab in the open card, as Sleeper's own search adds one.
     await page.locator('button.snp-chip', { hasText: 'Derrick Henry' }).click();
-    await page.waitForFunction(() => window.__opens.includes('3198'));
+    await page.waitForFunction(() => window.__tabs.includes('3198'));
     await page.locator('.snp-tradepick button.snp-chip').click();
-    await page.waitForFunction(() => window.__opens.includes('9999'));
+    await page.waitForFunction(() => window.__tabs.includes('9999'));
+    assert.equal(await page.evaluate(() => window.__opens.length), 0, 'no second card');
   } finally {
     await page.unroute(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/drafts`);
     await page.unroute('https://api.sleeper.app/v1/draft/e2e-draft');
