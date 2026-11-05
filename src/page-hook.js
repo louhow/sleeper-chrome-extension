@@ -370,6 +370,27 @@
   }
   const playersInView = () => listPlayers().map((p) => String(p.player_id));
 
+  // Sleeper's table lists only players with a projection for the week, so a two-way player out of the
+  // rotation (or anyone out for the year) never shows, even searched for by name. While a search is
+  // typed, the extension's matches that Sleeper left out go in as rows of Sleeper's own shape (no
+  // numbers, so zeros); they come out again with the search.
+  const UNLISTED = Symbol('snp-unlisted');
+  function addUnlisted(panel) {
+    const { players, loading, searchTerm } = panel.state;
+    if (panel.props.sport !== 'nba' || loading || !players?.length) return;
+    const term = String(searchTerm || '').trim();
+    if (panel.snpUnlisted?.term !== term) panel.snpUnlisted = { term, found: term.length < 2 ? [] : bridge.ask('snp:players-unlisted', { term }) || [] };
+    const real = players.filter((p) => !p[UNLISTED]);
+    const listed = new Set(real.map((p) => String(p.player_id)));
+    const wanted = panel.snpUnlisted.found.filter((x) => !listed.has(x.id));
+    if (wanted.map((x) => x.id).join() === players.filter((p) => p[UNLISTED]).map((p) => p.player_id).join()) return;
+    const template = real[0];
+    const empty = Object.fromEntries(Object.keys(template.player || {}).map((k) => [k, null]));
+    const rows = wanted.map((x) => ({ ...template, [UNLISTED]: true, player_id: x.id, team: x.team, stats: {},
+      player: { ...empty, player_id: x.id, sport: 'nba', active: true, first_name: x.first, last_name: x.last, full_name: `${x.first || ''} ${x.last || ''}`.trim(), team: x.team, position: x.position, fantasy_positions: x.positions, injury_status: x.injury, years_exp: x.years_exp } }));
+    panel.setState({ players: [...real, ...rows] });
+  }
+
   // The stats map Sleeper renders is rebuilt from its own: the picked games
   // (Best or Worst) first, then adminFPTS = FPTS plus what the changed settings
   // add or take away, so it matches FPTS exactly until a value changes.
@@ -407,6 +428,7 @@
     weekSwitch(week);
     shotToggle(statType === 'stat' && !nfl);
     teamPicker(panel);
+    addUnlisted(panel);
     if (nfl) unclaimedChops(panel);
     const fetched = shownWeek && !nfl ? weekSchedule(season, shownWeek) : null;
     // The season shows the weeks through the current one (Sleeper's leg).
@@ -1220,7 +1242,13 @@
     }
     /* A trade in Sleeper's NFL player card (cardTrades): each team's side, players that open their card, and
        what a traded pick turned into, in place of Sleeper's own trade detail. */
+    .transaction-history-trade .trade-detail { visibility: hidden; }
     .body-column:has(> .snp-tradebox) > .trade-detail { display: none; }
+    /* While the picks' drafts load: the real layout kept for its size, hidden under a soft bar. */
+    .snp-tradebox.loading { position: relative; }
+    .snp-tradebox.loading > * { visibility: hidden; }
+    .snp-tradebox.loading::before { content: ''; position: absolute; inset: 2px auto 2px 0; width: min(360px, 70%); border-radius: 6px; background: rgba(255, 255, 255, 0.12); animation: snp-espn-fade 1.2s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) { .snp-tradebox.loading::before { animation: none; } }
     .snp-tradebox { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
     .snp-tradeside { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
     .snp-tradewho { color: rgba(255, 255, 255, 0.55); font-size: 12px; }
@@ -1498,6 +1526,7 @@
       }
       body.append(box);
       if (!picks.length) continue;
+      box.classList.add('loading');
       Promise.race([bridge.call('snp:trade-picks', { leagueId: tx.league_id, picks }), new Promise((resolve) => setTimeout(resolve, TRADE_WAIT_MS, null))]).then((reply) => {
         for (const [pickKey, wrap] of Object.entries(became)) {
           const made = reply?.results?.[pickKey];
@@ -1509,6 +1538,7 @@
           note.remove();
           wrap.append(' ➔ ', chip(made.playerId, made), make('span', 'snp-tradevia', made.label));
         }
+        box.classList.remove('loading');
       });
     }
   }

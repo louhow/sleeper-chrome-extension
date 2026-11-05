@@ -223,6 +223,8 @@ Sleeper's own NBA Players table, with these additions:
 - The columns narrow to fit the header's room after its corner, so the table never scrolls sideways (15 columns at 37px; 17 with the admin pair at 32px).
   Each column also has Sleeper's 2px margin on both sides.
 
+- Search finds players Sleeper leaves out: its table lists only players with a projection for the week, so a two-way player out of the rotation (or anyone out for the year) never shows, even by name. While a search is typed, the extension's matching players that aren't listed (`snp:players-unlisted`, from the players it already holds) are added as rows of Sleeper's own shape (no numbers, so zeros), and come out with the search. Open one for the real numbers.
+
 ### Player card
 
 Clicking a player's name or headshot on the Team or Matchup tab, a player on the Players or Trend tab, or a tile in the Trades tab's trade block or the Propose Trade dialog (instead of Sleeper's own NBA card), opens a card laid out like Sleeper's NFL player card:
@@ -239,6 +241,7 @@ Clicking a player's name or headshot on the Team or Matchup tab, a player on the
 
 In the card's Transaction History, a trade shows both teams' sides in place of Sleeper's own detail (which lists one team's players and the picks it sent).
 Each player is a chip that opens their card (Sleeper's own card, as from the tabs), and a traded pick reads "2026 1st Rd ➔ Player 1.05" once its draft is done, else "not drafted yet".
+- Until the picks' drafts are known the detail holds its place under a soft bar, so nothing shifts when it lands (the NBA card does the same).
 - page-hook.js (`cardTrades`) reads the transaction off the history item's props (`adds`, `player_map`, `draft_picks`, `roster_ids`) and draws the chips; it asks the extension for the picks over the bridge (`snp:trade-picks`, answered in content.js).
 - The lookup is the NBA card's: `loaders.draftBoard` (the season's league through `previous_league_id`, then `/v1/draft/<id>` and `/v1/draft/<id>/picks`), `model.pickBecame` for the slot. Two small calls per season, in the open league's API tab, kept for the page's life.
 

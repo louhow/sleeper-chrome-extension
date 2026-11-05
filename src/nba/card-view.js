@@ -5,7 +5,7 @@
   const { esc, f2, CDN, teamLogo, shortName, scoringOf, adminScoring, whatIfOn, whatIfBanner, playerOf, playerName, ownerOf, pct: share, tierClass,
     dash, num, height, ago, newsSource, heat, scaler, ordinal } = globalThis.SNP.ui;
   const { scoreStats } = globalThis.SNP.scoring;
-  const { scoreTier, tradeSides, pickBecame } = globalThis.SNP.model;
+  const { scoreTier, tradeSides, tradedPick, pickBecame } = globalThis.SNP.model;
 
   // NBA team nicknames and primary colors, for the hero ("KINGS #9").
   const TEAMS = {
@@ -310,7 +310,8 @@
         : ' <span class="pc-chip-via">not drafted yet</span>';
       return `<span class="pc-pick">${via}${esc(p.season)} ${ordinal(p.round)} Rd${became}</span>`;
     };
-    const tradeDetail = (t) => `<div class="pc-trade">${tradeSides(t).map((x) => `<div class="pc-trade-side">
+    // Held back (a soft bar of the same size) until every pick's draft is known, so nothing shifts when it lands.
+    const tradeDetail = (t) => `<div class="pc-trade${(t.draft_picks || []).some((x) => s.draftBoards?.[tradedPick(x).season] === undefined) ? ' loading' : ''}">${tradeSides(t).map((x) => `<div class="pc-trade-side">
         <span class="pc-trade-who">${who(x.rosterId)} got</span>
         <span class="pc-trade-assets">${x.players.map(player).join('')}${x.picks.map((p) => pick(p, x.rosterId)).join('')}</span>
       </div>`).join('')}</div>`;

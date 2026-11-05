@@ -240,7 +240,8 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
       playerStatsMap: Object.fromEntries(PLAYERS.map((p) => [p.id, p.stats])),
       // Sleeper's NBA projection columns; the ones a test doesn't set print "-".
       statKeys: ['fpts_proj', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'], statType: 'proj', sort: 'fpts_proj', positionFilter: 'ALL',
-      season: '2026', statInterval: 'season',
+      season: '2026', statInterval: 'season', searchTerm: '',
+      players: PLAYERS.map((p) => ({ player_id: p.id, team: p.team, player: { player_id: p.id, first_name: p.id, last_name: '', injury_status: null } })),
       hideOwned: false, filterByUser: false, filterByUserMap: Object.fromEntries(Object.keys(USERS).map((id) => [id, false])),
       ...${JSON.stringify(state)},
     },
@@ -285,14 +286,20 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
     const view = PLAYERS.filter((p) => positionFilter === 'ALL' || p.pos === positionFilter)
       .filter((p) => !(hideOwned && owned[p.id]) && !(filterByUser && !filterByUserMap[owned[p.id]?.user_id]))
       .map((p) => ({ player_id: p.id, team: p.team }));
-    if (sort) view.sort((a, b) => (map[b.player_id][sort] || -1) - (map[a.player_id][sort] || -1));
+    // Rows beyond the fixture's players, as the extension adds them while a search is typed.
+    const term = String(panel.state.searchTerm || '').trim().toLowerCase();
+    for (const p of panel.state.players) {
+      if (!PLAYERS.some((q) => q.id === p.player_id) && term && String(p.player.full_name).toLowerCase().includes(term)) view.push({ player_id: p.player_id, team: p.team });
+    }
+    const meta = (id) => PLAYERS.find((p) => p.id === id) || {};
+    if (sort) view.sort((a, b) => ((map[b.player_id] || {})[sort] || -1) - ((map[a.player_id] || {})[sort] || -1));
     const grid = document.querySelector('.ReactVirtualized__Grid');
     grid.__reactInternalInstance$test = fiberOf({ players: view, playerStatsMap: map }, 3);
     const nfl = panel.props.sport === 'nfl';
     const game = (p) => (nfl ? '<div class="position-container">' + p.pos + ' - ' + p.team + '</div><div class="game-schedule-live-description">' + (p.game || 'Sun 1:00 PM') + (p.redZone ? '<span class="rz">RZ</span>' : '') + '</div>' : '');
-    grid.innerHTML = view.map(({ player_id: id }) => '<div class="player-list-item' + (nfl ? ' nfl' : '') + '" data-id="' + id + '"><div class="owner-cell"></div><div class="player-meta-container"><div class="name-container"><div class="name">' + id + (PLAYERS.find((p) => p.id === id).rookie ? '<img alt="rookie-label" class="rookie-label" width="12" height="12" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1 1%22%3E%3Crect width=%221%22 height=%221%22 fill=%22%23a97cff%22/%3E%3C/svg%3E">' : '') + '</div>' + game(PLAYERS.find((p) => p.id === id)) +
+    grid.innerHTML = view.map(({ player_id: id }) => '<div class="player-list-item' + (nfl ? ' nfl' : '') + '" data-id="' + id + '"><div class="owner-cell"></div><div class="player-meta-container"><div class="name-container"><div class="name">' + id + (meta(id).rookie ? '<img alt="rookie-label" class="rookie-label" width="12" height="12" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1 1%22%3E%3Crect width=%221%22 height=%221%22 fill=%22%23a97cff%22/%3E%3C/svg%3E">' : '') + '</div>' + game(meta(id)) +
       (OWNERS[id] ? '<div class="owner"><i class="fa fa-arrow-right">→</i><div>' + USERS[owned[id].user_id].display_name + '</div></div>' : '') + '</div></div>' +
-      statKeys.map((k) => '<div class="cell nba">' + (map[id][k] == null ? '-' : (map[id][k] / (k === 'sp' ? 60 : 1) / (map[id].gp || 1)).toFixed(1)) + '</div>').join('') + '</div>').join('');
+      statKeys.map((k) => '<div class="cell nba">' + (((map[id] || {})[k]) == null ? '-' : (map[id][k] / (k === 'sp' ? 60 : 1) / (map[id].gp || 1)).toFixed(1)) + '</div>').join('') + '</div>').join('');
     for (const row of grid.children) row.__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: { player: { player_id: row.dataset.id } } } };
   }
   document.querySelector('.stat-key-header').addEventListener('click', (e) => {
@@ -2803,6 +2810,22 @@ test('players tab: a team picker beside the search, and rostered players show th
   await picker.locator('.snp-team-menu button', { hasText: 'All teams' }).click();
   await page.waitForFunction(() => document.querySelectorAll('.player-list-item').length === 4);
   await forgetPlayersView();
+  documentBody = LOGGED_OUT;
+});
+
+test("players tab: a search finds players Sleeper's list leaves out (no projection for the week), and lets them go with the search", async () => {
+  documentBody = playersTable([{ id: 'guard', pos: 'PG', team: 'LAL', stats: { fpts: 10, fpts_proj: 12, pts: 10 } }], { statType: 'proj', statInterval: 3, sort: 'fpts_proj' });
+  await forgetPlayersView();
+  await page.goto(PLAYERS_URL);
+  const rows = () => page.locator('.player-list-item').evaluateAll((els) => els.map((r) => r.dataset.id));
+  await page.waitForFunction(() => panel.state.statKeys.includes('fpts_proj') && document.querySelector('.snp-team-pick'), null, { timeout: 30000 });
+  assert.deepEqual(await rows(), ['guard']);
+  // Dalton Knecht: a two-way player with no projection in any week, so not in Sleeper's list.
+  await page.evaluate(() => panel.setState({ searchTerm: 'knecht' }));
+  await page.waitForFunction(() => [...document.querySelectorAll('.player-list-item')].some((r) => r.dataset.id === '2709'), null, { timeout: 15000 });
+  await page.evaluate(() => panel.setState({ searchTerm: '' }));
+  await page.waitForFunction(() => document.querySelectorAll('.player-list-item').length === 1 && document.querySelector('.player-list-item').dataset.id === 'guard');
+  assert.deepEqual(await rows(), ['guard'], 'the extra row goes with the search');
   documentBody = LOGGED_OUT;
 });
 

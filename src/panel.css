@@ -2813,6 +2813,21 @@ ul.pc-history {
   gap: 6px;
   margin-top: 2px;
 }
+/* A trade's detail while its picks' drafts load: the real layout kept for its size, hidden under a soft bar. */
+.pc-trade.loading { position: relative; }
+.pc-trade.loading > * { visibility: hidden; }
+.pc-trade.loading::before {
+  content: '';
+  position: absolute;
+  inset: 2px auto 2px 0;
+  width: min(360px, 70%);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  animation: pc-fade 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-trade.loading::before { animation: none; }
+}
 .pc-trade-side {
   display: flex;
   flex-wrap: wrap;

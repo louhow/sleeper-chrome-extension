@@ -44,6 +44,18 @@
       return rows && model.weekPicks(rows, mode, settings(), scoring.scoreStats);
     }),
 
+    // Players Sleeper's table leaves out for having no projection for the week (a two-way player out of the
+    // rotation, someone out for the year): the ones a search matches, for page-hook.js to add as rows.
+    bridge.answer('snp:players-unlisted', ({ term }) => {
+      const plain = (text) => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const q = plain(term).trim();
+      if (q.length < 2) return [];
+      return Object.entries(state.players || {})
+        .filter(([, p]) => p.team && plain(p.name).includes(q))
+        .slice(0, 25)
+        .map(([id, p]) => ({ id, first: p.first, last: p.last, team: p.team, position: p.position, positions: p.positions, injury: p.injury, years_exp: p.years_exp }));
+    }),
+
     // The week strip: per team and day, where each game stands, with each
     // player's fantasy points and score tier per finished game (league scoring).
     bridge.answer('snp:week-schedule', ({ season, week }) => {
