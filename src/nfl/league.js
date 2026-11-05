@@ -15,6 +15,8 @@
   const { host, root } = shared.shadowHost('sleeper-nfl-league');
   host.className = 'on-league';
   const layer = shared.shadowHost('sleeper-nfl-matchup', renderDialog);
+  // Sleeper's own player card (a name in the dialog opens it) steps in front of the dialog.
+  const behind = shared.behindSleeperCard(layer.host);
   // Sleeper's cards sit in a list inside the list ours goes on top of.
   const hide = shared.hideSleeper('nfl-cards', '.league-matchups .league-matchup-row-item');
   let destroyed = false;
@@ -67,11 +69,13 @@
 
   function openDialog(rosterId, week) {
     state.dialog = { rosterId, week };
+    behind.on();
     renderDialog();
   }
   function closeDialog() {
     if (!state.dialog) return;
     state.dialog = null;
+    behind.off();
     renderDialog();
   }
   // The dialog's week picker, within the panel's weeks.
@@ -144,6 +148,7 @@
     destroyed = true;
     cancelAnimationFrame(frame);
     watch.disconnect();
+    behind.off();
     document.removeEventListener('keydown', onKey);
     host.remove();
     layer.host.remove();

@@ -36,17 +36,22 @@
     if (body) body.scrollTop = scroll;
   }
 
+  // Sleeper's own player card (a name here opens it) steps in front of the dialog.
+  const behind = shared.behindSleeperCard(host);
+
   function open() {
     const l = lineup(true);
     if (!l?.editable || l.irBlocked?.length) return;
     state.modal = { lineup: l, ...plan(l), errors: [], saving: false, busy: null, done: null };
     state.notice = null;
+    behind.on();
     render();
   }
 
   function close() {
     if (state.modal?.saving) return;
     state.modal = null;
+    behind.off();
     render();
   }
 
@@ -166,6 +171,7 @@
     destroyed = true;
     document.removeEventListener('click', onClick);
     document.removeEventListener('keydown', onKey);
+    behind.off();
     stopKeys();
     document.getElementById(BUTTON_ID)?.remove();
     host.remove();

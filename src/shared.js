@@ -162,6 +162,21 @@
     globalThis.SNP.bridge.tell('snp:nfl-player-card', { playerId: id, player: basics });
   }
 
+  // Sleeper's own player card (what a player's name opens in the NFL dialogs) lands in the page, below a
+  // dialog's layer. `on()` while the dialog is open puts the dialog's host behind that card for as long as
+  // one is open (`.player-card-header` in the page), and `off()` when the dialog closes.
+  function behindSleeperCard(host) {
+    const step = () => { host.style.cssText = document.querySelector('.player-card-header') ? 'position: relative; z-index: 0' : ''; };
+    const watch = new MutationObserver(step);
+    return {
+      on: () => watch.observe(document.body, { childList: true, subtree: true }),
+      off: () => {
+        watch.disconnect();
+        host.style.cssText = '';
+      },
+    };
+  }
+
   // addEventListener that returns the matching removeEventListener, so a
   // session's teardown is one list of these.
   function listen(target, type, fn, options) {
@@ -212,5 +227,5 @@
     console[dropped ? 'debug' : level](label, err);
   }
 
-  return { report, stylesheet, shadowHost, hideSleeper, flasher, activateOnKey, markMissingImages, safeStore, arrowStep, teamOrder, movedText, listen, openSleeperTab, nflPlayerCard, morph };
+  return { report, stylesheet, shadowHost, hideSleeper, flasher, activateOnKey, markMissingImages, safeStore, arrowStep, teamOrder, movedText, listen, openSleeperTab, nflPlayerCard, behindSleeperCard, morph };
 })();

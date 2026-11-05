@@ -370,7 +370,7 @@ It opens the same dialog as the NBA version, with no warnings to tick through: o
 - Players whose team has kicked off stay put, as Sleeper locks them.
 - Questionable and Doubtful players can start; when one moves into the lineup their row is flagged ("Questionable: check the news") with a note at the top.
 - Every apply works the plan out again first, then saves through Sleeper's own Team component (`updateMatchupLeg` once the draft is done until the league is complete, `roster_update_starters` otherwise, as its `_updateRoster` does: `model.lineupOnLeg`, which the NBA saves follow too), so Sleeper's screen updates as if you'd made the swaps.
-- A player's name or headshot in the dialog opens Sleeper's own player card, as on the compact tabs.
+- A player's name or headshot in the dialog opens Sleeper's own player card, as on the compact tabs, in front of the dialog (which steps behind it while the card is open, `shared.behindSleeperCard`).
 - The save notice shows in the compact tab when it's on screen, else under the dialog's layer; never both.
 
 How it hooks in: `src/page-hook.js` reads the lineup from Sleeper's Team component props (slots and starters as shown, roster, players, `hasTeamPlayedMap`) and each row's projection (`proj` stats and `scoringSettings`), and answers the extension's `snp:nfl-lineup` ask synchronously.

@@ -3618,6 +3618,19 @@ test('NFL optimize lineup: an OPTIMIZE button beside WAIVER and TRADE proposes a
   await page.mouse.move(0, 0);
   await page.screenshot({ path: `${OUT}nfl-dialog.png` });
   assert.equal(await page.locator(nflDialog('[data-action="apply-lineup"]')).textContent(), 'Apply all');
+  // Sleeper's own player card (a player's name opens it) opens in the page; the dialog steps behind it, then comes back.
+  const onTop = () => page.evaluate(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.id);
+  assert.equal(await onTop(), 'sleeper-nfl-dialog');
+  await page.evaluate(() => {
+    const card = document.createElement('div');
+    card.id = 'stand-in-card';
+    card.innerHTML = '<div class="player-card-header"></div>';
+    card.style.cssText = 'position: fixed; inset: 0; z-index: 100';
+    document.body.append(card);
+  });
+  await page.waitForFunction(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.id === 'stand-in-card');
+  await page.evaluate(() => document.getElementById('stand-in-card').remove());
+  await page.waitForFunction(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.id === 'sleeper-nfl-dialog');
 
   // Cancel saves nothing.
   await page.locator(nflDialog('.op-foot button[data-action="close-modal"]')).click();
