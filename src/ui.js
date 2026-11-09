@@ -772,14 +772,28 @@
     ['#', 'rank', 1], ['Team', 'team', 1], ['Record', 'record', -1], ['PF', 'pf', -1], ['PA', 'pa', -1], ['Max PF', 'maxPf', -1], ['Waiver', 'waiver', 1],
   ];
 
+  // The playoff line: a dashed rule between the last team in and the first team
+  // out, by the league's own rules (model.playoffSpots); nothing in a league
+  // without playoffs. `ranks`: each row's rank, in table order. Returns the row
+  // (if any) to draw after row i.
+  function playoffCut(league, ranks, cols) {
+    const spots = globalThis.SNP.model.playoffSpots(league);
+    if (!spots) return () => '';
+    const line = `<tr class="playoff-cut"><td colspan="${cols}"><span class="cut-rule">Top ${spots} make the playoffs</span></td></tr>`;
+    const inside = (rank) => rank != null && rank <= spots;
+    return (i) => (i + 1 < ranks.length && inside(ranks[i]) !== inside(ranks[i + 1]) ? line : '');
+  }
+
   // The league's standings (NBA and NFL League tabs), in place of Sleeper's: click a header to sort by it,
-  // again to flip. `s.standingsSort`: { key, dir }, rank ascending by default.
+  // again to flip. `s.standingsSort`: { key, dir }, rank ascending by default. The playoff line
+  // is drawn only while the table is in rank order.
   function standingsTable(s) {
     const { standingsRanks, standingsRows, sortStandings, FAAB } = globalThis.SNP.model;
     const { key, dir } = s.standingsSort || { key: 'rank', dir: 1 };
     const faab = s.league.settings?.waiver_type === FAAB;
     const ranks = s.weeks?.[s.week]?.ranks ?? standingsRanks(s.rosters || [], null);
     const rows = sortStandings(standingsRows(s.league, s.rosters, ranks), key, dir, (r) => teamName(s, r.roster));
+    const cut = key === 'rank' ? playoffCut(s.league, rows.map((r) => r.rank), STANDINGS_COLS.length) : () => '';
     const head = STANDINGS_COLS.map(([label, k]) => {
       const on = k === key;
       const align = k === 'record' ? 'mid' : !['rank', 'team'].includes(k) ? 'num' : '';
@@ -787,7 +801,7 @@
       return `<th class="${align}${opt}" aria-sort="${on ? (dir > 0 ? 'ascending' : 'descending') : 'none'}"><button class="sort${on ? ' on' : ''}" data-sort="${k}">${label}<span class="arrow">${on ? (dir > 0 ? '▲' : '▼') : ''}</span></button></th>`;
     }).join('');
     return `<div class="lg-head standings-head"><h3>Standings</h3></div>
-      <div class="standings-scroll"><table class="standings"><thead><tr>${head}</tr></thead><tbody>${rows.map((r) => `<tr class="${r.roster.roster_id === s.rosterId ? 'is-mine' : ''}">
+      <div class="standings-scroll"><table class="standings"><thead><tr>${head}</tr></thead><tbody>${rows.map((r, i) => `<tr class="${r.roster.roster_id === s.rosterId ? 'is-mine' : ''}">
         <td class="rank">${r.rank ?? '–'}</td>
         <td><span class="name-cell" data-open-team="${r.roster.roster_id}" role="link" tabindex="0">${avatarImg(avatar(s, r.roster), 'avatar small', s.failedAvatars || undefined)}<span class="team-name">${esc(teamName(s, r.roster))}</span></span></td>
         <td class="mid">${r.wins}-${r.losses}${r.ties ? `-${r.ties}` : ''}</td>
@@ -795,11 +809,11 @@
         <td class="num opt">${f2(r.pa)}</td>
         <td class="num opt">${f2(r.maxPf)}</td>
         <td class="num">${faab ? `<span class="amt">$${r.faab}</span> ` : ''}<span class="sub"><span class="pos">${faab ? `(${r.waiver ?? '–'})` : r.waiver ?? '–'}</span></span></td>
-      </tr>`).join('')}</tbody></table></div>`;
+      </tr>${cut(i)}`).join('')}</tbody></table></div>`;
   }
 
   return {
-    standingsTable, reserveRule, irBlockNames, irBlockTip, irBanner, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
+    standingsTable, playoffCut, reserveRule, irBlockNames, irBlockTip, irBanner, whatIfOn, scoringOf, adminScoring, whatIfChanges, whatIfBanner,
     esc, f2, CDN, headshot, teamLogo, teamName, ownerName, avatar, record, shortName, injuryTag, positions, teamTag,
     gameTime, weekday, gameLabel, nextGame, lockIcon, dialog, dialogErrors, slotBadge, weekNav, notice, loading, errorMsg,
     lineup, rosterParts, opponentOf, taxiRule, weekAhead, forWeek, owns, myRoster, ownerOf, real, playerOf, playerName, padTo, pct, ordinal, researchLine,

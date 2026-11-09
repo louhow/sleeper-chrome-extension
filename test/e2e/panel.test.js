@@ -1266,17 +1266,24 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
   assert.equal(await page.locator('.league-members-container').isVisible(), false);
   const standingsHead = await page.locator(panel('.standings thead th')).allTextContents();
   assert.deepEqual(standingsHead.map((t) => t.replace(/[▲▼]/g, '').trim()), ['#', 'Team', 'Record', 'PF', 'PA', 'Max PF', 'Waiver']);
-  assert.equal(await page.locator(panel('.standings tbody tr')).count(), 14);
+  assert.equal(await page.locator(panel('.standings tbody tr:not(.playoff-cut)')).count(), 14);
+  // The playoff line sits under the league's last playoff spot (its rules say how many), in rank order only.
+  const playoffTeams = await page.evaluate(async (id) => (await (await fetch(`https://api.sleeper.app/v1/league/${id}`)).json()).settings.playoff_teams, LEAGUE);
+  assert.equal(await page.locator(panel('.standings tbody tr.playoff-cut')).count(), 1);
+  assert.equal(await page.locator(panel('.standings tbody tr.playoff-cut')).innerText(), `TOP ${playoffTeams} MAKE THE PLAYOFFS`);
+  assert.equal(await page.locator(panel(`.standings tbody tr:nth-child(${playoffTeams}) + tr`)).getAttribute('class'), 'playoff-cut');
+  await page.locator(panel('.standings')).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${OUT}league-standings.png`, fullPage: true });
   const column = async (i) => (await page.locator(panel(`.standings tbody tr td:nth-child(${i})`)).allTextContents()).map((t) => Number(t.trim().split(/\s+/)[0]));
   const sorted = (dir) => page.locator(panel(`.standings th[aria-sort="${dir}"] [data-sort="pf"]`)).waitFor();
   await page.locator(panel('.standings [data-sort="pf"]')).click();
   await sorted('descending');
   const pf = await column(4);
   assert.deepEqual(pf, [...pf].sort((a, b) => b - a), 'PF sorts most first');
+  assert.equal(await page.locator(panel('.standings tbody tr.playoff-cut')).count(), 0, 'no playoff line once the order is by points');
   await page.locator(panel('.standings [data-sort="pf"]')).click();
   await sorted('ascending');
   assert.deepEqual(await column(4), [...pf].sort((a, b) => a - b), 'a second click flips it');
-  await page.screenshot({ path: `${OUT}league-standings.png`, fullPage: true });
   await assertFitsAtWidths('League tab');
   // Record is centered under its header; the waiver amounts and spots pad so their digits line up in columns.
   const align = await page.evaluate(() => {

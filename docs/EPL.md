@@ -17,6 +17,7 @@ The extension fills that page with the mobile app's tabs.
   The gameweeks run through the one on now once a match in it has kicked off.
   Score colors are the thirds of the rostered players' gameweeks over the same five, per position (Sleeper's public matchups, which NBA and NFL take them from, answer 404 for EPL).
 - **League**: every matchup this week, the standings table and the week's transactions.
+  Sleeper's Premier League leagues have no playoffs (`playoff_week_start` is 0, whatever `playoff_teams` says), so the standings draw no playoff line; one whose rules were changed to have them gets the same line as NBA and NFL.
 - **Player card**: bio, next match, projections for the coming gameweeks, news, a per-match game log with heat-shaded stats, career totals with the club (or clubs, in order) each season and the player's transaction history in your league.
 - **API**: a log of every call the extension makes, with timing, size and a JSON preview.
 

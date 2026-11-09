@@ -133,6 +133,20 @@ test('league tab standings: record centered, FAAB and waiver spot padded into co
   assert.match(html, /<span class="amt">\$100<\/span> <span class="sub"><span class="pos">\(12\)<\/span><\/span>/);
 });
 
+test('league tab standings: the playoff line sits under the last team in, only in rank order and only with playoffs', () => {
+  const r = (id, wins, waiver) => ({ roster_id: id, owner_id: `u${id}`, settings: { wins, losses: 3 - wins, fpts: 100 + id, waiver_position: waiver }, players: [], reserve: [] });
+  const rosters = [r(1, 3, 4), r(2, 2, 3), r(3, 1, 2), r(4, 0, 1)];
+  const playoffs = { ...state().league, settings: { ...state().league.settings, playoff_week_start: 19, playoff_teams: 2, num_teams: 4 } };
+  const lg = (extra) => matchup.league(state({ page: 'league', rosters, league: playoffs, weeks: { 1: { ...week(legs()), ranks: { 1: 1, 2: 2, 3: 3, 4: 4 } } }, ...extra }));
+  const rowsOf = (html) => [...html.matchAll(/<tr class="([^"]*)">\s*<td[^>]*>(?:<span class="cut-rule">)?([^<]*)/g)].map((m) => m[1] === 'playoff-cut' ? 'cut' : m[2].trim());
+  assert.deepEqual(rowsOf(lg()), ['1', '2', 'cut', '3', '4']);
+  assert.match(lg(), /<tr class="playoff-cut"><td colspan="7"><span class="cut-rule">Top 2 make the playoffs<\/span><\/td><\/tr>/);
+  assert.deepEqual(rowsOf(lg({ standingsSort: { key: 'rank', dir: -1 } })), ['4', '3', 'cut', '2', '1'], 'rank flipped: the line moves with the teams');
+  assert.doesNotMatch(lg({ standingsSort: { key: 'pf', dir: -1 } }), /playoff-cut/, 'sorted by points the line means nothing');
+  assert.doesNotMatch(lg({ league: state().league }), /playoff-cut/, 'no playoff_week_start, no playoffs');
+  assert.doesNotMatch(lg({ league: { ...playoffs, settings: { ...playoffs.settings, playoff_week_start: 0 } } }), /playoff-cut/);
+});
+
 test('league tab standings: PF, PA, Max PF and waiver columns, sortable by the header', () => {
   const rosters = [
     { roster_id: 10, owner_id: 'u1', settings: { wins: 1, losses: 0, fpts: 120, fpts_against: 100, ppts: 150, waiver_position: 2 }, players: [], reserve: [] },

@@ -1132,6 +1132,19 @@
     return !(s.playoff_week_start && week >= s.playoff_week_start);
   }
 
+  // ---- Playoffs ----
+
+  // How many teams make the playoffs, from the league's own rules; 0 when the
+  // league has none (no playoff_week_start, as in Sleeper's Premier League
+  // leagues, which still carry a default playoff_teams; or a chopped league).
+  function playoffSpots(league) {
+    const s = league?.settings || {};
+    if (!s.playoff_week_start || s.type === 3) return 0;
+    const n = Number(s.playoff_teams) || 0;
+    const teams = Number(s.num_teams) || league?.total_rosters || Infinity;
+    return n > 0 && n < teams ? n : 0;
+  }
+
   // The middle value (the mean of the middle two for an even count); null for none.
   function median(values) {
     const v = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -1386,7 +1399,7 @@
     taxiEligible, taxiOpen, reserveEligible, illegalReserve,
     lockedGameId, lockState, lockCheck, scoresAtStake, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
-    openValue, formBars, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
+    openValue, formBars, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, playoffSpots, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
     isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, chopLeagueAvg, graveyard,
   };

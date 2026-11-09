@@ -164,6 +164,18 @@ test('win probability: a settled tie is a coin flip, missing numbers count as 0,
   for (const p of model.winProbability(5, 0, 0, 10)) assert.ok(Number.isFinite(p), 'a projection of 0 never divides by zero');
 });
 
+test('playoff spots come from the league rules; none without a playoff week, in a chopped league, or when every team is in', () => {
+  const spots = (settings, extra = {}) => model.playoffSpots({ settings, total_rosters: 14, ...extra });
+  assert.equal(spots({ playoff_week_start: 19, playoff_teams: 6, num_teams: 14 }), 6, 'the NBA league');
+  assert.equal(spots({ playoff_week_start: 0, playoff_teams: 6, num_teams: 10 }), 0, 'Sleeper\'s Premier League leagues carry a default playoff_teams but no playoffs');
+  assert.equal(spots({ num_teams: 18, type: 3 }), 0, 'a chopped league');
+  assert.equal(spots({ playoff_week_start: 15, playoff_teams: 6, num_teams: 18, type: 3 }), 0, 'a chopped league, whatever else its settings say');
+  assert.equal(spots({ playoff_week_start: 15, playoff_teams: 14, num_teams: 14 }), 0, 'everyone in: nothing to draw a line between');
+  assert.equal(spots({ playoff_week_start: 15, playoff_teams: 4 }), 4, 'team count from total_rosters when the settings lack it');
+  assert.equal(spots({ playoff_week_start: 15 }), 0);
+  assert.equal(model.playoffSpots(null), 0);
+});
+
 test('standings ranks use roster_standings, else record then waiver order', () => {
   const rosters = [
     { roster_id: 1, settings: { wins: 0, waiver_position: 14 } },

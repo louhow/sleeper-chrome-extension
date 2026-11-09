@@ -2,7 +2,7 @@
 (globalThis.SEP ||= {}).ui = (() => {
   const { playerGames, weekTotals, started, finished, slotAccepts, savedFormation, slotLabels, formationOf, lineupOnLeg } = globalThis.SEP.model;
   // The same helpers as NBA and NFL; the rest differ by sport.
-  const { esc, f2, CDN, teamName, ownerName, avatar, record, owns, myRoster, ownerOf, real, weekday, shortName, gameTime, dialogErrors, notice, loading, errorMsg } = globalThis.SNP.ui;
+  const { esc, f2, CDN, teamName, ownerName, avatar, record, owns, myRoster, ownerOf, real, weekday, shortName, gameTime, dialogErrors, notice, loading, errorMsg, playoffCut } = globalThis.SNP.ui;
   const f1 = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toFixed(1));
   const INJURY_SEVERE = /^(out|ir|sus)/i;
   // Sleeper's apps list players by position in this order.
@@ -213,6 +213,7 @@
   }
 
   return {
+    playoffCut,
     esc, f2, f1, CDN, headshot, teamLogo, teamName, ownerName, avatar, avatarImg, record, shortName, playerOf, injuryTag, positions,
     gameTime, weekday, shortDate, slotBadge, versus, nextMatch, nextGameText, gameChips, lineupSide, dialog, dialogErrors, weekNav, notice, loading, errorMsg,
     owns, myRoster, real, ownerOf, lineup, teamTotals, reserveRule, pct, playerLine, positionRank, roleName,

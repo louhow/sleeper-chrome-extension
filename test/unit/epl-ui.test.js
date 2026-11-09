@@ -7,7 +7,15 @@ const { ui, model, scoring, panelView: view } = SEP;
 const plain = (x) => JSON.parse(JSON.stringify(x));
 
 test('helpers that are the same as NBA and NFL come from the core', () => {
-  for (const name of ['esc', 'f2', 'CDN', 'teamName', 'ownerName', 'avatar', 'record', 'owns', 'myRoster', 'ownerOf', 'real', 'loading', 'errorMsg', 'weekday', 'shortName', 'gameTime', 'dialogErrors', 'notice']) assert.equal(ui[name], SNP.ui[name], name);
+  for (const name of ['esc', 'f2', 'CDN', 'teamName', 'ownerName', 'avatar', 'record', 'owns', 'myRoster', 'ownerOf', 'real', 'loading', 'errorMsg', 'weekday', 'shortName', 'gameTime', 'dialogErrors', 'notice', 'playoffCut']) assert.equal(ui[name], SNP.ui[name], name);
+});
+
+test('the playoff line: none in a Premier League league as Sleeper sets them up, drawn when its rules have playoffs', () => {
+  const ranks = [1, 2, 3, 4];
+  const epl = { settings: { num_teams: 4, playoff_week_start: 0, playoff_teams: 2 } };
+  assert.deepEqual(ranks.map((_, i) => ui.playoffCut(epl, ranks, 5)(i)), ['', '', '', '']);
+  const cut = ui.playoffCut({ settings: { ...epl.settings, playoff_week_start: 30 } }, ranks, 5);
+  assert.deepEqual(ranks.map((_, i) => cut(i)), ['', '<tr class="playoff-cut"><td colspan="5"><span class="cut-rule">Top 2 make the playoffs</span></td></tr>', '', '']);
 });
 
 const NOW = Date.parse('2026-10-24T12:00:00Z');

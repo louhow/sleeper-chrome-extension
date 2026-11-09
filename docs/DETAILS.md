@@ -158,6 +158,7 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
 - Clicking a matchup opens it on the Matchup tab, that team on the left, through Sleeper's own MATCHUP tab; clicking a team's avatar, owner or name opens that team on the Team tab.
 - Under the matchups, a standings table: rank, team, record, PF, PA, Max PF (`ppts`) and waiver (FAAB left and waiver spot).
   A click on a header sorts by it (most first, or first rank and A to Z for rank, team and waiver), another click flips it.
+  In rank order, a dashed playoff line sits under the last playoff spot, labelled with how many teams make it, from the league's own rules (`settings.playoff_teams`, only in a league with a `playoff_week_start`; a chopped league has none).
   It stands in for Sleeper's own "League is full" teams list and standings, which are hidden.
 - In Recent Activity, a click on an added or dropped player opens the extension's player card (page-hook.js reads the player off the transaction its component holds, checked against the name the line shows), not Sleeper's popup.
 
@@ -336,7 +337,7 @@ The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), a
 - The week's matchups drawn as the NBA League tab draws them (yours first and framed; avatars, owners, team names, scores, win chance and bar, record, projection), in place of Sleeper's own cards.
 - The numbers are Sleeper's own: its cards stay on the page, hidden, and the extension reads them as they update during games, so they always match the rest of Sleeper.
 - Clicking a matchup opens it in the extension's own dialog, full-size and laid out like the Matchup tab (both teams' card, then both lineups slot by slot with the game and box score under each player, with the week picker), on the week the League tab showed and yours on the left when it's your matchup, in place of Sleeper's small matchup modal. A team in it opens on the Team tab; Escape, the backdrop or ✕ closes it. The teams are matched by the owner names on Sleeper's card (its props no longer carry the roster ids); a card that matches no roster opens Sleeper's own. Sleeper's week picker and the rest of the tab (activity) stay as they are.
-- Below the cards, the NBA League tab's standings table (ranks from `roster_standings`, falling back to the record's order), in place of Sleeper's, which stay on the page, hidden. A chopped league has the chopping block instead.
+- Below the cards, the NBA League tab's standings table (ranks from `roster_standings`, falling back to the record's order, with the playoff line under the last playoff spot), in place of Sleeper's, which stay on the page, hidden. A chopped league has the chopping block instead.
 - In a league that plays the median, its banner comes first and every team over it wears a medallion (see League median).
 
 ### NFL: Chopped leagues

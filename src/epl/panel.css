@@ -316,6 +316,8 @@ th.num, td.num { text-align: right; }
 .standings .rank { color: var(--muted); font-weight: 900; width: 40px; }
 .standings .name-cell { display: flex; align-items: center; gap: 10px; }
 .standings .team-name { font-size: 14px; }
+/* The EPL table draws borders on top of rows: the row under the playoff line gives its up. */
+.standings tr.playoff-cut + tr td { border-top: 0; }
 .txs { margin: 0; padding: 0; list-style: none; }
 .tx { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .tx-head { margin-bottom: 6px; font-size: 13px; }

@@ -616,3 +616,35 @@ ol.claims {
 .claim-actions .bid-input input {
   width: 56px;
 }
+
+/* The standings' playoff line: a dashed rule between the last team in and the
+   first team out, its label on the line. The row above gives up its border so
+   the two don't double up. */
+.standings tr.playoff-cut td {
+  padding-top: 0;
+  padding-bottom: 0;
+  border: 0;
+  background: none;
+}
+.standings tr:has(+ .playoff-cut) td {
+  border-bottom-color: transparent;
+}
+.standings .cut-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 18px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.standings .cut-rule::before,
+.standings .cut-rule::after {
+  content: "";
+  flex: 1;
+  border-top: 2px dashed var(--accent);
+  opacity: 0.75;
+}

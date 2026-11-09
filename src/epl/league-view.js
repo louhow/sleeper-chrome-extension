@@ -2,7 +2,7 @@
 // transactions, as the mobile app's League tab shows them. Pure: state -> HTML.
 (globalThis.SEP ||= {}).leagueView = (() => {
   const { winProbability, standings, pointsFor, pointsAgainst, streak, faabLeft, FAAB } = globalThis.SEP.model;
-  const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, lineupSide, weekNav, headshot, positions, owns, playerOf, loading, errorMsg } = globalThis.SEP.ui;
+  const { esc, f2, teamName, ownerName, avatarImg, record, lineup, teamTotals, lineupSide, weekNav, headshot, positions, owns, playerOf, loading, errorMsg, playoffCut } = globalThis.SEP.ui;
 
   function render(s) {
     if (s.error) return errorMsg(s.error);
@@ -45,9 +45,12 @@
     </section>`;
   }
 
+  // Sleeper's Premier League leagues have no playoffs (playoff_week_start is 0),
+  // so the playoff line shows only in one whose rules were changed to have them.
   function standingsTable(s) {
     const rows = standings(s.rosters);
     const faab = s.league.settings?.waiver_type === FAAB;
+    const cut = playoffCut(s.league, rows.map((_, i) => i + 1), 5);
     return `<table class="standings">
       <thead><tr><th>Rank</th><th>Name</th><th class="num">${faab ? 'Waiver' : 'Priority'}</th><th class="num">PF</th><th class="num">PA</th></tr></thead>
       <tbody>${rows.map((r, i) => `<tr class="${owns(s, r) ? 'is-mine' : ''}${r.roster_id === s.rosterId ? ' shown' : ''}" data-roster="${r.roster_id}">
@@ -56,7 +59,7 @@
         <td class="num">${faab ? `$${faabLeft(s.league, r)}` : ''} <span class="sub">(${r.settings?.waiver_position ?? '–'})</span></td>
         <td class="num">${f2(pointsFor(r))}</td>
         <td class="num">${f2(pointsAgainst(r))}</td>
-      </tr>`).join('')}</tbody>
+      </tr>${cut(i)}`).join('')}</tbody>
     </table>`;
   }
 
