@@ -28,6 +28,11 @@
 // its props nothing changes, and a click still opens its trade dialog. A trade
 // Sleeper hasn't loaded has no card, just rows of each team's adds and drops,
 // written out the same way from the message's own data (no dialog to open then).
+// An image pasted into a chat (inspected in Sleeper's bundle 2026-11-10) goes
+// where a dropped file does: Sleeper wraps each chat in a drop zone
+// (.drag-drop-container) whose drop opens its own preview, with a caption and
+// send, and uploads it as a file message. Sleeper never listens for a paste,
+// so a pasted image is handed to that drop zone; Sleeper does the rest.
 //   chat() -> { destroy }
 (globalThis.SNP ||= {}).chat = () => {
   const { bridge, chatView, shared, ui } = globalThis.SNP;
@@ -265,8 +270,24 @@
     draw();
   }
 
+  // A pasted image goes to the chat's drop zone, as if dropped there. Only an
+  // image on its own: a paste that also has text (cells from a spreadsheet
+  // carry a picture of themselves) stays a text paste.
+  function pasteImage(e) {
+    const zone = e.target instanceof Element && e.target.closest('.drag-drop-container');
+    const overlay = zone?.querySelector(':scope > .upload-area-overlay');
+    const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+    if (!overlay || !files.length || e.clipboardData.getData('text/plain')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const dataTransfer = new DataTransfer();
+    for (const f of files) dataTransfer.items.add(f);
+    overlay.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+  }
+
   // Capture, so the row is held before the hover paints.
   document.addEventListener('click', openPlayer, true);
+  document.addEventListener('paste', pasteImage, true);
   const onKey = (e) => shown && e.key === 'Escape' && closeTrade();
   document.addEventListener('keydown', onKey);
   document.addEventListener('mouseover', enter, true);
@@ -275,6 +296,7 @@
 
   function destroy() {
     document.removeEventListener('click', openPlayer, true);
+    document.removeEventListener('paste', pasteImage, true);
     document.removeEventListener('keydown', onKey);
     layer.host.remove();
     document.removeEventListener('mouseover', enter, true);

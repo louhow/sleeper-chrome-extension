@@ -437,6 +437,14 @@ The popup itself sits inside its message, which clips it, and cuts names at 64px
 - Who reacted shows above the emoji, outside the message, as wide as the names.
 - It's all one stylesheet switched on by `data-snp-chat` on `<html>`, plus a hover handler that holds the row's height while it's open (`src/chat.js`).
 
+### Chat image paste
+
+Sleeper's web chat takes an image or file dragged onto it (its drop zone, `.drag-drop-container`, opens a preview with a caption box, then uploads it as a file message), but a pasted image does nothing: Sleeper never listens for a paste.
+Here an image pasted anywhere in a chat is handed to that drop zone as if it were dropped there, so Sleeper's own preview, size limit and upload take it from there (`src/chat.js`).
+
+- Only an image on its own: a paste that also carries text (cells copied from a spreadsheet bring a picture of themselves) stays a text paste.
+- A paste outside a chat is left alone.
+
 ### How the extension and page-hook talk
 
 `src/page-hook.js` runs in the page's own world (only there can it read React props); the rest runs in the extension's.

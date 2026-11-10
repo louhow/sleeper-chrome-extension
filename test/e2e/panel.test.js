@@ -4017,6 +4017,7 @@ test('chat: a trade Sleeper has no card for is written out from its rows, with n
   documentBody = LOGGED_OUT;
 });
 
+
 test('chat: hovering an emoji reaction opens its rows below, in place, moves nothing, never flickers, and the names popup shows whole', async () => {
   documentBody = chatPage();
   // A reacted emoji's place, the chat's scroll, and the names popup, as seen.
@@ -4130,6 +4131,41 @@ test('chat: hovering an emoji reaction opens its rows below, in place, moves not
   assert.deepEqual(out, { below: true, pastChat: true, shown: true, rows: 81 }, 'all three rows, below, shown past the chat');
   assert.deepEqual(await page.locator('.reaction.reacted').nth(2).boundingBox(), last, 'the picked emoji stays under the cursor');
   await page.screenshot({ path: `${OUT}chat-reactions-last.png`, clip: { x: 380, y: 40, width: 560, height: 400 } });
+  documentBody = LOGGED_OUT;
+});
+
+// Sleeper's chat in its drop zone (markup and drop handler from its bundle,
+// 2026-11-10): a dropped file goes to its preview, which uploads it.
+const chatPastePage = () => `<!doctype html><title>Sleeper</title>
+<div class="drag-drop-container"><div class="upload-area-overlay"></div>
+  <div class="chat-panel"><textarea class="chat-input"></textarea></div>
+</div>
+<textarea class="elsewhere"></textarea>
+<script>
+  window.__dropped = [];
+  document.querySelector('.upload-area-overlay').addEventListener('drop', (e) => {
+    e.preventDefault();
+    window.__dropped.push([...e.dataTransfer.files].map((f) => f.name + ':' + f.type + ':' + f.size));
+  });
+  window.__paste = (sel, withText) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([new Uint8Array([137, 80, 78, 71])], 'image.png', { type: 'image/png' }));
+    if (withText) dt.setData('text/plain', 'A1');
+    const e = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt });
+    document.querySelector(sel).dispatchEvent(e);
+    return e.defaultPrevented;
+  };
+</script>`;
+
+test('chat: an image pasted into the chat goes to Sleeper\'s drop zone; text pastes and pastes outside the chat are left alone', async () => {
+  documentBody = chatPastePage();
+  await page.goto('https://sleeper.com/settings', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-snp-chat'));
+  assert.equal(await page.evaluate(() => window.__paste('.chat-input', false)), true);
+  assert.deepEqual(await page.evaluate(() => window.__dropped), [['image.png:image/png:4']]);
+  assert.equal(await page.evaluate(() => window.__paste('.chat-input', true)), false, 'an image with text stays a text paste');
+  assert.equal(await page.evaluate(() => window.__paste('.elsewhere', false)), false, 'outside a chat nothing changes');
+  assert.equal((await page.evaluate(() => window.__dropped)).length, 1);
   documentBody = LOGGED_OUT;
 });
 

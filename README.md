@@ -77,6 +77,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Chat: hovering a message's emoji reactions no longer shifts the chat around, and who reacted shows in full.
 - Chat: compact messages, free agent and waiver moves (one line a player) and weekly reports, about half the height.
 - Chat: trades written out as on Sleeper's mobile app, each team and everything it gets, with no VIEW to click.
+- Chat: paste an image from the clipboard (Cmd/Ctrl+V) to send it, as you could only drag one in before.
 - My Waivers dialog: each pending claim two lines, its clear time and bid once on the add's line, so more than twice as many claims fit before it scrolls.
 - Debug button (`{ }` in the toolbar, its tooltip says what it is): a log of every call the extension makes, with status, timing, size and a JSON preview.
 
