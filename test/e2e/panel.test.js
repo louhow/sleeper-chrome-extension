@@ -103,7 +103,7 @@ const LEAGUE_TAB = TEAM_TAB.replace('<template id="app">', `<template id="league
   // Sleeper's tabs route: Matchup and Team show the placeholder the panel fills, League its own content.
   document.addEventListener('click', (e) => {
     const tab = e.target.closest('.item-tab');
-    const page = tab && { MATCHUP: 'matchup', TEAM: 'team', LEAGUE: 'league' }[tab.textContent];
+    const page = tab && { MATCHUP: 'matchup', TEAM: 'team', LEAGUE: 'league' }[tab.__reactFiber$test?.key ?? tab.textContent];
     if (!page) return;
     history.pushState({}, '', location.pathname.replace(/[a-z]+$/, page));
     document.querySelector('.center-panel').replaceWith(document.getElementById(page === 'league' ? 'league' : 'app').content.cloneNode(true));
@@ -1329,7 +1329,12 @@ test('league tab: every matchup of the week on top of Sleeper\'s own content; a 
   assert.equal(fit.cards, 7);
   assert.ok(fit.bottom <= fit.room, `all ${fit.cards} fit (${Math.round(fit.bottom)} of ${Math.round(fit.room)}px)`);
   await page.screenshot({ path: `${OUT}league-matchups.png` });
-  // A team's name (or avatar, or owner) opens its Team tab; "My team" comes back.
+  // A team's name (or avatar, or owner) opens its Team tab; "My team" comes back. On a narrow
+  // page Sleeper's tabs are icons with no name, each known only by its React key.
+  await page.evaluate(() => document.querySelectorAll('.center-tab-selector .item-tab').forEach((tab) => {
+    tab.__reactFiber$test = { key: tab.textContent, memoizedProps: { className: tab.className } };
+    tab.textContent = '';
+  }));
   const theirName = (await cards.nth(1).locator('.mu-team.theirs .team-name').textContent()).trim();
   await cards.nth(1).locator('.mu-team.theirs .team-name .team-link').click();
   await page.waitForURL(`**/leagues/${LEAGUE}/team`);

@@ -213,9 +213,14 @@
     for (const x of a.slice(b.length)) x.remove();
   }
 
+  // Sleeper's tab for `page` ('team', 'matchup', ...), found by its name. When
+  // Sleeper draws its tabs as icons only (a narrow page), only the tab's React
+  // key says which is which, and page-hook clicks that one (snp:open-tab).
   function openSleeperTab(page) {
     const tabs = [...document.querySelectorAll('.center-tab-selector .item-tab')];
-    tabs.find((t) => new RegExp(`^${page}$`, 'i').test(t.textContent.trim()))?.click();
+    const tab = tabs.find((t) => new RegExp(`^${page}$`, 'i').test(t.textContent.trim()));
+    if (tab) tab.click();
+    else globalThis.SNP.bridge.tell('snp:open-tab', { page });
   }
 
   // Report a failed call. A dropped connection (offline, asleep, a request

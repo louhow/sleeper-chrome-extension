@@ -179,6 +179,16 @@
     nav.router.push(`/leagues/${id}/${page}`);
   }, true);
 
+  // Sleeper's tab for a page, by the React key each tab carries (TEAM, MATCHUP,
+  // ...): its tabs can be icons with no name (shared.openSleeperTab).
+  bridge.on('snp:open-tab', ({ page } = {}) => {
+    const keyOf = (el) => {
+      const key = Object.keys(el).find((k) => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+      return key ? String(el[key]?.key ?? '').toLowerCase() : '';
+    };
+    [...document.querySelectorAll('.center-tab-selector .item-tab')].find((el) => page && keyOf(el) === page)?.click();
+  });
+
   // The sidebar's leagues, each link marked with its league id and sport
   // (data-snp-league, data-snp-sport), which only this world can read: the
   // extension adds NBA leagues' matchup lines there (nba/nav.js).
