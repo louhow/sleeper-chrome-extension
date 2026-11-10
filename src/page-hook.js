@@ -1382,14 +1382,44 @@
     }
     return card && card.props ? { card, open, playersMap: card.props.playersMap || props.playersMap || {} } : null;
   }
-  function sleeperCard() {
-    const team = teamFiber()?.stateNode;
-    const first = team?.props?.roster?.players?.[0];
-    if (team?._onClickPlayerNews && first) return catchCard(team.props, () => team._onClickPlayerNews(first));
+  function rowCard() {
     const row = document.querySelector('.matchup-player-row-container .row');
     const click = row && props(row, (x) => typeof x.onClick === 'function')?.onClick;
     const owner = row && props(row, (x) => typeof x.openModal === 'function' && x.playersMap);
     return click && owner ? catchCard(owner, () => click({ stopPropagation() {}, preventDefault() {} })) : null;
+  }
+  // The League tab has neither: nothing mounted there builds Sleeper's card (it's
+  // module-private in Sleeper's bundle). Sleeper's own League tab matchup card
+  // (hidden under ours) opens its small matchup modal, whose player rows do. React
+  // mounts that modal in the same task, so it's opened, a row's card caught and the
+  // modal closed again before the browser paints: nothing shows. Kept per league.
+  let leagueCard = null;
+  function leagueTabCard() {
+    const leagueId = location.pathname.match(/^\/leagues\/(\d+)/)?.[1];
+    if (!leagueId) return null;
+    if (leagueCard?.leagueId === leagueId) return leagueCard.caught;
+    const item = document.querySelector(NFL_ROW);
+    const click = item && [item, ...item.querySelectorAll('*')].map((el) => props(el, () => true)?.onClick).find((f) => typeof f === 'function');
+    const panel = item && props(item, (x) => typeof x.openModal === 'function' && typeof x.closeModal === 'function');
+    if (!click || !panel) return null;
+    const before = document.querySelectorAll('.modal-item').length;
+    let caught = null;
+    try {
+      click();
+      caught = rowCard();
+    } catch {
+      caught = null;
+    } finally {
+      if (document.querySelectorAll('.modal-item').length > before) panel.closeModal();
+    }
+    if (caught) leagueCard = { leagueId, caught };
+    return caught;
+  }
+  function sleeperCard() {
+    const team = teamFiber()?.stateNode;
+    const first = team?.props?.roster?.players?.[0];
+    if (team?._onClickPlayerNews && first) return catchCard(team.props, () => team._onClickPlayerNews(first));
+    return rowCard() || leagueTabCard();
   }
   bridge.on('snp:nfl-player-card', ({ playerId, player: basics }) => openNflCard(playerId, basics));
   function openNflCard(playerId, basics) {

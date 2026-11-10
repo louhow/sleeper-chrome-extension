@@ -395,7 +395,9 @@ const NFL_PLAYERS = {
 // own modal (recorded in __nflOpened); Sleeper's tab row records which tab was clicked (__tabClicks).
 // `you`: your roster id and user id (louhow's real ones, so the extension's own lookup by name agrees).
 const NFL_LEAGUE_URL = `https://sleeper.com/leagues/${NFL_LEAGUE}/league`;
-const nflLeagueTab = ({ you = { roster: 1, user: 'u1' } } = {}) => {
+// `modal`: a card's click opens Sleeper's small matchup modal at once (React mounts it in the same task), its
+// player rows opening Sleeper's player card (recorded in __nflModals), and Sleeper's closeModal takes it away.
+const nflLeagueTab = ({ you = { roster: 1, user: 'u1' }, modal = false } = {}) => {
   const side = (t, flip) => `<div class="user${flip ? ' reverse' : ''}"><div class="matchup-owner-item"><div class="owner-container">
     <div class="row space-between"><div class="row"><div class="avatar-container"><div class="avatar" style="background-image: url(&quot;https://sleepercdn.com/avatars/thumbs/${t.av}&quot;)"></div></div>
     <div class="meta"><div class="team-name">@${t.owner}</div><div class="name">${t.team}</div></div></div>
@@ -417,12 +419,26 @@ ${pairs.map(([a, b]) => `<div class="league-matchup-row-item"><div class="matchu
   window.__nflOpened = [];
   window.__tabClicks = [];
   document.querySelectorAll('.item-tab').forEach((tab) => tab.addEventListener('click', () => window.__tabClicks.push(tab.textContent)));
-  const league = { rosters: [${you.roster}, 2, 103, 104].map((r) => ({ roster_id: r, owner_id: r === ${you.roster} ? '${you.user}' : 'u' + r })), userId: '${you.user}', round: 7 };
+  window.__nflModals = [];
+  const card = (id) => ({ type: 'PlayerCard', props: { sport: 'nfl', playerIds: [id], selectedPlayerId: id, playersMap: { [id]: { player_id: id, first_name: 'Row', last_name: id } }, week: 7 } });
+  const openModal = (el) => window.__nflModals.push({ type: el.type, playerId: el.props.selectedPlayerId, ids: el.props.playerIds, known: Boolean(el.props.playersMap[el.props.selectedPlayerId]) });
+  const closeModal = () => document.querySelector('.modal-item:last-of-type')?.remove();
+  function sleeperModal() {
+    const item = Object.assign(document.createElement('div'), { className: 'modal-item' });
+    item.innerHTML = '<div class="league-matchups-modal"><div class="matchup-player-row-container"><div class="row">Row player</div></div></div>';
+    const owner = { openModal, playersMap: {} };
+    item.querySelector('.row').__reactInternalInstance$test = { memoizedProps: { onClick: () => owner.openModal(card('rowPlayer')) }, return: { memoizedProps: owner } };
+    document.body.append(item);
+  }
+  const league = { rosters: [${you.roster}, 2, 103, 104].map((r) => ({ roster_id: r, owner_id: r === ${you.roster} ? '${you.user}' : 'u' + r })), userId: '${you.user}', round: 7, openModal, closeModal };
   const pairs = ${JSON.stringify(pairs.map(([a, b]) => [a.r, b.r]))};
   document.querySelectorAll('.league-matchup-row-item').forEach((row, i) => {
     row.__reactInternalInstance$test = { memoizedProps: {}, return: { memoizedProps: { rosterId1: pairs[i][0], rosterId2: pairs[i][1] }, return: { memoizedProps: league } } };
     const header = row.querySelector('.matchup-header');
-    const open = () => window.__nflOpened.push(i);
+    const open = () => {
+      window.__nflOpened.push(i);
+      if (${modal}) sleeperModal();
+    };
     header.__reactInternalInstance$test = { memoizedProps: { onClick: open } };
     header.addEventListener('click', open);
   });
@@ -3489,6 +3505,30 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   await cards.nth(1).locator('.mu-who .sub').filter({ hasText: '@nobody0' }).waitFor();
   await cards.nth(1).click();
   assert.deepEqual(await page.evaluate(() => [window.__tabClicks, window.__nflOpened]), [[], [1]], 'Sleeper\'s second card');
+  documentBody = LOGGED_OUT;
+});
+
+test('NFL league tab: a player in the matchup dialog opens Sleeper\'s player card, caught off Sleeper\'s matchup modal, which never stays', async () => {
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
+  const me = users.find((u) => u.display_name === 'louhow');
+  documentBody = nflLeagueTab({ you: { roster: rosters.find((r) => r.owner_id === me.user_id).roster_id, user: me.user_id }, modal: true });
+  await page.goto(NFL_LEAGUE_URL);
+  const cards = page.locator('#sleeper-nfl-league .lg-match[data-nfl-matchup]');
+  await cards.first().waitFor({ timeout: 30000 });
+  await cards.first().click();
+  const name = page.locator('#sleeper-nfl-matchup .mu-row .mp.nfl .name button[data-player]').first();
+  await name.waitFor({ timeout: 30000 });
+  const id = await name.getAttribute('data-player');
+  await name.click();
+  await page.waitForFunction(() => window.__nflModals.length === 1);
+  assert.deepEqual(await page.evaluate(() => window.__nflModals[0]), { type: 'PlayerCard', playerId: id, ids: [id], known: true });
+  assert.equal(await page.locator('.modal-item').count(), 0, 'Sleeper\'s matchup modal is closed again');
+  assert.deepEqual(await page.evaluate(() => window.__nflOpened), [0], 'opened once, behind the scenes');
+  // A second player: the card caught before, no second trip through Sleeper's modal.
+  await page.locator('#sleeper-nfl-matchup .mu-row .mp.nfl .name button[data-player]').nth(1).click();
+  await page.waitForFunction(() => window.__nflModals.length === 2);
+  assert.deepEqual(await page.evaluate(() => window.__nflOpened), [0]);
   documentBody = LOGGED_OUT;
 });
 
