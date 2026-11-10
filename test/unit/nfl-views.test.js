@@ -122,6 +122,15 @@ test('NFL league cards: Sleeper\'s own numbers, broken avatars as the plain circ
   assert.match(html, /class="mu-head lg-match own" role="button" tabindex="0" data-nfl-matchup="0"/);
 });
 
+test('NFL league cards: a finished matchup (scores at their projections) is 100% and 0%, not Sleeper\'s 99% and 1%', () => {
+  const side = (team, score, proj, win) => ({ avatar: '', owner: team.toLowerCase(), team, score, win, record: '1-0', proj });
+  const render = (a, b) => text(nflLeagueView.render({ cards: [{ own: true, sides: [a, b] }], round: 9 }, null, new Set()));
+  assert.match(render(side('Mine', '134.60', '134.60', '99%'), side('Theirs', '88.10', '88.10', '1%')), /Mine 134\.60 100% WIN .* Theirs 88\.10 0% WIN/);
+  assert.match(render(side('Mine', '88.10', '88.10', '1%'), side('Theirs', '134.60', '134.60', '99%')), /Mine 88\.10 0% WIN .* Theirs 134\.60 100% WIN/);
+  // One side still to play: Sleeper's numbers as they are.
+  assert.match(render(side('Mine', '134.60', '134.60', '99%'), side('Theirs', '88.10', '101.30', '1%')), /Mine 134\.60 99% WIN .* Theirs 88\.10 1% WIN/);
+});
+
 test("League tab cards: Sleeper's own text as read, a card with no teams yet, and win text that isn't a number", () => {
   const side = (team, win) => ({ avatar: '', owner: team.toLowerCase(), team, score: '12.30', win, record: '3-3', proj: '40.10' });
   const out = text(nflLeagueView.render({ cards: [
