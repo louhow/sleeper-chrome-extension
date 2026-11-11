@@ -121,6 +121,15 @@
     return (player.positions || []).some((p) => accepts.includes(p));
   }
 
+  // The player positions a league has a starting slot for (e.g. no DEF or K
+  // in a league without those slots), for lists that would show the rest.
+  // Null when any position can start (a UTIL slot) or the league names no slots.
+  function startablePositions(rosterPositions) {
+    const slots = (rosterPositions || []).filter((slot) => slot !== 'BN');
+    if (!slots.length || slots.some((slot) => OPEN_SLOTS.has(slot))) return null;
+    return [...new Set(slots.flatMap((slot) => SLOT_ACCEPTS[slot] || [slot]))];
+  }
+
   // Taxi rules, ported from Sleeper's apps. A player qualifies by experience:
   // up to taxi_years (0 = no limit) when non-rookies are allowed, else rookies only.
   function taxiEligible(player, settings) {
@@ -1401,6 +1410,6 @@
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
     openValue, formBars, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, playoffSpots, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
-    isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, chopLeagueAvg, graveyard,
+    startablePositions, isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, chopLeagueAvg, graveyard,
   };
 })();

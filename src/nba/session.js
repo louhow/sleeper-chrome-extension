@@ -257,6 +257,13 @@
     schedule();
   }
 
+  // Sleeper's Trend tab lists every trending player, whatever the league can start:
+  // page-hook.js takes out the ones this league has no slot for.
+  function tellTrend(league) {
+    const positions = model.startablePositions(league.roster_positions);
+    if (positions && !destroyed) bridge.tell('snp:trend-positions', { leagueId, positions });
+  }
+
   async function loadLeague(force = false) {
     state.error = null;
     const league = await api.get(`/v1/league/${leagueId}`);
@@ -268,10 +275,13 @@
       teardown();
       await settings?.ready;
       // The NFL pages are the extension's unless the settings turned them off.
-      if (league.sport === 'nfl' && !destroyed && (settings?.values().nflUi ?? true)) nflSession = globalThis.SNP.nflSession(leagueId, lastPage, api, league, nav);
-      else console.info('[sleeper-nba-panel] not an NBA league, staying hidden');
+      if (league.sport === 'nfl' && !destroyed && (settings?.values().nflUi ?? true)) {
+        tellTrend(league);
+        nflSession = globalThis.SNP.nflSession(leagueId, lastPage, api, league, nav);
+      } else console.info('[sleeper-nba-panel] not an NBA league, staying hidden');
       return;
     }
+    tellTrend(league);
     // Tells page-hook.js to route this league's waiver and add buttons here.
     document.documentElement.dataset.snpNbaLeague = leagueId;
     // And to add its columns to this league's Players tab.

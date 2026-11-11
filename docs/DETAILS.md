@@ -373,6 +373,13 @@ Sleeper's own NFL Players table, with these additions (the same hooks as the NBA
 - The team picker and team lines of the NBA Players tab: every league team with its avatar, narrowing the list to one team through Sleeper's owner filter, arrow keys through the teams (stopping at the ends), and each rostered player's team avatar and name.
 - The view you last had on comes back, as on the NBA Players tab.
 
+### Trend tab
+
+Sleeper's Trend tab lists the most added and dropped players across all of Sleeper, whatever your league can start: a defense or a kicker shows in a league with no slot for one.
+The extension leaves out every player the league has no starting slot for, read from the league's own `roster_positions` (a flex slot counts for each position it takes; a league with a UTIL slot starts anyone, so its list is untouched).
+They come out of the lists Sleeper's own component holds, so Sleeper draws and ranks the rest, and its position filter never brings them back.
+NBA and NFL leagues; with the NFL switch off in the settings, an NFL league keeps Sleeper's list.
+
 ### NFL: Optimize lineup
 
 **Optimize lineup** sits in the compact Team tab's toolbar; on Sleeper's own Team tab (⇄) it's an **OPTIMIZE** button left of Sleeper's WAIVER and TRADE buttons (it reuses their classes, so it looks like them).
@@ -458,11 +465,12 @@ Chrome injects a file once per frame, so `page-hook.js` carries a copy of its co
 | --- | --- | --- |
 | `ask` / `answer` | `<name>-request`, answered with `<name>` before `dispatchEvent` returns | `snp:nfl-lineup`, `snp:nfl-league`, `snp:nav-leagues`, `snp:week-games`, `snp:week-schedule`, `snp:recent-weeks`, `snp:admin-scores` |
 | `call` / `answerLater` | the request carries an `id` the answer echoes, so concurrent calls never take each other's answer | `snp:nfl-lineup-save` |
-| `tell` / `on` | one-way | `snp:player-action`, `snp:player-card`, `snp:nfl-player-card`, `snp:nfl-league-open`, `snp:admin-scoring`, `snp:players-ready`, `snp:week-games-ready` |
+| `tell` / `on` | one-way | `snp:player-action`, `snp:player-card`, `snp:nfl-player-card`, `snp:nfl-league-open`, `snp:admin-scoring`, `snp:players-ready`, `snp:week-games-ready`, `snp:trend-positions` |
 
 `snp:nav-leagues` marks each sidebar league link with its league id and sport (`data-snp-league`, `data-snp-sport`) and lists them.
 `snp:players-ready` says the extension has a league's Players-tab data (NBA or NFL); page-hook adds no columns before it.
 `snp:week-games-ready` says a week the extension was loading is in, so page-hook asks again.
+`snp:trend-positions` gives the positions a league has a starting slot for; page-hook takes everyone else out of the Trend tab's lists.
 
 ### Waivers
 

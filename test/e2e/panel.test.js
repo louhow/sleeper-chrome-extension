@@ -1859,6 +1859,64 @@ test('player card: opens from the Players and Trend tabs instead of Sleeper\'s c
 });
 
 
+// Sleeper's Trend list (from its web bundle, 2026-11-11), reduced to its stateful component: the adds
+// and drops it loads a moment after mounting, the two it draws (narrowed by its position filter), and
+// every player by id as a prop. Each row shows its rank in the list drawn.
+const trendTab = (adds, drops, players) => `<!doctype html><meta charset="utf-8"><title>Sleeper</title>
+<div class="trending-list2"><div class="trending-container up"></div><div class="trending-container last down"></div></div>
+<script>
+  const el = document.querySelector('.trending-list2');
+  const list = {
+    props: { playerInfoMap: ${JSON.stringify(players)}, getTrendingPlayers() {} },
+    state: { adds: [], drops: [], filteredAdds: [], filteredDrops: [] },
+    setState(patch) {
+      Object.assign(this.state, patch);
+      for (const [side, rows] of [['up', this.state.filteredAdds], ['down', this.state.filteredDrops]]) {
+        el.querySelector('.' + side).innerHTML = rows.map((t, i) => {
+          const p = this.props.playerInfoMap[t.player_id];
+          return '<div class="trending-list-item"><div class="rank">' + (i + 1) + '</div><div class="position">' + p.position + '</div></div>';
+        }).join('');
+      }
+    },
+  };
+  window.__trend = list;
+  el.__reactInternalInstance$test = { memoizedProps: { className: 'trending-list2' }, return: { memoizedProps: list.props, stateNode: list } };
+  const adds = ${JSON.stringify(adds)};
+  const drops = ${JSON.stringify(drops)};
+  setTimeout(() => list.setState({ adds, drops, filteredAdds: adds, filteredDrops: drops }), 300);
+</script>`;
+
+test('Trend tab: players the league has no slot for (a defense, a kicker) are left out, and the rest keep their order', async () => {
+  const players = {
+    1: { player_id: '1', position: 'WR', fantasy_positions: ['WR'] },
+    2: { player_id: '2', position: 'K', fantasy_positions: ['K'] },
+    BAL: { player_id: 'BAL', position: 'DEF', fantasy_positions: ['DEF'] },
+    4: { player_id: '4', position: 'QB', fantasy_positions: ['QB'] },
+    5: { player_id: '5', position: 'TE', fantasy_positions: null },
+  };
+  const trend = (ids) => ids.map((id, i) => ({ player_id: String(id), count: 1000 - i }));
+  const body = trendTab(trend([1, 'BAL', 4, 2, 5]), trend(['BAL', 2, 4]), players);
+  const shown = (side) => page.locator(`.${side} .trending-list-item`).evaluateAll((rows) => rows.map((r) => `${r.querySelector('.rank').textContent} ${r.querySelector('.position')?.textContent}`));
+  // The NBA league starts anyone (a UTIL slot): Sleeper's list as it is.
+  documentBody = body;
+  await page.goto(`https://sleeper.com/leagues/${LEAGUE}/trend`);
+  await page.waitForFunction((id) => document.documentElement.dataset.snpNbaLeague === id, LEAGUE, { timeout: 30000 });
+  await page.waitForTimeout(800);
+  assert.deepEqual(await shown('down'), ['1 DEF', '2 K', '3 QB']);
+  // The NFL league has QB, RB, WR, TE, FLEX and SUPER_FLEX: no defense, no kicker.
+  const league = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}`)).json();
+  assert.ok(!league.roster_positions.includes('DEF') && !league.roster_positions.includes('K'), 'the test league has neither slot');
+  await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/trend`);
+  await page.waitForFunction(() => window.__trend.state.adds.length === 3, null, { timeout: 30000 });
+  assert.deepEqual(await shown('up'), ['1 WR', '2 QB', '3 TE'], 'ranked again without them; a player with no fantasy positions goes by position');
+  assert.deepEqual(await shown('down'), ['1 QB']);
+  // Sleeper's position filter narrows the list the component holds, so "ALL" brings none of them back.
+  await page.evaluate(() => window.__trend.setState({ filteredAdds: window.__trend.state.adds, filteredDrops: window.__trend.state.drops }));
+  assert.deepEqual(await shown('down'), ['1 QB']);
+  documentBody = LOGGED_OUT;
+});
+
+
 test('sidebar: each league opens on the tab you were last on in it, any sport', async () => {
   documentBody = leagueNav;
   const path = () => new URL(page.url()).pathname;

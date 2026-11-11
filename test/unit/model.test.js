@@ -945,6 +945,15 @@ test('live reads: every so often while a game is on, else a minute after the nex
 
 // ---- Chopped leagues ----
 
+test('startablePositions: the positions a league has a starting slot for, null when anyone can start', () => {
+  assert.deepEqual(plain(model.startablePositions(['QB', 'RB', 'RB', 'WR', 'TE', 'FLEX', 'SUPER_FLEX', 'BN', 'BN'])), ['QB', 'RB', 'WR', 'TE'], 'no K, no DEF');
+  assert.deepEqual(plain(model.startablePositions(['QB', 'K', 'DEF', 'IDP_FLEX', 'BN'])), ['QB', 'K', 'DEF', 'DL', 'LB', 'DB']);
+  assert.deepEqual(plain(model.startablePositions(['REC_FLEX', 'WRRB_FLEX'])), ['WR', 'TE', 'RB']);
+  assert.equal(model.startablePositions(['PG', 'G', 'UTIL', 'BN']), null, 'a UTIL slot starts anyone');
+  assert.equal(model.startablePositions(['BN', 'BN']), null);
+  assert.equal(model.startablePositions(undefined), null);
+});
+
 test('isChopped: Sleeper\'s guillotine type only', () => {
   assert.equal(model.isChopped({ settings: { type: 3 } }), true);
   assert.equal(model.isChopped({ settings: { type: 2 } }), false);

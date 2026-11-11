@@ -72,6 +72,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 **All sports**
 - Player cards (NBA, and Sleeper's own NFL card): the player's real-life draft (year, round, pick, team) and contract (when he's a free agent, years left, this season's pay, since when), from ESPN, beside Exp. A pick fades as the years pass, and a contract's last year is flagged.
 - Score colors (green, yellow, red) from the league's own games: the thirds of its starters' recent scores, per position in NFL.
+- Trend tab: players your league has no starting slot for (a defense or kicker in a league without one) are left out.
 - Each league opens on the tab you were last on in it when you switch leagues in the sidebar.
 - Settings: the gear in Sleeper's sidebar opens the extension's settings (a switch for the NFL pages and tools, so Sleeper's own show instead), with Sleeper's account settings a button away.
 - Chat: hovering a message's emoji reactions no longer shifts the chat around, and who reacted shows in full.

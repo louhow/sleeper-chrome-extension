@@ -981,6 +981,49 @@
     if (el) rowWatcher.observe(el, { childList: true, subtree: true, characterData: true });
   }
 
+  // Trend tab: Sleeper lists every trending player, whatever the league can
+  // start (a defense or kicker in a league with no slot for one). Its list
+  // component holds the adds and drops it loaded, and its own position filter
+  // narrows those: taking the players this league has no slot for out of them
+  // (by fantasy position, as that filter reads it) leaves Sleeper to draw and
+  // number the rest. The extension says which positions can start
+  // ('snp:trend-positions'); a league it hasn't spoken for keeps Sleeper's list.
+  const TREND_ROUTE = /^\/leagues\/(\d+)\/trend(?:\/|$)/;
+  const TREND_LIST = '.trending-list2';
+  const trendPositions = {};
+  function patchTrend() {
+    const positions = trendPositions[location.pathname.match(TREND_ROUTE)?.[1]];
+    const el = positions && document.querySelector(TREND_LIST);
+    const list = el && fiber(el, (x) => x.playerInfoMap && x.getTrendingPlayers)?.stateNode;
+    const { adds, drops, filteredAdds, filteredDrops } = list?.state || {};
+    if (![adds, drops, filteredAdds, filteredDrops].every(Array.isArray)) return;
+    const startable = (t) => {
+      const p = list.props.playerInfoMap[t.player_id];
+      const at = p && (p.fantasy_positions?.length ? p.fantasy_positions : [p.position]);
+      return !p || at.some((pos) => positions.includes(pos));
+    };
+    if (adds.every(startable) && drops.every(startable)) return;
+    list.setState({
+      adds: adds.filter(startable), drops: drops.filter(startable),
+      filteredAdds: filteredAdds.filter(startable), filteredDrops: filteredDrops.filter(startable),
+    });
+  }
+  // On the Trend tab, as soon as Sleeper's list is in: before it's painted.
+  const trendWatcher = new MutationObserver(patchTrend);
+  let trendWatched = false;
+  function watchTrend() {
+    const on = TREND_ROUTE.test(location.pathname);
+    if (on === trendWatched) return;
+    trendWatched = on;
+    if (on) trendWatcher.observe(document.documentElement, { childList: true, subtree: true });
+    else trendWatcher.disconnect();
+  }
+  bridge.on('snp:trend-positions', ({ leagueId, positions } = {}) => {
+    if (!leagueId || !Array.isArray(positions)) return;
+    trendPositions[leagueId] = positions;
+    patchTrend();
+  });
+
   // No layout shift: on the NBA Players tab, Sleeper's table stays hidden (its
   // space kept) until the view you had is restored and our columns, sizes and
   // week data are in, then shows once. Any players route starts hidden; it shows
@@ -993,6 +1036,7 @@
   function routeChanged() {
     if (location.pathname === routePath) return;
     routePath = location.pathname;
+    watchTrend();
     const on = PLAYERS_ROUTE.test(routePath);
     document.documentElement.toggleAttribute(PENDING, on);
     pendingSince = on ? Date.now() : 0;
@@ -1032,9 +1076,11 @@
   routeChanged();
 
   // One poll for what Sleeper changes without telling: the path (for the tab
-  // to reopen a league on) and the Players table.
+  // to reopen a league on), the Trend list and the Players table.
   setInterval(() => {
     rememberPage();
+    watchTrend();
+    patchTrend();
     checkPending();
     if (document.documentElement.dataset.snpPlayersLeague && document.querySelector(PLAYERS_PANEL)) patchPlayers();
   }, 500);
