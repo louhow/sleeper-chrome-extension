@@ -159,3 +159,15 @@ test('a trade in the history lists both sides, each player opens a card, and a p
   assert.match(card.render(state({ 2026: undefined })), /2026 1st Rd <span class="pc-chip-via">…/);
   assert.match(card.render(state({ 2026: null })), /not drafted yet/);
 });
+
+test('a drafted row names the pick\'s original team when the pick was traded', () => {
+  const draft = { type: 'draft_pick', status: 'complete', created: 1752514206707, adds: { 4881: 10 }, drops: null, metadata: { round: 1, round_pick_no: 11, picked_by: 'b' } };
+  const state = (slotToRoster) => ({
+    modal: { kind: 'player', playerId: '4881' }, players: { 4881: { name: 'Yaxel Lendeborg', positions: ['PF'] } },
+    draftBoards: { 2025: { slotToRoster, picks: [{ round: 1, draft_slot: 11, pick_no: 11, player_id: '4881', roster_id: 10 }] } },
+    rosters: [{ roster_id: 5, owner_id: 'a' }, { roster_id: 10, owner_id: 'b' }], usersById: { a: { display_name: 'badonkeyds' }, b: { display_name: 'louhow' } },
+    cards: { 4881: { history: [draft] } }, league: { season: '2025' },
+  });
+  assert.match(card.render(state({ 11: 5 })), /with pick 1\.11 <span class="pc-chip-via">\(from badonkeyds\)/);
+  assert.doesNotMatch(card.render(state({ 11: 10 })), /\(from /);
+});

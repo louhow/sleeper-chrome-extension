@@ -83,7 +83,8 @@
   // Every pick in the card's trades turns into a player once its draft is done: that draft's slots and picks,
   // one small pair of calls per season, kept for the session in `state.draftBoards` (null: nothing drafted yet).
   function loadBoards(history) {
-    const seasons = new Set(history.filter((t) => t.type === 'trade').flatMap((t) => (t.draft_picks || []).map((p) => model.tradedPick(p).season)));
+    const seasons = new Set(history.flatMap((t) => (t.type === 'trade' ? (t.draft_picks || []).map((p) => model.tradedPick(p).season)
+      : t.type === 'draft_pick' ? [String(new Date(t.created).getFullYear())] : [])));
     for (const season of seasons) {
       if (season in state.draftBoards) continue;
       state.draftBoards[season] = undefined; // asked

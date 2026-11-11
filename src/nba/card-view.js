@@ -290,7 +290,12 @@
       if (t.type === 'draft_pick') {
         const md = t.metadata || {};
         const pick = `${md.round}.${String(md.round_pick_no).padStart(2, '0')}`;
-        return [['drafted', 'Drafted', `by <b>${esc(user(md.picked_by) || byRoster[to] || '')}</b> with pick ${esc(pick)}`]];
+        // The slot's original team, from that draft's board; a different one means the pick was traded.
+        const board = s.draftBoards?.[String(new Date(t.created).getFullYear())];
+        const made = board?.picks?.find((x) => String(x.player_id) === String(id));
+        const original = made && board.slotToRoster?.[made.draft_slot];
+        const traded = original != null && Number(original) !== Number(to) ? ` <span class="pc-chip-via">(from ${esc(byRoster[original] || `Team ${original}`)})</span>` : '';
+        return [['drafted', 'Drafted', `by <b>${esc(user(md.picked_by) || byRoster[to] || '')}</b> with pick ${esc(pick)}${traded}`]];
       }
       if (t.type === 'trade') return [['traded', 'Traded', `to ${who(to)} from ${who(from)}`, tradeDetail(t)]];
       const bid = t.type === 'waiver' && t.settings?.waiver_bid != null ? ` for $${esc(t.settings.waiver_bid)}` : '';

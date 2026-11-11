@@ -44,7 +44,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Optimize lineup (on the Team and Matchup tabs, for the week shown, upcoming weeks included): recommends which finished games to lock in and the best starters for the next day of games, slot by slot in your lineup's order, each with its lock score, projection, open value and a small chart of their last games' scores; apply one row or all of them.
 - Waiver bids and free-agent adds from Sleeper's own W and ADD buttons, plus your pending claims.
 - Players tab: remembers your last view; a week strip per player (games played in their score's color, games left, scores on hover); a team picker to scan any roster; team avatars on rostered players; in Stats, a week's Avg (with games played) / Best / Worst game and an optional Shooting group (FGM, FGA, 3PA, FTM, FTA). Searching by name also finds players Sleeper's list leaves out for lacking a projection (a two-way player, say).
-- Player card: bio, game logs, career, news, transaction history (a trade shows both sides, players open their card, a traded pick shows the player it became).
+- Player card: bio, game logs, career, news, transaction history (a trade shows both sides, players open their card, a traded pick shows the player it became; a drafted row names the team the pick came from when it was traded).
 - NFL player card: a trade in its transaction history shows both sides, players open their card, a traded pick shows the player it became.
 - Admin tools (off unless `?snp-admin=1`): what-if scoring on the Team and Matchup tabs and player card, adminFPTS and adminDelta columns on the Players tab.
 
