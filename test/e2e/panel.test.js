@@ -3568,6 +3568,24 @@ test('chopped league tab: your safe status, the chopping block and the graveyard
   documentBody = LOGGED_OUT;
 });
 
+test('chopped league tab: someone else\'s team opens in the compact view, even with Sleeper\'s own Team tab picked (it shows only yours)', async () => {
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${CHOP_LEAGUE}/rosters`)).json();
+  sleeper.me = rosters.find((r) => !r.settings?.eliminated).owner_id;
+  documentBody = chopLeagueTab();
+  await page.goto(`https://sleeper.com/leagues/${CHOP_LEAGUE}/league`);
+  // Read as the page loads, so it's set first.
+  await page.evaluate(() => localStorage.setItem('snp:nfl-sleeper-view', '1'));
+  await page.reload();
+  const row = (sel) => page.locator(`#sleeper-nfl-chop .chop-tab ${sel}`);
+  await row('.chop-row[data-open-team]').first().waitFor({ timeout: 30000 });
+  // Yours keeps Sleeper's view; someone else's turns it off.
+  await row('.chop-row.own').click();
+  assert.equal(await page.evaluate(() => localStorage.getItem('snp:nfl-sleeper-view')), '1');
+  await row('.chop-row[data-open-team]:not(.own)').first().click();
+  assert.equal(await page.evaluate(() => localStorage.getItem('snp:nfl-sleeper-view')), null);
+  documentBody = LOGGED_OUT;
+});
+
 test('chopped league team tab: points per week, FAAB left and the safe chance in place of the 0-0 record', async () => {
   const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${CHOP_LEAGUE}/rosters`)).json();
   sleeper.me = rosters.find((r) => !r.settings?.eliminated).owner_id;

@@ -228,8 +228,10 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
   }
 
   // A team on the Matchup tab opens on the Team tab, through Sleeper's own tab (so its router follows).
+  // Sleeper's own Team tab shows only yours, so someone else's opens in the compact view.
   function openTeam(rosterId) {
     setRoster(rosterId);
+    if (sleeperView && rosterId !== myRosterId()) setSleeperView(false);
     state.tab = 'page';
     shared.openSleeperTab('team');
   }

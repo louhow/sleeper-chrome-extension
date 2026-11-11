@@ -300,6 +300,7 @@ The value is Sleeper's FPTS plus the changed settings scored on their own (`snp:
 The extension's own Team and Matchup tabs take the place of Sleeper's, laid out like the NBA ones.
 Sleeper's own tab stays on the page, hidden: its Team component saves lineups and feeds Optimize lineup.
 The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), and "⇄ Compact view" beside Sleeper's tab row comes back.
+Sleeper's Team tab shows only your team, so a link to someone else's team (a matchup, the standings, the chopping block) opens the compact view again.
 
 - Team: the team card (avatar, record, opponent, points, live projection, week picker), then starters slot by slot, bench (by position), IR and taxi.
   Points read – until a starter's game kicks off, as on NBA; IR and taxi keep a row per league slot, open ones included, so the page holds its shape.
