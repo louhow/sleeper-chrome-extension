@@ -61,7 +61,7 @@ The projection follows Lock-In rules: an unlocked player scores their final game
 The **Optimize lineup** button on the Team and Matchup tabs (your own team, a week you can still edit) proposes the best starting lineup and the finished games worth locking in, and shows all of it in a dialog before anything saves.
 Opening it first reads your rosters, the week's lineup, games and stats again, so a page left open for days still plans from what Sleeper holds now.
 A starter with no games left keeps their final game's score in the slot, so a bench player replaces them only when projected to beat it; the row says so.
-A starter with no games left, and a bench player whose games all come on a later day who fits the slot and is projected (Sleeper's projection) above that score, show under **Later this week** with the day, the gain and a Swap now button: today's plan never makes the move, since swapping on that day gets the same result with news of who is out.
+Nothing today beats a starter with no games left, so their slot goes to the next day that gets played: a bench player who fits it and whose last game, by Sleeper's projection, beats the score the slot keeps comes in, marked with the gain. The header is the week's projection (each starter's locked or final score).
 Nothing is written until you apply a row or press Apply all; Cancel, ✕, the backdrop or Esc leave the rest as it was.
 - Ties: at equal points, a player with a game that day takes the slot of one with none (a 0.00 projection with a game is all upside), even if the idle player is better later in the week; check back the next day to start them again. After that, the better player later, then fewest moves.
 

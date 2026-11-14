@@ -62,8 +62,6 @@
       summary: summary(plan),
       notes: warning,
       rows,
-      later: laterMoves(s, m, plan),
-      none: plan.later?.length ? `Nothing to change ${day(plan)}. ${plan.later.length === 1 ? '1 move' : `${plan.later.length} moves`} later this week.` : undefined,
       actionable,
       apply: applyAll(m, apply, { risky: good.length > 0, held: blocked, title: blocked ? BLOCKED : '' }),
     });
@@ -72,24 +70,9 @@
   // The day the plan is for, e.g. "Fri".
   const day = (plan) => (plan.date ? weekday(plan.date) : 'Day');
 
-  // The starters' projected points on that day now and after the changes.
+  // The week's projection (the score each starter counts at the end) now and after the changes.
   function summary(plan) {
-    return plan.date ? planSummary(plan, `${day(plan)} projection`, `Starters playing ${day(plan)}`)
-      : planSummary(plan, 'Lineup projection', 'No games left this week');
-  }
-
-  // Moves for a later day, one line each: who comes in for whom, when, the gain
-  // (Sleeper's projection against the score the slot keeps) and a Swap now button.
-  function laterMoves(s, m, plan) {
-    if (!plan.later?.length) return '';
-    const rows = plan.later.map((o) => `<div class="os-later">
-      <span class="os-slot">${slotBadge(plan.slots[o.slot])}</span>
-      <span class="who"><b>${esc(playerName(s.players, o.id))}</b> in for ${esc(playerName(s.players, o.out))}</span>
-      <span class="when">${esc(weekday(o.date))}${o.tip ? ` ${esc(gameTime(o.tip))}` : ''}</span>
-      <span class="gain">+${f2(o.gain)}</span>
-      <button class="os-apply" data-op-later="${o.slot}" ${m.saving ? 'disabled' : ''} title="You can wait: swapping on ${esc(weekday(o.date))} gets the same result, and you'll know if ${esc(shortName(s.players[o.id]))} is out.">${m.busy === `later:${o.slot}` ? 'Saving…' : 'Swap now'}</button>
-    </div>`).join('');
-    return `<div class="os-laterbox"><h4>Later this week</h4>${rows}</div>`;
+    return planSummary({ ...plan, ...plan.week }, 'Week projection', 'Locked or final score per starter');
   }
 
   // One starting slot, in lineup order: who starts there. When the plan
@@ -115,7 +98,7 @@
         ? `<span class="sub drops ${tone}"${change.dropsUnsure ? ' title="If they were starting when it tipped off; the extension didn\'t see your lineup then"' : ''}>${change.dropsUnsure ? 'May drop' : 'Drops'} lock-in ${score(s, drops.actual)} ${esc(gameLabel(drops))}</span>` : ''}`;
       return `<div class="os-row nba swap${change?.goodScore ? ' losing' : change?.lost ? ' warning' : ''}">
         <span class="os-slot">${slotBadge(slot)}</span>
-        ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}</span>${nextLock ? `<span class="sub">${lockIcon()}Then locks ${score(s, nextLock.actual)} ${esc(gameLabel(nextLock.game))} · ${openText(s, nextLock)}</span>` : ''}`)}
+        ${player(s, next, 'in', `<span class="sub move">${moveText(plan, next, 'in')} · ${esc(upcoming(s, next))}${plan.future?.[next] ? ` <span class="gain" title="Sleeper's projection for their last game over the score the slot keeps">+${f2(plan.future[next].gain)}</span>` : ''}</span>${nextLock ? `<span class="sub">${lockIcon()}Then locks ${score(s, nextLock.actual)} ${esc(gameLabel(nextLock.game))} · ${openText(s, nextLock)}</span>` : ''}`)}
         ${player(s, cur, 'out', outSub)}
         ${numbers(s, plan, next, nextLock?.actual)}
         <span class="os-act">${swapActions(s, m, plan, i, { cur, next, nextLock, drops, change, risky, others })}</span>

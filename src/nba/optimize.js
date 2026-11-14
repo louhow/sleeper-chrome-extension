@@ -113,18 +113,6 @@
   const lockNow = (lineup, id, gameId, okText) =>
     modalSave(() => saveLeg('lock_in', lineup.roster.roster_id, lineup.starters, { ...lineup.locks, [id]: gameId }), okText, replan);
 
-  // A move for a later day, made now: the bench player takes the slot on the lineup as it stands.
-  function applyLater(i) {
-    const fresh = freshPlan();
-    if (!fresh) return;
-    const { m, lineup, plan } = fresh;
-    const move = plan.later?.find((o) => o.slot === i);
-    if (!move || lineup.starters[i] !== move.out) return;
-    m.busy = `later:${i}`;
-    const starters = lineup.starters.map((id, k) => (k === i ? move.id : id));
-    return modalSave(() => saveStarters(starters), `Saved${ui.forWeek(state)}: ${shortOf(move.id)} in for ${shortOf(move.out)}`, replan);
-  }
-
   // Saves the proposed lineup and locks in one write (locks are final).
   function apply() {
     const fresh = freshPlan();
@@ -207,8 +195,6 @@
     if (row) applyRow(Number(row.dataset.opRow));
     const out = target.closest('[data-op-lock-out]');
     if (out) lockOut(out.dataset.opLockOut);
-    const later = target.closest('[data-op-later]');
-    if (later) applyLater(Number(later.dataset.opLater));
     const move = target.closest('[data-op-lock-move]');
     if (move) lockMove(Number(move.dataset.opLockMove));
     const lock = target.closest('[data-op-lock-row]');
@@ -216,7 +202,7 @@
     const keep = target.closest('[data-op-keep], [data-op-relock]');
     if (keep) toggleLock(keep.dataset.opKeep ?? keep.dataset.opRelock, keep.dataset.opRelock != null);
     if (target.closest('[data-action="apply-lineup"]')) apply();
-    return Boolean(row || later || out || move || lock || keep);
+    return Boolean(row || out || move || lock || keep);
   }
 
   return { open, click };

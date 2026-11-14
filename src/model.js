@@ -918,28 +918,28 @@
     const first = solve(new Set());
     const locking = new Set(l.starters.filter((id) => lockable(id) && !skip.has(id) && first.starters.includes(id)));
     const plan = locking.size ? solve(locking) : first;
-    // Moves for a later day, not today's plan: a starter with no games left
-    // scores the week's final game, played, and a bench player whose games all
-    // come later would score theirs in that slot instead. Waiting costs nothing
-    // (the swap works as well on that day, with news of who is out), so these
-    // are offered, never folded into today's lineup. Gain: Sleeper's projection
-    // for the bench player's last game over the score the slot keeps.
+    // Nothing today beats a starter with no games left (they score the week's
+    // final game, played): the slot goes to the next day that gets played. A bench
+    // player whose games all come later takes it when Sleeper's projection for
+    // their last game beats the score the slot keeps. `plan.future` marks those
+    // moves by the player coming in: { date, tip, gain }.
     const slotAt = (i) => l.slots[i] ?? 'UTIL';
     const dead = (id) => id && id !== '0' && look[id] && !look[id].fixed && look[id].gamesLeft === 0 && !look[id].locked;
     const spare = [...l.starters, ...l.bench].filter((id) => id && id !== '0' && look[id] && !look[id].fixed
       && look[id].gamesLeft > 0 && !l.starters.includes(id) && !plan.starters.includes(id));
     const offers = plan.starters.flatMap((id, i) => (dead(id) && l.starters[i] === id ? spare
       .filter((b) => fits(slotAt(i), l.players[b] || {}))
-      .map((b) => ({ slot: i, out: id, id: b, gain: (look[b].left.at(-1)?.proj ?? 0) - (look[id].final?.actual ?? 0),
+      .map((b) => ({ slot: i, id: b, gain: (look[b].left.at(-1)?.proj ?? 0) - (look[id].final?.actual ?? 0),
         date: look[b].left[0].date, tip: look[b].left[0].game.start ?? null }))
       .filter((o) => o.gain > 0) : []))
       .sort((x, y) => y.gain - x.gain);
-    plan.later = [];
+    plan.future = {};
     for (const o of offers) {
-      if (plan.later.some((k) => k.slot === o.slot || k.id === o.id)) continue;
-      plan.later.push(o);
+      if (plan.starters[o.slot] === o.id || o.id in plan.future || !dead(plan.starters[o.slot])) continue;
+      plan.starters[o.slot] = o.id;
+      plan.future[o.id] = { date: o.date, tip: o.tip, gain: o.gain };
     }
-    plan.later.sort((x, y) => x.slot - y.slot);
+    if (Object.keys(plan.future).length) plan.changes = lineupChanges(l.starters, plan.starters, slotAt);
     plan.date = date;
     // Unticked ones stay listed, so they can be ticked again.
     plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {
@@ -985,6 +985,17 @@
       // The score a starter with no games left keeps in the slot (the week's final game).
       final: o.final?.actual ?? null,
     }]));
+    // The week's projection: what each starter would count at the end, i.e. the
+    // locked game, else the final game of the week (played, or Sleeper's projection).
+    const lockedOn = new Set(plan.locks.filter((k) => k.on).map((k) => k.id));
+    const counts = (id) => {
+      if (!id || id === '0' || !look[id]) return 0;
+      const o = look[id];
+      if (o.locked) return o.locked.actual ?? 0;
+      if (lockedOn.has(id)) return o.banked?.actual ?? 0;
+      return o.gamesLeft > 0 ? o.left.at(-1)?.proj ?? 0 : o.final?.actual ?? 0;
+    };
+    plan.week = { before: l.starters.reduce((sum, id) => sum + counts(id), 0), after: plan.starters.reduce((sum, id) => sum + counts(id), 0) };
     return plan;
   }
 
@@ -1420,7 +1431,7 @@
   const lineupOnLeg = (league) => !['pre_draft', 'drafting', 'complete'].includes(league?.status);
 
   // Whether two optimize plans (bestLineup) propose the same thing.
-  const samePlan = (a, b) => ['starters', 'current', 'changes', 'locks', 'later'].every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
+  const samePlan = (a, b) => ['starters', 'current', 'changes', 'locks'].every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
 
   // Arrow keys through the teams: `order` lists groups of rosters (one team
   // each, or a matchup's pair), and the step goes from the group holding

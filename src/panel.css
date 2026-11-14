@@ -3500,36 +3500,3 @@ button.autosub-chip:hover {
   color: var(--muted);
   font-size: 12px;
 }
-
-/* Optimize: moves for a later day, under the slot rows. */
-.os-laterbox {
-  margin-top: 14px;
-}
-.os-laterbox h4 {
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted, rgba(255, 255, 255, 0.6));
-}
-.os-later {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-}
-.os-later .who {
-  flex: 1 1 200px;
-  min-width: 0;
-}
-.os-later .when {
-  color: var(--muted, rgba(255, 255, 255, 0.6));
-}
-.os-later .gain {
-  font-weight: 700;
-  color: var(--good, #4cd98f);
-}

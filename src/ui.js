@@ -720,10 +720,10 @@
   // (warnings), then a row per slot; Cancel and `apply` (applyAll) below.
   // Without anything to apply, it says the lineup is already the best.
   // `ahead`: the week is ahead of the one on now, which the title says.
-  function optimizeDialog(m, { week, ahead = false, how, summary, notes = '', rows, later = '', none = `This is already your best lineup for week ${week}.`, actionable, apply }) {
+  function optimizeDialog(m, { week, ahead = false, how, summary, notes = '', rows, actionable, apply }) {
     const done = m.done ? `<p class="op-done" role="status">${esc(m.done)}</p>` : '';
-    const body = actionable ? `${summary}${done}${notes}${rows}${later}`
-      : `${summary}${done}<p class="msg">${esc(none)}</p>${rows}${later}`;
+    const body = actionable ? `${summary}${done}${notes}${rows}`
+      : `${summary}${done}<p class="msg">This is already your best lineup for week ${esc(week)}.</p>${rows}`;
     return dialog('Optimize Lineup', `Week ${week}${ahead ? ' · upcoming' : ''}`, `
       <div class="dialog-body">
         ${dialogErrors(m.errors)}

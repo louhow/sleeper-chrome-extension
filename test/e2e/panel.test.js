@@ -960,7 +960,7 @@ test('a week ahead: your lineup for it is yours to set and Optimize plans its fi
   await page.locator(dialog('.os-row')).first().waitFor();
   assert.equal(await dialogText('.dialog-head .sub'), 'Week 2 · upcoming');
   const day = new Date(`${firstDay}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
-  assert.match(await dialogText('.op-sum'), new RegExp(`${day} projection\\s*Starters playing ${day}\\s*\\d+\\.\\d\\d\\s*→\\s*\\d+\\.\\d\\d\\s*\\+\\d+\\.\\d\\d`));
+  assert.match(await dialogText('.op-sum'), new RegExp(`Week projection\\s*Locked or final score per starter\\s*\\d+\\.\\d\\d\\s*→\\s*\\d+\\.\\d\\d\\s*\\+\\d+\\.\\d\\d`));
   assert.equal(await page.locator(dialog('.os-row.lock')).count(), 0);
   const starRow = page.locator(dialog('.os-row.swap')).filter({ has: page.locator(`.os-p.in [data-player="${star}"]`) });
   assert.equal(await starRow.count(), 1, 'the must-start for that day comes in');
@@ -2082,7 +2082,7 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   await page.locator(panel('button.optimize')).click();
   await page.locator(dialog('.os-row')).first().waitFor();
   assert.ok(await page.locator(dialog('.form-wait')).count() > 0, 'form waits for the logs');
-  assert.match(await page.locator(dialog('.op-sum')).textContent(), /(\w{3}) projection\s*Starters playing \1\s*\d+\.\d\d\s*→\s*\d+\.\d\d\s*\+\d+\.\d\d/);
+  assert.match(await page.locator(dialog('.op-sum')).textContent(), /Week projection\s*Locked or final score per starter\s*\d+\.\d\d\s*→\s*\d+\.\d\d\s*\+\d+\.\d\d/);
   // The tooltip shows on hover, inside the dialog.
   assert.equal(await page.locator(dialog('.how-tip')).isVisible(), false);
   await page.locator(dialog('.how')).hover();
