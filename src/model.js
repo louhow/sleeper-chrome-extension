@@ -917,30 +917,28 @@
     const first = solve(new Set());
     const locking = new Set(l.starters.filter((id) => lockable(id) && !skip.has(id) && first.starters.includes(id)));
     const plan = locking.size ? solve(locking) : first;
-    // A starter with no games left scores the week's final game, played. A bench
-    // player whose games all come later (not on `date`) isn't weighed against
-    // them above, which plans one day at a time; but their last game would count
-    // in that slot, so when it's projected to beat the score the slot keeps, the
-    // swap is worth making now.
+    // Moves for a later day, not today's plan: a starter with no games left
+    // scores the week's final game, played, and a bench player whose games all
+    // come later would score theirs in that slot instead. Waiting costs nothing
+    // (the swap works as well on that day, with news of who is out), so these
+    // are offered, never folded into today's lineup. Gain: Sleeper's projection
+    // for the bench player's last game over the score the slot keeps.
     const slotAt = (i) => l.slots[i] ?? 'UTIL';
-    const deadScore = (id) => (look[id].final?.actual ?? 0);
     const dead = (id) => id && id !== '0' && look[id] && !look[id].fixed && look[id].gamesLeft === 0 && !look[id].locked;
-    const lastProj = (id) => look[id].left.at(-1)?.proj ?? 0;
     const spare = [...l.starters, ...l.bench].filter((id) => id && id !== '0' && look[id] && !look[id].fixed
-      && look[id].gamesLeft > 0 && !plan.starters.includes(id));
-    const offers = plan.starters.flatMap((id, i) => (dead(id) ? spare
-      .filter((b) => fits(slotAt(i), l.players[b] || {}) && lastProj(b) > deadScore(id))
-      .map((b) => ({ i, b, gain: lastProj(b) - deadScore(id) })) : []))
-      .sort((a, b) => b.gain - a.gain);
-    const taken = new Set();
-    const used = new Set();
-    for (const { i, b } of offers) {
-      if (taken.has(i) || used.has(b)) continue;
-      plan.starters[i] = b;
-      taken.add(i);
-      used.add(b);
+      && look[id].gamesLeft > 0 && !l.starters.includes(id) && !plan.starters.includes(id));
+    const offers = plan.starters.flatMap((id, i) => (dead(id) && l.starters[i] === id ? spare
+      .filter((b) => fits(slotAt(i), l.players[b] || {}))
+      .map((b) => ({ slot: i, out: id, id: b, gain: (look[b].left.at(-1)?.proj ?? 0) - (look[id].final?.actual ?? 0),
+        date: look[b].left[0].date, tip: look[b].left[0].game.start ?? null }))
+      .filter((o) => o.gain > 0) : []))
+      .sort((x, y) => y.gain - x.gain);
+    plan.later = [];
+    for (const o of offers) {
+      if (plan.later.some((k) => k.slot === o.slot || k.id === o.id)) continue;
+      plan.later.push(o);
     }
-    if (taken.size) plan.changes = lineupChanges(l.starters, plan.starters, (i) => slotAt(i));
+    plan.later.sort((x, y) => x.slot - y.slot);
     plan.date = date;
     // Unticked ones stay listed, so they can be ticked again.
     plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {
@@ -1421,7 +1419,7 @@
   const lineupOnLeg = (league) => !['pre_draft', 'drafting', 'complete'].includes(league?.status);
 
   // Whether two optimize plans (bestLineup) propose the same thing.
-  const samePlan = (a, b) => ['starters', 'current', 'changes', 'locks'].every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
+  const samePlan = (a, b) => ['starters', 'current', 'changes', 'locks', 'later'].every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
 
   // Arrow keys through the teams: `order` lists groups of rosters (one team
   // each, or a matchup's pair), and the step goes from the group holding

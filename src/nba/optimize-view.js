@@ -62,6 +62,8 @@
       summary: summary(plan),
       notes: warning,
       rows,
+      later: laterMoves(s, m, plan),
+      none: plan.later?.length ? `Nothing to change ${day(plan)}. ${plan.later.length === 1 ? '1 move' : `${plan.later.length} moves`} later this week.` : undefined,
       actionable,
       apply: applyAll(m, apply, { risky: good.length > 0, held: blocked, title: blocked ? BLOCKED : '' }),
     });
@@ -74,6 +76,20 @@
   function summary(plan) {
     return plan.date ? planSummary(plan, `${day(plan)} projection`, `Starters playing ${day(plan)}`)
       : planSummary(plan, 'Lineup projection', 'No games left this week');
+  }
+
+  // Moves for a later day, one line each: who comes in for whom, when, the gain
+  // (Sleeper's projection against the score the slot keeps) and a Swap now button.
+  function laterMoves(s, m, plan) {
+    if (!plan.later?.length) return '';
+    const rows = plan.later.map((o) => `<div class="os-later">
+      <span class="os-slot">${slotBadge(plan.slots[o.slot])}</span>
+      <span class="who"><b>${esc(playerName(s.players, o.id))}</b> in for ${esc(playerName(s.players, o.out))}</span>
+      <span class="when">${esc(weekday(o.date))}${o.tip ? ` ${esc(gameTime(o.tip))}` : ''}</span>
+      <span class="gain">+${f2(o.gain)}</span>
+      <button class="os-apply" data-op-later="${o.slot}" ${m.saving ? 'disabled' : ''} title="You can wait: swapping on ${esc(weekday(o.date))} gets the same result, and you'll know if ${esc(shortName(s.players[o.id]))} is out.">${m.busy === `later:${o.slot}` ? 'Saving…' : 'Swap now'}</button>
+    </div>`).join('');
+    return `<div class="os-laterbox"><h4>Later this week</h4>${rows}</div>`;
   }
 
   // One starting slot, in lineup order: who starts there. When the plan

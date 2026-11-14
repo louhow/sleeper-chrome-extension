@@ -365,7 +365,7 @@ test('best lineup: a starter with no games left keeps the slot while their final
   assert.equal(plan.info.done.final, 44);
 });
 
-test('best lineup: a slot with nothing left goes to a bench player whose later game is projected to beat the score it keeps', () => {
+test('best lineup: a slot with nothing left is offered to a bench player whose later game beats the score it keeps, never done today', () => {
   // Saturday is next for `sat` alone. `done` has only a 12 to keep; `sun` plays Sunday, projected 24; `low` Sunday, 9.
   const games = {
     done: [['d1', '2026-10-20', 'complete', 30, 12]],
@@ -375,11 +375,11 @@ test('best lineup: a slot with nothing left goes to a bench player whose later g
   };
   const l = optimizerLineup(['F', 'UTIL'], ['done', 'sat'], ['sun', 'low'], { done: ['SF'], sat: ['PG'], sun: ['PF'], low: ['SF'] }, games);
   const plan = model.bestLineup(l, OPT_NOW);
-  assert.deepEqual(plain(plan.starters), ['sun', 'sat']);
-  assert.deepEqual(plain(plan.changes.map((c) => [c.id, c.from, c.to])), [['sun', 'BN', 'F'], ['done', 'F', 'BN']]);
-  // Their kept 12 beats a Sunday projected 9: stays.
+  assert.deepEqual(plain(plan.changes), [], 'today stays as it is');
+  assert.deepEqual(plain(plan.later.map((o) => [o.slot, o.out, o.id, o.gain, o.date])), [[0, 'done', 'sun', 12, '2026-10-23']]);
+  // Their kept 12 beats a Sunday projected 9: nothing to offer.
   l.bench = ['low'];
-  assert.deepEqual(plain(model.bestLineup(l, OPT_NOW).changes), []);
+  assert.deepEqual(plain(model.bestLineup(l, OPT_NOW).later), []);
 });
 
 test('best lineup: picks for the next day of games, so a starter without one sits until their next game', () => {
