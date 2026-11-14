@@ -754,6 +754,21 @@
     return colOf;
   }
 
+  // What moves between two lineups, slot by slot: who goes where ('BN' = bench),
+  // in lineup order, then whoever goes to the bench.
+  function lineupChanges(current, starters, slotOf) {
+    const real = (id) => id && id !== '0';
+    const where = (list, id) => {
+      const i = list.indexOf(id);
+      return i < 0 ? 'BN' : slotOf(i);
+    };
+    return [...new Set([...current, ...starters])]
+      .filter((id) => real(id) && current.indexOf(id) !== starters.indexOf(id))
+      .map((id) => ({ id, from: where(current, id), to: where(starters, id) }))
+      .sort((a, b) => (starters.includes(a.id) ? starters.indexOf(a.id) : 100 + current.indexOf(a.id)) -
+        (starters.includes(b.id) ? starters.indexOf(b.id) : 100 + current.indexOf(b.id)));
+  }
+
   // The starting lineup with the highest total worth: every movable player is
   // matched to an open slot they fit, or to the bench. Ties go to playing
   // someone with a game over leaving the slot to a player with none, then to the higher
@@ -844,16 +859,7 @@
       }
     }
 
-    const where = (list, id) => {
-      const i = list.indexOf(id);
-      return i < 0 ? 'BN' : slotOf(i);
-    };
-    const changes = [...new Set([...current, ...starters])]
-      .filter((id) => real(id) && current.indexOf(id) !== starters.indexOf(id))
-      .map((id) => ({ id, from: where(current, id), to: where(starters, id) }))
-      // Lineup order, then whoever goes to the bench.
-      .sort((a, b) => (starters.includes(a.id) ? starters.indexOf(a.id) : 100 + current.indexOf(a.id)) -
-        (starters.includes(b.id) ? starters.indexOf(b.id) : 100 + current.indexOf(b.id)));
+    const changes = lineupChanges(current, starters, slotOf);
     const total = (list) => list.reduce((sum, id) => sum + (real(id) ? worth(id) : 0), 0);
     return { starters, changes, fixed, before: total(current), after: total(starters) };
   }
@@ -911,6 +917,30 @@
     const first = solve(new Set());
     const locking = new Set(l.starters.filter((id) => lockable(id) && !skip.has(id) && first.starters.includes(id)));
     const plan = locking.size ? solve(locking) : first;
+    // A starter with no games left scores the week's final game, played. A bench
+    // player whose games all come later (not on `date`) isn't weighed against
+    // them above, which plans one day at a time; but their last game would count
+    // in that slot, so when it's projected to beat the score the slot keeps, the
+    // swap is worth making now.
+    const slotAt = (i) => l.slots[i] ?? 'UTIL';
+    const deadScore = (id) => (look[id].final?.actual ?? 0);
+    const dead = (id) => id && id !== '0' && look[id] && !look[id].fixed && look[id].gamesLeft === 0 && !look[id].locked;
+    const lastProj = (id) => look[id].left.at(-1)?.proj ?? 0;
+    const spare = [...l.starters, ...l.bench].filter((id) => id && id !== '0' && look[id] && !look[id].fixed
+      && look[id].gamesLeft > 0 && !plan.starters.includes(id));
+    const offers = plan.starters.flatMap((id, i) => (dead(id) ? spare
+      .filter((b) => fits(slotAt(i), l.players[b] || {}) && lastProj(b) > deadScore(id))
+      .map((b) => ({ i, b, gain: lastProj(b) - deadScore(id) })) : []))
+      .sort((a, b) => b.gain - a.gain);
+    const taken = new Set();
+    const used = new Set();
+    for (const { i, b } of offers) {
+      if (taken.has(i) || used.has(b)) continue;
+      plan.starters[i] = b;
+      taken.add(i);
+      used.add(b);
+    }
+    if (taken.size) plan.changes = lineupChanges(l.starters, plan.starters, (i) => slotAt(i));
     plan.date = date;
     // Unticked ones stay listed, so they can be ticked again.
     plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {
