@@ -382,6 +382,16 @@ test('best lineup: a slot with nothing left is offered to a bench player whose l
   assert.deepEqual(plain(model.bestLineup(l, OPT_NOW).later), []);
 });
 
+test('best lineup: a starter with a worthwhile later game is not benched for a zero projection today', () => {
+  // `sat` plays Saturday (next). `sun` holds F with Sunday's 27 to come; `out` is projected 0 Saturday.
+  const l = optimizerLineup(['F', 'UTIL'], ['sun', 'sat'], ['out'], { sun: ['PF'], sat: ['PG'], out: ['PF'] }, {
+    sun: [['n1', '2026-10-23', 'pre_game', 27]],
+    sat: [['s1', '2026-10-22', 'pre_game', 20]],
+    out: [['o1', '2026-10-22', 'pre_game', 0], ['o2', '2026-10-24', 'pre_game', 0]],
+  });
+  assert.deepEqual(plain(model.bestLineup(l, OPT_NOW).changes), []);
+});
+
 test('best lineup: picks for the next day of games, so a starter without one sits until their next game', () => {
   // Thursday is next. Two plays and starts; one only plays Friday, so they wait for Friday's run.
   const l = optimizerLineup(['UTIL'], ['two'], ['one', 'done'], { two: ['PG'], one: ['SG'], done: ['SF'] }, {

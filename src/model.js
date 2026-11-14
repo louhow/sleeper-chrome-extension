@@ -885,8 +885,9 @@
     const solve = (locking) => solveLineup({
       slots: l.slots, starters: l.starters, bench: l.bench, players: l.players,
       worth: today,
-      // A zero projection with a game still beats an idle slot: it's all upside.
-      plays: (id) => look[id].left.some((d) => d.date === date),
+      // A game to play beats an idle slot, but not a zero projection (likely out) over a player
+      // whose next game is worth something: that would bench them to bring back later.
+      plays: (id) => today(id) > 0 && look[id].left.some((d) => d.date === date),
       later: (id) => look[id].value,
       fixedReason: (id) => look[id].fixed,
       // A player being locked starts for sure, in any slot they fit: the lock pins them there.
