@@ -355,6 +355,16 @@ test('applying one slot of a plan: a bench swap alone, linked moves together', (
   assert.deepEqual(plain(model.applySlot(current, planned, 3)), { starters: current, slots: [] }, 'nothing to change');
 });
 
+test('best lineup: a starter with no games left keeps the slot while their final game beats the bench', () => {
+  const l = optimizerLineup(['F'], ['done'], ['bench'], { done: ['SF'], bench: ['SF'] }, {
+    done: [['d1', '2026-10-20', 'complete', 30, 44]],
+    bench: [['b1', '2026-10-23', 'pre_game', 25]],
+  });
+  const plan = model.bestLineup(l, OPT_NOW);
+  assert.deepEqual(plain(plan.changes), [], 'their 44 stays in the slot');
+  assert.equal(plan.info.done.final, 44);
+});
+
 test('best lineup: picks for the next day of games, so a starter without one sits until their next game', () => {
   // Thursday is next. Two plays and starts; one only plays Friday, so they wait for Friday's run.
   const l = optimizerLineup(['UTIL'], ['two'], ['one', 'done'], { two: ['PG'], one: ['SG'], done: ['SF'] }, {

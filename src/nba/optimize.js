@@ -2,7 +2,7 @@
 // for the shown week, worked out again right before every save, saved all at
 // once or a row at a time, with the finished games worth locking in.
 //   ctx: { state, schedule, modalSave, saveStarters, saveLeg }
-(globalThis.SNP ||= {}).nbaOptimize = ({ state, api, schedule, modalSave, saveStarters, saveLeg }) => {
+(globalThis.SNP ||= {}).nbaOptimize = ({ state, api, schedule, modalSave, saveStarters, saveLeg, refreshWeek }) => {
   const { model, ui, shared } = globalThis.SNP;
   const shortOf = (id) => ui.shortName(ui.playerOf(state.players, id));
   // Names a few moves; past that, just the count, so the notice stays one line.
@@ -38,9 +38,24 @@
   }
 
   // Proposes the best lineup for the shown week; nothing saves until it's applied.
-  function open() {
+  let opening = false;
+  async function open() {
+    if (opening) return;
+    // The page may have been open for days: read the roster, lineup and games
+    // again first, so the plan is made from what Sleeper holds now.
+    opening = true;
+    try {
+      state.notice = { kind: 'ok', text: 'Reading your latest lineup…' };
+      schedule();
+      await refreshWeek();
+    } catch (err) {
+      shared.report('warn', '[sleeper-nba-panel] refresh before optimize failed', err);
+    } finally {
+      opening = false;
+      if (state.notice?.text === 'Reading your latest lineup…') state.notice = null;
+    }
     const lineup = ui.lineup(state);
-    if (state.saving || !lineup?.editable || !lineup.week || ui.whatIfOn(state) || lineup.irBlocked.length) return;
+    if (state.saving || !lineup?.editable || !lineup.week || ui.whatIfOn(state) || lineup.irBlocked.length) return schedule();
     state.swap = null;
     state.lockConfirm = null;
     state.notice = null;

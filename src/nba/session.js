@@ -95,7 +95,7 @@
   const reloadRosters = async () => {
     state.rosters = await data.rosters();
   };
-  const ctx = { state, api, leagueId, schedule, modalSave, saveStarters, saveLeg, reloadRosters };
+  const ctx = { state, api, leagueId, schedule, modalSave, saveStarters, saveLeg, reloadRosters, refreshWeek };
   const playerCard = nbaCard(ctx);
   const waivers = nbaWaivers(ctx);
   const optimizer = nbaOptimize(ctx);
@@ -420,6 +420,24 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
     state.weeks[week].legs = legs;
     seeLineups(week, legs);
     schedule();
+  }
+
+  // Rosters, lineup legs, games and stats for a week, read again right now: a
+  // page left open for days holds what it loaded then. Optimize plans from this.
+  async function refreshWeek(week = state.week) {
+    if (!state.weeks[week]) return;
+    const [rosters, core, legs] = await Promise.all([
+      data.rosters(),
+      nbaWeek.load(api, state.league, week, ui.scoringOf(state)),
+      loadLegs(week),
+    ]);
+    state.rosters = rosters;
+    if (!state.weeks[week]) return;
+    Object.assign(state.weeks[week], core);
+    if (legs) {
+      state.weeks[week].legs = legs;
+      seeLineups(week, legs);
+    }
   }
 
   // Tip-off times of your players' games still to come this week, and the

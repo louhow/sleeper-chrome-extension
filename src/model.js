@@ -953,6 +953,8 @@
       open: o.open,
       fixed: o.fixed,
       locked: o.locked,
+      // The score a starter with no games left keeps in the slot (the week's final game).
+      final: o.final?.actual ?? null,
     }]));
     return plan;
   }
