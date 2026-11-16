@@ -27,6 +27,9 @@ test('rows: game state, box score, research and points in their score color', ()
   assert.match(out, /RB CeeDee Lamb RB - DAL Q .* vs PHI · Q2 4:12 · 7-10 · RZ 8 CAR, 41 YD 6\.00 proj 14\.00/);
   assert.match(out, /WR Brandon Aiyuk WR - SF .* @ SEA · Sun 4:25pm – proj 11\.50/);
   assert.match(html, /<b class="tier tier-green">24\.50<\/b>/, 'a finished game in its tier color');
+  // Only players whose game is on now are lit: the row marked and the points ringed.
+  assert.equal(html.match(/class="card nfl[^"]* in-game"/g)?.length, html.match(/class="nfl-game live"/g).length, 'and no other row');
+  assert.match(html, /<b class="in-game">6\.00<\/b>/, 'a live game\'s points ringed');
   assert.match(out, /W R T Empty Bench/, 'an open FLEX');
 });
 
@@ -86,6 +89,8 @@ test('matchup: both teams, win chance, rows slot by slot and empty sections held
   // A row is the player and points, then the game and box score under them, as on Sleeper's own tab.
   assert.match(out, /P\. Mahomes QB • KC 24\.50 proj 21\.20 Final W 27-20 vs BUF 21\/30 CMP, 260 YD, 2 TD QB J\. Allen QB • BUF 12\.00 proj 18\.00 Final L 20-27 @ KC/);
   assert.match(out, /C\. Lamb Q RB • DAL 6\.00 proj 14\.00 Q2 4:12 7-10 vs PHI · RZ 8 CAR, 41 YD/, 'a live game');
+  assert.match(html, /<div class="mp nfl mine in-game">(?:(?!class="mp ).)*<b class="in-game">6\.00<\/b>/s, 'a live game lit');
+  assert.equal(html.match(/class="mp nfl \w+ in-game"/g)?.length, html.match(/class="mp-game live"/g).length, 'and no other row');
   assert.match(html, /<div class="mp-game done"><span class="sub">Final W 27-20 vs BUF<\/span><span class="stats">21\/30 CMP, 260 YD, 2 TD<\/span>/);
   assert.match(out, /Empty W R T G\. Kittle/, 'an open FLEX');
   assert.match(out, /Injured Reserve H\. Back .* IR Empty Empty IR Empty Taxi Squad Empty TX Empty/);

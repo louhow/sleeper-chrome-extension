@@ -331,6 +331,7 @@ Sleeper's Team tab shows only your team, so a link to someone else's team (a mat
   A Matchup row knows only that matchup's players, so the extension sends the player's name, position and team along; Sleeper's card loads the rest.
 - On the Matchup tab, a team's avatar, owner or name opens it on the Team tab (just for now: the picker's choice stays), as on NBA.
 - Live games show Sleeper's RZ mark when the player's team has the ball inside the 20.
+- A player whose game is on now stands out on the Team tab, the Matchup tab and the League tab's matchup dialog: the row lit red from its edge, a pulsing dot by the game clock, and the points in a red ring (a finished game keeps its score color).
 - Matchup: the League tab's matchup card on top (avatars, scores, win chance and bar, record, projection), then both lineups slot by slot, bench, IR and taxi (as many rows as the league has slots). The picker picks a matchup (both teams), as on the NBA Matchup tab.
 - Points are Sleeper's stats scored with the league's settings; the live projection is what's scored plus the projection for the game time left. Win chance is Sleeper's own formula (see the League tab).
 - The data: `/v1/league/<id>/matchups/<week>` (logged in, `matchup_legs`) for who's starting, `/projections/nfl/<season>/<week>` and `/stats/nfl/<season>/<week>` for players, projections and points, GraphQL `scores` for each game, `/players/nfl/research/...` for start and rostered %.

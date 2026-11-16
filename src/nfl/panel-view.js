@@ -175,11 +175,14 @@
     return teams.length ? leagueMedian(teams) : null;
   }
 
-  // Points once the game kicks off (– until then), a finished game's in its score color.
+  // Points once the game kicks off (– until then), a finished game's in its score color, a game on now ringed.
   function points(s, p, { g, actual }) {
     const tier = g.state === 'done' && actual != null ? scoreTier(actual, s.tiers, p.positions?.[0] || p.position) : '';
-    return `<b${tier ? ` class="${tierClass(tier).trim()}"` : ''}>${kickedOff(g) ? f2(actual ?? 0) : '–'}</b>`;
+    const cls = g.state === 'live' ? 'in-game' : tierClass(tier).trim();
+    return `<b${cls ? ` class="${cls}"` : ''}>${kickedOff(g) ? f2(actual ?? 0) : '–'}</b>`;
   }
+  // A row whose player is in a game on now stands out from the rest (.in-game).
+  const inGame = (n) => (n.g.state === 'live' ? ' in-game' : '');
 
   const photo = (id, p) => `<img class="headshot${p.position === 'DEF' ? ' logo' : ''}" src="${headshot(id, p)}" alt="" data-player="${esc(id)}">`;
 
@@ -285,7 +288,7 @@
     const p = playerOf(s.players, id);
     const week = s.weeks[s.week];
     const n = numbers(s, id);
-    return `<article class="card nfl${cls}"${subFor && subPicks.has(id) ? ` data-sub-pick="${esc(id)}"` : ''}>
+    return `<article class="card nfl${cls}${inGame(n)}"${subFor && subPicks.has(id) ? ` data-sub-pick="${esc(id)}"` : ''}>
       ${slotBadge(slot, button)}
       ${photo(id, p)}
       <div class="info">
@@ -342,7 +345,7 @@
     const p = playerOf(s.players, id);
     const n = numbers(s, id);
     const stats = statLine(s.weeks[s.week].stats[id], p.position);
-    return `<div class="mp nfl ${cls}">
+    return `<div class="mp nfl ${cls}${inGame(n)}">
       ${photo(id, p)}
       <div class="mp-id">
         <div class="name"><button data-player="${esc(id)}">${esc(shortName(p))}</button>${injury(p)}</div>

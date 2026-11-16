@@ -3264,9 +3264,46 @@ button.danger.solid:hover:not(:disabled) {
 .mp-game.left b {
   color: var(--muted);
 }
+/* A player whose game is on now: the row lit from its edge, a pulsing dot by the
+   clock and the points ringed, so they stand apart from games done or to come. */
+.card.nfl.in-game {
+  background: linear-gradient(90deg, var(--danger) 0 3px, color-mix(in srgb, var(--danger) 20%, transparent) 3px, transparent 70%) no-repeat, var(--card);
+}
+.mp.nfl.in-game {
+  background: linear-gradient(90deg, var(--danger) 0 3px, color-mix(in srgb, var(--danger) 20%, transparent) 3px, transparent 85%) no-repeat;
+}
+.mp.nfl.theirs.in-game {
+  background: linear-gradient(270deg, var(--danger) 0 3px, color-mix(in srgb, var(--danger) 20%, transparent) 3px, transparent 85%) no-repeat;
+}
 .nfl-game.live b,
 .mp-game.live .sub {
   color: var(--danger);
+  font-weight: 700;
+}
+.nfl-game.live b::before,
+.mp-game.live .sub::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: in-game 1.4s ease-in-out infinite;
+}
+.week-pts b.in-game,
+.mp-pts b.in-game {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+@keyframes in-game {
+  50% { opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nfl-game.live b::before,
+  .mp-game.live .sub::before { animation: none; }
 }
 .nfl-game.bye b {
   color: var(--muted);
