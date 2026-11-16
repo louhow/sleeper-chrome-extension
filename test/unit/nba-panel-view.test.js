@@ -196,6 +196,10 @@ test('game cells: locked, still lockable, past locking, live, today and later re
   assert.deepEqual(tiers(html, 'Bench Guard'), ['green', null], '40 is green');
   // A bench player's finished game can't be locked; a game under way reads live.
   assert.deepEqual(cells(html, 'Bench Guard').map(([kind]) => kind), ['past', 'live']);
+  // And only that player's row is lit; points are ringed once there's a number to ring.
+  const card = (name) => html.split('<article').find((c) => c.includes(name));
+  assert.match(card('Bench Guard'), /^ class="card[^"]* in-game"[\s\S]*<div class="week-pts">\s*<b>–<\/b>/);
+  assert.doesNotMatch(card('Luka Doncic'), /in-game/);
   assert.doesNotMatch(html, /data-lock=/, 'only your own lineup, in season, can lock');
   // Your own lineup in season: the lockable cell is a button that asks "Lock?" on hover, then confirms in the cell.
   s.league = { ...s.league, status: 'in_season' };

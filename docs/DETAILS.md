@@ -17,11 +17,12 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
   | Finished, can still be locked (a starter who was starting at tip-off, before their next tip-off) | Bright teal outline, open padlock |
   | Finished, may be lockable (the extension didn't see your lineup at tip-off) | Dashed teal outline, open padlock |
   | Finished, too late to lock, played on your bench, or a bench player's | Faded, no outline |
-  | Live | Red outline, "Live" |
+  | Live | Red outline, a pulsing dot and "Live" |
   | Today, still to tip off | Bright outline, bold time |
   | Later in the week | Quiet outline, projection muted |
 
 - A game played is tinted, muted, by its score's color (see [Score colors](#score-colors)); a locked one is filled bright in that color inside its gold frame.
+- A player whose game is on now, and who hasn't locked a game in, stands out as on NFL: the row lit red from its edge and their points in a red ring; on the Matchup tab the row is lit toward the middle, with a pulsing dot by "Live".
 - The points column shows a locked-in score once, boxed like its day cell (the same height, its score's color in a gold frame, a padlock under the score), in yellow, so it reads apart from a score still in play.
 - Lock-In from the strip, on your own lineup in season: hovering a lockable game asks "Lock?"; clicking it asks to confirm in the cell ("Lock 30.95?" Yes / No, Esc cancels), and Yes saves the lock (`update_matchup_leg`, as on the Matchup tab).
 - Lock-In needs the player starting when the game tipped off and never benched since. Sleeper's own wording (in its app's strings): "Player was not in starting lineup OR was moved to bench since game began". A game played on the bench can't be locked after moving them in, nor one whose player was benched and started again.

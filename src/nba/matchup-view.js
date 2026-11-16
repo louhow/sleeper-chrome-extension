@@ -1,7 +1,7 @@
 // Matchup view: the selected team (left) against its opponent (right), slot by
 // slot, with Lock-In status and the lock control for the logged-in owner.
 (globalThis.SNP ||= {}).nbaMatchupView = (() => {
-  const { playerDays, lockState, winProbability, medianStanding } = globalThis.SNP.model;
+  const { playerDays, lockState, winProbability, medianStanding, gameState } = globalThis.SNP.model;
   const { side, median } = globalThis.SNP.nbaWeek;
   const { esc, f2, headshot, teamLogo, teamName, shortName, injuryTag, teamTag, gameTime, weekday, gameLabel, slotBadge, weekNav, lineup, real, playerOf,
     loading, errorMsg, avatar, avatarImg, opponentOf, teamSideOf, matchupPair, medianBanner, standingsTable, muRow, muEmpty, muStarters, muSection } = globalThis.SNP.ui;
@@ -62,12 +62,14 @@
     const who = `<span>${teamTag(p, { chips: true, sep: '•' })}</span>`;
     const games = `<span class="mp-games">${st.games.map((d) => gameChip(d, st)).join('')}</span>`;
     const confirming = starter && s.lockConfirm === ref && !st.locked && sd.l.lockable && (st.lockable || st.unsure);
-    const result = `<div class="mp-game">
+    // In a game on now (and not already locked in): the row stands out (.in-game).
+    const live = Boolean(cur) && !st.locked && gameState(cur.game, s.now) === 'live';
+    const result = `<div class="mp-game${live ? ' live' : ''}">
         ${cur ? `<b>${cur.home ? 'vs' : '@'} ${esc(cur.opponent)}</b>
-          <span class="sub">${esc(status(cur))}</span>` : '<span class="sub">No games</span>'}
+          <span class="sub">${esc(status(cur, live))}</span>` : '<span class="sub">No games</span>'}
       </div>
       <div class="mp-pts"><b>${starter && st.counted ? f2(st.points) : '–'}</b>${cur ? `<span>${curDone ? 'pts' : 'proj'} ${f2(curValue)}</span>` : ''}</div>`;
-    return `<div class="mp ${cls}${st.locked ? ' is-locked' : ''}${confirming ? ' confirming' : ''}">
+    return `<div class="mp ${cls}${st.locked ? ' is-locked' : ''}${live ? ' in-game' : ''}${confirming ? ' confirming' : ''}">
       <img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}">
       <div class="mp-id">
         <div class="name"><button data-player="${esc(id)}">${esc(shortName(p))}</button>${injuryTag(p)}</div>
@@ -77,10 +79,11 @@
     </div>`;
   }
 
-  function status(d) {
+  // `live`: the game is on now by the clock, even while Sleeper still lists it as to come (model.gameState).
+  function status(d, live = false) {
     const day = weekday(d.date);
     if (d.game.status === 'complete') return `Final · ${day}`;
-    if (d.game.status === 'in_game') return `Live · ${day}`;
+    if (live || d.game.status === 'in_game') return `Live · ${day}`;
     return d.game.start ? `${day} ${gameTime(d.game.start)}` : day;
   }
 

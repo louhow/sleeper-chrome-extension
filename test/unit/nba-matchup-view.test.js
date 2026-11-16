@@ -55,6 +55,16 @@ const state = (overrides = {}) => ({
   ...overrides,
 });
 
+test('a player whose game is on now is lit, until it is locked in or over', () => {
+  const side = (html, name) => html.split('<div class="mp ').find((c) => c.includes(name));
+  const before = matchup.render(state());
+  assert.doesNotMatch(before, /in-game/, 'nobody is playing yet');
+  // Mitchell's game has tipped off; Luka's next one hasn't.
+  const during = matchup.render(state({ now: Date.parse('2026-10-22T23:30:00Z') }));
+  assert.match(side(during, 'D. Mitchell'), /^theirs in-game">[\s\S]*<div class="mp-game live">[\s\S]*<span class="sub">Live · Thu<\/span>/);
+  assert.doesNotMatch(side(during, 'L. Doncic'), /in-game|mp-game live/);
+});
+
 test('header pairs both teams with win %, record, rank and projection', () => {
   const out = text(matchup.render(state()));
   // Sleeper's running total counts only locked and final games, so Luka's open one is 0 (the leg's points are empty).

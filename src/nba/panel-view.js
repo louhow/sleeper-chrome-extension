@@ -129,7 +129,10 @@
     const lastDone = st.games.filter((d) => d.game.status === 'complete').at(-1);
     const state = st.lockable ? 'lockable' : st.unsure ? 'maybe' : st.benched ? 'benched' : null;
     const mark = (d) => (starting && d === lastDone ? state : null);
-    return `<article class="card${cls}">
+    // In a game on now (and not already locked in): the row and its points stand out (.in-game).
+    const inGame = !lockedDay && days.some((d) => d.game && gameState(d.game, s.now) === 'live');
+    const pts = points ? points[id] : st.points;
+    return `<article class="card${cls}${inGame ? ' in-game' : ''}">
       ${slotBadge(slot, button)}
       <img class="headshot" src="${headshot(id)}" alt="" data-player="${esc(id)}">
       <div class="info">
@@ -145,7 +148,7 @@
         // Locked: the score that counts, boxed like its day cell (its score's color in a gold frame).
         ? `<div class="week-pts locked"><b class="tier-${scoreTier(lockedDay.actual ?? lockedDay.proj ?? 0, s.tiers)}">${lockIcon()}${f2(lockedDay.actual ?? lockedDay.proj ?? 0)}</b></div>`
         : `<div class="week-pts">
-        <b>${f2(points ? points[id] : st.points)}</b>
+        <b${inGame && pts != null ? ' class="in-game"' : ''}>${f2(pts)}</b>
         <span>proj ${f2(lockInDefault(days))}</span>
       </div>`}
     </article>`;
