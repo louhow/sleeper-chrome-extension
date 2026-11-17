@@ -383,7 +383,7 @@
     const name = `Week ${leg} (Current)`;
     for (const el of document.querySelectorAll(`${PLAYERS_PANEL} .filter-dropdown .app-dropdown`)) {
       const options = fiber(el, (x) => Array.isArray(x.options) && x.options.some((o) => o.value === 'season'))?.memoizedProps.options;
-      const week = options?.find((o) => o.value === leg);
+      const week = options?.find((o) => String(o.value) === String(leg));
       if (!week) continue;
       if (week.name !== name) week.name = name;
       if (options[0] === week || options[0].snpCurrent) continue;

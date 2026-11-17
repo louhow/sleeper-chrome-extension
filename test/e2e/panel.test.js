@@ -259,7 +259,7 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
   // Sleeper's week dropdown: it keeps the value it was created with (as a
   // string, while its options are numbers) and shows the placeholder, the
   // season, when nothing matches.
-  const OPTIONS = [{ name: 'Season', value: 'season' }, ...[1, 2, 3].map((n) => ({ name: 'Week ' + n, value: n }))];
+  const OPTIONS = [{ name: 'Season', value: 'season' }, ...[1, 2, 3].map((n) => ({ name: 'Week ' + n, value: String(n) }))];
   const dropdown = {
     state: { selectedValue: String(panel.state.statInterval) },
     setState(update) {
