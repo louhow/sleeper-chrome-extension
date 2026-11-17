@@ -373,6 +373,24 @@
     }
   }
 
+  // The week dropdown marks the current week "Week n (Current)", and lists it a
+  // second time at the top, so it's one pick away. The copy has the week's own
+  // value, so Sleeper handles either pick the same way. Sleeper may rebuild its
+  // options, so this runs on every pass and changes only what differs.
+  function currentWeekOption(panel) {
+    const leg = Number(panel.props.leg);
+    if (!(leg > 0)) return;
+    const name = `Week ${leg} (Current)`;
+    for (const el of document.querySelectorAll(`${PLAYERS_PANEL} .filter-dropdown .app-dropdown`)) {
+      const options = fiber(el, (x) => Array.isArray(x.options) && x.options.some((o) => o.value === 'season'))?.memoizedProps.options;
+      const week = options?.find((o) => o.value === leg);
+      if (!week) continue;
+      if (week.name !== name) week.name = name;
+      if (options[0] === week || options[0].snpCurrent) continue;
+      options.unshift({ ...week, snpCurrent: true });
+    }
+  }
+
   // The players the list shows right now (after Sleeper's position, search and owned filters).
   function listPlayers() {
     const grid = document.querySelector(`${PLAYERS_PANEL} .ReactVirtualized__Grid`);
@@ -428,6 +446,7 @@
     }
     openOnLastView(panel);
     weekLabel(panel);
+    currentWeekOption(panel);
     if (!panel.state.loading) saveView(panel);
     const { playerStatsMap: map, statKeys = [], statType, statInterval, season } = panel.state;
     const base = statType === 'stat' ? 'fpts' : 'fpts_proj';

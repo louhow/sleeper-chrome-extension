@@ -2568,6 +2568,9 @@ test('players tab opens on Projection for the current week, then on whatever you
   await page.waitForFunction(() => panel.state.statType === 'proj' && panel.state.statInterval === 2, null, { timeout: 30000 });
   assert.deepEqual(await page.evaluate(() => panel.fetched), [['proj', 2]], 'loaded the way Sleeper\'s own dropdown loads a week');
   await page.waitForFunction(() => document.querySelector('.app-dropdown').textContent === 'Week 2');
+  // The current week is listed twice: first, and in its place, both marked.
+  const names = await page.evaluate(() => document.querySelector('.app-dropdown').__reactInternalInstance$test.return.memoizedProps.options.map((o) => o.name));
+  assert.deepEqual(names, ['Week 2 (Current)', 'Season', 'Week 1', 'Week 2 (Current)', 'Week 3']);
   // What the user picks next sticks.
   await page.evaluate(() => panel.setState({ statType: 'stat', statInterval: 'season' }));
   await page.waitForTimeout(1200);

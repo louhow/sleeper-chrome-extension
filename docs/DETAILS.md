@@ -209,6 +209,7 @@ Sleeper's own NBA Players table, with these additions:
   A week that was the current one comes back as the current one, so when a new week starts it opens on that; any other week, or the season, comes back as it was.
   The first time, it opens on Projection for the current week (Sleeper's own current week).
   It loads the view the way Sleeper's own dropdowns do.
+- Sleeper's week dropdown marks the current week "Week n (Current)" and lists it a second time at the top, with the week's own value so either pick behaves the same.
 - Sleeper's week dropdown reads the week shown: on its own it shows the season ("2026") on load even with a week picked, because its option values are numbers and the value it starts with is a string.
 - Week: with a week picked (Projection or Stats, not the season), a column after FPTS (and GP) with a mark a day, Monday to Sunday, from each team's schedule.
   A game played wears its score's color (see [Score colors](#score-colors); dim gray when they didn't play); in the game log's muted tones; bright red is a game on now, light gray one still to play, faint no game.
