@@ -176,6 +176,41 @@ test('playoff spots come from the league rules; none without a playoff week, in 
   assert.equal(model.playoffSpots(null), 0);
 });
 
+test('clinches: only what no result can change while games are left, else Sleeper\'s final ranks', () => {
+  const league = (extra = {}) => ({ settings: { playoff_week_start: 15, start_week: 1, playoff_teams: 6, num_teams: 12, ...extra } });
+  const rosters = (records) => records.map(([wins, losses, ties = 0], i) => ({ roster_id: i + 1, settings: { wins, losses, ties } }));
+  // 10 of 14 weeks played, 4 left: 9-1 can't be caught by the 4-6 teams (8 at most), but five others can reach 9.
+  const mid = rosters([[9, 1], [9, 1], [7, 3], [7, 3], [5, 5], [5, 5], [4, 6], [4, 6], [4, 6], [2, 8], [2, 8], [2, 8]]);
+  assert.deepEqual(plain(model.clinches(league(), mid, null)), { 1: 'in', 2: 'in' }, 'two clinch the playoffs, no bye yet, nobody out');
+  // Against a median, two games a week: 8 left. 3-17 reaches 11 at most, and six teams have more than 11 already.
+  const median = rosters([[18, 2], [15, 5], [14, 6], [13, 7], [12, 8], [12, 8], [10, 10], [7, 13], [6, 14], [6, 14], [4, 16], [3, 17]]);
+  assert.deepEqual(plain(model.clinches(league({ league_average_match: 1 }), median, null)), { 12: 'out' });
+  // One week left: 12-0 can't be caught, 10-2 only by it; 7-5 and 6-6 are still in the race (a tie on wins could go either way).
+  const late = rosters([[12, 0], [10, 2], [8, 4], [8, 4], [8, 4], [7, 5], [6, 6], [4, 8], [3, 9], [3, 9], [2, 10], [1, 11]]);
+  assert.deepEqual(plain(model.clinches(league({ playoff_week_start: 14 }), late, null)),
+    { 1: 'top', 2: 'bye', 3: 'in', 4: 'in', 5: 'in', 8: 'out', 9: 'out', 10: 'out', 11: 'out', 12: 'out' });
+  // Regular season over: Sleeper's ranks decide, tiebreakers and all.
+  const lateLeague = league({ playoff_week_start: 13 });
+  const ranks = Object.fromEntries(late.map((r) => [r.roster_id, r.roster_id]));
+  assert.deepEqual(plain(model.clinches(lateLeague, late, ranks)),
+    { 1: 'top', 2: 'bye', 3: 'in', 4: 'in', 5: 'in', 6: 'in', 7: 'out', 8: 'out', 9: 'out', 10: 'out', 11: 'out', 12: 'out' });
+  // Byes fill the bracket to a power of two: none for 4 or 8 teams, one (the top seed) for 7.
+  assert.equal(model.clinches(league({ playoff_week_start: 13, playoff_teams: 4 }), late, ranks)[2], 'in');
+  assert.equal(model.clinches(league({ playoff_week_start: 13, playoff_teams: 7 }), late, ranks)[2], 'in');
+  assert.equal(model.clinches(league({ playoff_week_start: 13, playoff_teams: 7 }), late, ranks)[1], 'top');
+  assert.deepEqual(plain(model.clinches(league({ divisions: 2 }), mid, null)), {}, 'division winners take seeds: nothing until it\'s over');
+  assert.deepEqual(plain(model.clinches(league({ playoff_week_start: 0 }), mid, null)), {}, 'no playoffs');
+  assert.deepEqual(plain(model.clinches(league({ playoff_week_start: 5 }), mid, null)), {}, 'more games played than the season has: the count is off');
+});
+
+test('a past season\'s league is on its last scored week; the current season\'s on Sleeper\'s', () => {
+  const state = { week: 11, display_week: 10, season: '2026', league_season: '2026' };
+  assert.equal(model.pastSeasonWeek({ season: '2021', settings: { last_scored_leg: 17, leg: 17, playoff_week_start: 15 } }, state), 17);
+  assert.equal(model.pastSeasonWeek({ season: '2021', settings: { playoff_week_start: 15 } }, state), 14);
+  assert.equal(model.pastSeasonWeek({ season: '2026', settings: { last_scored_leg: 10 } }, state), null);
+  assert.equal(model.pastSeasonWeek({ season: '2026' }, { season: '2026' }), null);
+});
+
 test('standings ranks use roster_standings, else record then waiver order', () => {
   const rosters = [
     { roster_id: 1, settings: { wins: 0, waiver_position: 14 } },

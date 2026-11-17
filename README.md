@@ -32,7 +32,8 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Weeks ahead: the week picker goes forward, and your lineup for an upcoming week is yours to set there, as in Sleeper's mobile app; it saves to that week.
 - Matchup tab: both lineups slot by slot, win probability, Lock-In status, a player whose game is on now lit red.
 - League tab: every matchup of the week, styled like the Matchup tab; click one to open it, or a team to see its roster.
-- Standings on the League tab (NBA and NFL): rank, record, PF, PA, Max PF and waiver, sortable by any column, with the playoff line under the last playoff spot by the league's own rules; Sleeper's "League is full" teams list is gone.
+- Standings on the League tab (NBA and NFL): rank, record, PF, PA, Max PF and waiver, sortable by any column, with the playoff line under the last playoff spot by the league's own rules and, as on the mobile app, a mark on each team that has clinched the no. 1 seed, a bye or the playoffs, or is out of the winners bracket; Sleeper's "League is full" teams list is gone.
+- Past seasons: a league from an earlier season opens on its last week, with every week's points.
 - Recent Activity on the League tab: a player's name opens the extension's player card instead of Sleeper's popup.
 - League median, in leagues that play one: the week's median score (now and projected) at the top of the League tab, and a medallion on every team over it now, solid once it's likely to stay over and gold once it's won.
 - Points and projections follow the games: the week's stats are read again while a game is on.

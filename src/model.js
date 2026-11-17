@@ -1185,6 +1185,16 @@
     return !(s.playoff_week_start && week >= s.playoff_week_start);
   }
 
+  // A league from a season before the one Sleeper is on (`state`: /v1/state/<sport>)
+  // is over: it's on its last scored week, so every week of it reads as played.
+  // null for a league in Sleeper's current season.
+  function pastSeasonWeek(league, state) {
+    const now = Number(state?.league_season || state?.season);
+    if (!(Number(league?.season) < now)) return null;
+    const s = league.settings || {};
+    return Number(s.last_scored_leg) || Number(s.leg) || Math.max(Number(s.playoff_week_start) - 1, 0) || 1;
+  }
+
   // ---- Playoffs ----
 
   // How many teams make the playoffs, from the league's own rules; 0 when the
@@ -1196,6 +1206,52 @@
     const n = Number(s.playoff_teams) || 0;
     const teams = Number(s.num_teams) || league?.total_rosters || Infinity;
     return n > 0 && n < teams ? n : 0;
+  }
+
+  // Who has clinched what, as Sleeper's mobile app marks its standings:
+  // roster_id -> 'top' (no. 1 seed) | 'bye' | 'in' (playoffs) | 'out' (eliminated
+  // from the winners bracket); teams still in the race are left out. While games
+  // are left it's only what no result can change: a team has clinched the top k
+  // when fewer than k others can still reach its wins (a tie on wins could go
+  // either way), and is out when `spots` teams already have more wins than it
+  // can reach. Remaining games count from the regular season's weeks (two a week
+  // against a league median). Once the regular season is over, `ranks` (Sleeper's)
+  // decide. Byes fill the bracket to a power of two (6 teams: 2 byes). Nothing
+  // in a league with divisions until it's over, since their winners take seeds.
+  function clinches(league, rosters, ranks) {
+    const spots = playoffSpots(league);
+    const s = league?.settings || {};
+    if (!spots || !rosters?.length) return {};
+    const byes = 2 ** Math.ceil(Math.log2(spots)) - spots;
+    const tiers = [['top', 1], ...(byes > 1 ? [['bye', byes]] : []), ['in', spots]];
+    const weeks = Math.max(0, Number(s.playoff_week_start) - (Number(s.start_week) || 1));
+    const total = weeks * (s.league_average_match ? 2 : 1);
+    const teams = rosters.map((r) => {
+      const st = r.settings || {};
+      const played = (st.wins ?? 0) + (st.losses ?? 0) + (st.ties ?? 0);
+      const score = (st.wins ?? 0) + (st.ties ?? 0) / 2;
+      return { id: r.roster_id, score, max: score + Math.max(0, total - played), played };
+    });
+    // A record past the season's games means the count is off: claim nothing.
+    if (teams.some((t) => t.played > total)) return {};
+    const out = {};
+    if (teams.every((t) => t.played === total)) {
+      for (const t of teams) {
+        const rank = ranks?.[t.id];
+        if (rank == null) continue;
+        out[t.id] = tiers.find(([, k]) => rank <= k)?.[0] ?? 'out';
+      }
+      return out;
+    }
+    if (Number(s.divisions) > 1) return {};
+    for (const t of teams) {
+      const others = teams.filter((o) => o !== t);
+      const catchers = others.filter((o) => o.max >= t.score).length;
+      const tier = tiers.find(([, k]) => catchers < k)?.[0];
+      if (tier) out[t.id] = tier;
+      else if (others.filter((o) => o.score > t.max).length >= spots) out[t.id] = 'out';
+    }
+    return out;
   }
 
   // The middle value (the mean of the middle two for an even count); null for none.
@@ -1452,7 +1508,7 @@
     taxiEligible, taxiOpen, reserveEligible, illegalReserve,
     lockedGameId, lockState, lockCheck, scoresAtStake, startedAt, seeLineup, nextTipRead, FROZEN_MS, scoreTier, scoreTiers, tierSamples, onCourt, playedGame, TIER_MIN_GAMES,
     weekPicks, weekStrip, nflGames, nflWeekPoints, recentWeeks,
-    openValue, formBars, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, playoffSpots, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
+    openValue, formBars, solveLineup, bestLineup, samePlan, applySlot, bestNflLineup, cheapestAssignment, winProbability, scoreSpread, standingsRanks, standingsRows, sortStandings, playoffSpots, clinches, pastSeasonWeek, medianOn, median, leagueMedian, medianStanding, nextLiveRead,
     FAAB, rosterRoom, faabLeft, claimError, sortClaims,
     startablePositions, isChopped, CHOP_DANGER, safeChances, chopBlock, chopTeamStats, chopLeagueAvg, graveyard,
   };

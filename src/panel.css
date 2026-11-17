@@ -3557,3 +3557,58 @@ button.autosub-chip:hover {
   color: var(--muted);
   font-size: 12px;
 }
+/* Clinch marks (ui.clinchMark), on the avatar's lower right as Sleeper's mobile app has them:
+   gold for the no. 1 seed, white for a bye, green for the playoffs, red for out. */
+.standings .st-face {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.standings .st-face .clinch {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.clinch {
+  display: inline-grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+}
+.clinch.top {
+  background: var(--warn);
+}
+.clinch.bye {
+  background: #e6ecf5;
+}
+.clinch.in {
+  background: #3ad06b;
+}
+.clinch.out {
+  background: var(--danger);
+  color: #fff;
+}
+.standings-scroll:has(+ .clinch-legend) .standings {
+  margin-bottom: 10px;
+}
+.clinch-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 24px;
+  padding: 0 10px;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+.clinch-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

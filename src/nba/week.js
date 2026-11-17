@@ -21,10 +21,12 @@
 
   const players = (api, force = false) => loaders.players(api, 'nba', PLAYERS_KEY, toPlayer, force);
 
-  // The week Sleeper is on (its display week), within the league's weeks.
+  // The week Sleeper is on (its display week), within the league's weeks; a
+  // past season's league is on its last week.
   const currentWeek = (league, nbaState, maxWeek = Infinity) => {
     const min = league.settings?.start_week || 1;
-    return Math.min(Math.max(Number(nbaState.display_week || nbaState.week || min), min), maxWeek);
+    const week = globalThis.SNP.model.pastSeasonWeek(league, nbaState) ?? Number(nbaState.display_week || nbaState.week || min);
+    return Math.min(Math.max(week, min), maxWeek);
   };
 
   // A week's matchups, games, projections and stats, scored with `settings`.

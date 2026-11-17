@@ -166,6 +166,11 @@ Sleeper's web player card colors only standard and full-PPR points (`pts_std`, `
   A click on a header sorts by it (most first, or first rank and A to Z for rank, team and waiver), another click flips it.
   In rank order, a dashed playoff line sits under the last playoff spot, labelled with how many teams make it, from the league's own rules (`settings.playoff_teams`, only in a league with a `playoff_week_start`; a chopped league has none).
   It stands in for Sleeper's own "League is full" teams list and standings, which are hidden.
+  As on Sleeper's mobile app, a mark on the avatar (and a legend under the table for the marks shown) says who has clinched the no. 1 seed (gold), a bye (white), the playoffs (green), or is eliminated from the winners bracket (red).
+  Sleeper's API has no field for it (the web app doesn't show it), so `model.clinches` works it out: while games are left, a team has clinched the top k when fewer than k others can still reach its wins (a tie on wins could go either way), and is out when as many teams as there are playoff spots already have more wins than it can reach.
+  Games left come from the regular season's weeks (`playoff_week_start` less `start_week`, two a week in a league median league) less the games in each record.
+  Byes fill the bracket to a power of two (6 teams: 2 byes).
+  Once the regular season is over, Sleeper's ranks decide; in a league with divisions, nothing is marked until then.
 - In Recent Activity, a click on an added or dropped player opens the extension's player card (page-hook.js reads the player off the transaction its component holds, checked against the name the line shows), not Sleeper's popup.
 
 ### League median
@@ -309,6 +314,7 @@ Sleeper's own tab stays on the page, hidden: its Team component saves lineups an
 The ⇄ button shows Sleeper's tab instead (remembered in the page's storage), and "⇄ Compact view" beside Sleeper's tab row comes back.
 Sleeper's Team tab shows only your team, so a link to someone else's team (a matchup, the standings, the chopping block) opens the compact view again.
 
+- A league from a season before the one Sleeper is on (`/v1/state/nfl` `league_season`) opens on its last scored week (`settings.last_scored_leg`), and every week of it reads stats as played; before, it took this season's week and left later weeks blank. The NBA tabs do the same.
 - Team: the team card (avatar, record, opponent, points, live projection, week picker), then starters slot by slot, bench (by position), IR and taxi.
   Points read – until a starter's game kicks off, as on NBA; IR and taxi keep a row per league slot, open ones included, so the page holds its shape.
   Each row: slot, headshot, name, position and team, injury, start and rostered %; the game (opponent, kickoff, or the clock and score while it's on, or the final), the stat line; points, in their [score color](#score-colors) once the game is over, and the projection.

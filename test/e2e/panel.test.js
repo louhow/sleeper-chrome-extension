@@ -3073,6 +3073,27 @@ test('NFL players tab: a Last 5 column of weekly scores in the league\'s colors,
 
 const nflPanel = (sel = '') => `#sleeper-nfl-panel ${sel}`;
 
+test('NFL team tab: a league from a past season opens on its last scored week, played, with its points', async () => {
+  // Sleeper a season on: the league's season is over.
+  const league = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}`)).json();
+  const last = league.settings.last_scored_leg;
+  await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: String(Number(league.season) + 1), league_season: String(Number(league.season) + 1), season_type: 'regular', week: 3, display_week: 3, leg: 3 } }));
+  documentBody = nflTeamTab({ wrapped: true });
+  await page.goto(NFL_TEAM_URL);
+  await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+  await page.locator(nflPanel('.week-label b')).filter({ hasText: `Week ${last}` }).waitFor();
+  assert.equal(await page.locator(nflPanel('.week-label .ahead')).count(), 0, 'not upcoming');
+  // Each week before it was played too: stats read, points on the team card.
+  await page.locator(nflPanel('.week-nav [data-action="prev"]')).click();
+  await page.locator(nflPanel('.week-label b')).filter({ hasText: `Week ${last - 1}` }).waitFor({ timeout: 30000 });
+  await page.waitForFunction(() => {
+    const pts = document.querySelector('#sleeper-nfl-panel').shadowRoot.querySelector('.team-card .pts');
+    return Number(pts?.textContent) > 0;
+  }, null, { timeout: 30000 });
+  await context.unroute('https://api.sleeper.app/v1/state/nfl');
+  documentBody = LOGGED_OUT;
+});
+
 test('NFL team tab: the compact NBA layout in place of Sleeper\'s, any team from the picker, and Sleeper\'s own view a click away', async () => {
   await context.route('https://api.sleeper.app/v1/state/nfl', (route) => route.fulfill({ json: { season: '2026', season_type: 'regular', week: 7, display_week: 7, leg: 7 } }));
   documentBody = nflTeamTab({ wrapped: true });
@@ -3500,6 +3521,14 @@ test('NFL league tab: the week\'s matchups as the NBA League tab draws them, wit
   assert.ok(gap < 24, `the standings follow the cards (${gap}px)`);
   assert.equal(await page.locator('.league-tab-standings').isVisible(), false, 'Sleeper\'s standings give way to ours');
   assert.ok(await table.count() > 0, 'a row a team');
+  // Clinch marks on the avatars (live records, so whichever are earned), and a legend line for each kind shown.
+  const clinch = await page.evaluate(() => {
+    const root = document.querySelector('#sleeper-nfl-standings').shadowRoot;
+    const kinds = (sel) => [...new Set([...root.querySelectorAll(sel)].map((el) => [...el.classList].find((c) => c !== 'clinch')))].sort();
+    return { marks: kinds('.standings .st-face .clinch'), legend: kinds('.clinch-legend .clinch') };
+  });
+  assert.deepEqual(clinch.legend, clinch.marks);
+  await page.locator('#sleeper-nfl-standings').screenshot({ path: `${OUT}nfl-standings.png` });
   // Yours first, framed; each side as Sleeper shows it: owner, team, score, win chance and bar, record, projection.
   const first = cards.first();
   assert.match(await first.getAttribute('class'), /\bown\b/);

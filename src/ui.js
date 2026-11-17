@@ -784,16 +784,32 @@
     return (i) => (i + 1 < ranks.length && inside(ranks[i]) !== inside(ranks[i + 1]) ? line : '');
   }
 
+  // Clinch marks, as Sleeper's mobile app draws them on the avatar (model.clinches): a check for
+  // a seed won, a minus for out of the winners bracket.
+  const CLINCH = {
+    top: ['Clinched no. 1 seed', '✓'],
+    bye: ['Clinched bye', '✓'],
+    in: ['Clinched playoffs', '✓'],
+    out: ['Eliminated from winners bracket', '−'],
+  };
+  const clinchMark = (kind, label = true) => `<span class="clinch ${kind}" ${label ? `role="img" aria-label="${CLINCH[kind][0]}" title="${CLINCH[kind][0]}"` : 'aria-hidden="true"'}>${CLINCH[kind][1]}</span>`;
+  // The legend under the table: only the marks the table shows.
+  function clinchLegend(marks) {
+    const shown = Object.keys(CLINCH).filter((k) => Object.values(marks).includes(k));
+    return shown.length ? `<ul class="clinch-legend">${shown.map((k) => `<li>${clinchMark(k, false)}${CLINCH[k][0]}</li>`).join('')}</ul>` : '';
+  }
+
   // The league's standings (NBA and NFL League tabs), in place of Sleeper's: click a header to sort by it,
   // again to flip. `s.standingsSort`: { key, dir }, rank ascending by default. The playoff line
   // is drawn only while the table is in rank order.
   function standingsTable(s) {
-    const { standingsRanks, standingsRows, sortStandings, FAAB } = globalThis.SNP.model;
+    const { standingsRanks, standingsRows, sortStandings, clinches, FAAB } = globalThis.SNP.model;
     const { key, dir } = s.standingsSort || { key: 'rank', dir: 1 };
     const faab = s.league.settings?.waiver_type === FAAB;
     const ranks = s.weeks?.[s.week]?.ranks ?? standingsRanks(s.rosters || [], null);
     const rows = sortStandings(standingsRows(s.league, s.rosters, ranks), key, dir, (r) => teamName(s, r.roster));
     const cut = key === 'rank' ? playoffCut(s.league, rows.map((r) => r.rank), STANDINGS_COLS.length) : () => '';
+    const marks = clinches(s.league, s.rosters, ranks);
     const head = STANDINGS_COLS.map(([label, k]) => {
       const on = k === key;
       const align = k === 'record' ? 'mid' : !['rank', 'team'].includes(k) ? 'num' : '';
@@ -803,13 +819,13 @@
     return `<div class="lg-head standings-head"><h3>Standings</h3></div>
       <div class="standings-scroll"><table class="standings"><thead><tr>${head}</tr></thead><tbody>${rows.map((r, i) => `<tr class="${r.roster.roster_id === s.rosterId ? 'is-mine' : ''}">
         <td class="rank">${r.rank ?? '–'}</td>
-        <td><span class="name-cell" data-open-team="${r.roster.roster_id}" role="link" tabindex="0">${avatarImg(avatar(s, r.roster), 'avatar small', s.failedAvatars || undefined)}<span class="team-name">${esc(teamName(s, r.roster))}</span></span></td>
+        <td><span class="name-cell" data-open-team="${r.roster.roster_id}" role="link" tabindex="0"><span class="st-face">${avatarImg(avatar(s, r.roster), 'avatar small', s.failedAvatars || undefined)}${marks[r.roster.roster_id] ? clinchMark(marks[r.roster.roster_id]) : ''}</span><span class="team-name">${esc(teamName(s, r.roster))}</span></span></td>
         <td class="mid">${r.wins}-${r.losses}${r.ties ? `-${r.ties}` : ''}</td>
         <td class="num">${f2(r.pf)}</td>
         <td class="num opt">${f2(r.pa)}</td>
         <td class="num opt">${f2(r.maxPf)}</td>
         <td class="num">${faab ? `<span class="amt">$${r.faab}</span> ` : ''}<span class="sub"><span class="pos">${faab ? `(${r.waiver ?? '–'})` : r.waiver ?? '–'}</span></span></td>
-      </tr>${cut(i)}`).join('')}</tbody></table></div>`;
+      </tr>${cut(i)}`).join('')}</tbody></table></div>${clinchLegend(marks)}`;
   }
 
   return {
