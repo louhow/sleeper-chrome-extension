@@ -114,11 +114,11 @@
       : info.fixed === 'live' ? 'Playing'
       : 'No change';
     const sub = info.fixed === 'locked' ? `${score(s, info.locked.actual ?? 0)} ${esc(gameLabel(info.locked))}`
-      : notYet ? `${score(s, notYet.actual)} ${esc(gameLabel(notYet.game))} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
+      : notYet ? `${score(s, notYet.actual)} ${esc(gameLabel(notYet.game))}${unsureTag(notYet)} · ${openText(s, notYet)}${closeTag(notYet)} · ${esc(upcoming(s, cur))}`
       : maybe ? `<span title="Lockable only if they were starting when it tipped off; the extension didn't see your lineup then">${score(s, maybe.actual)} ${esc(gameLabel(maybe.game))} · lockable if started</span> · ${esc(upcoming(s, cur))}`
       : info.final > 0 ? `${esc(upcoming(s, cur))} · their ${score(s, info.final)} stays in the slot`
       : esc(upcoming(s, cur));
-    return `<div class="os-row nba same${info.fixed === 'locked' ? ' locked' : ''}">
+    return `<div class="os-row nba same${info.fixed === 'locked' ? ' locked' : ''}${notYet?.close ? ' close' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>
       ${player(s, cur, 'keep', `<span class="sub">${sub}</span>`)}
       ${numbers(s, plan, cur, info.fixed === 'locked' ? info.locked?.actual : (notYet || maybe)?.actual)}
@@ -163,14 +163,14 @@
     const toggle = k.on
       ? `<button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open instead</button>`
       : `<button class="os-link lock" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
-    const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameLabel(k.game))} · ${openText(s, k)}</span>
-      <span class="sub">${k.on ? `Lockable${esc(until)}` : 'Keeping open'}</span>`;
-    return `<div class="os-row nba lock${k.on ? '' : ' off'}">
+    const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameLabel(k.game))} · ${openText(s, k)}${closeTag(k)}</span>
+      <span class="sub">${k.on ? `${k.unsure ? 'Lockable if they started' : 'Lockable'}${esc(until)}` : 'Keeping open'}</span>`;
+    return `<div class="os-row nba lock${k.on ? '' : ' off'}${k.close ? ' close' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>
       ${player(s, k.id, 'keep', sub)}
       ${numbers(s, plan, k.id, k.actual)}
       <span class="os-act">${k.on
-        ? `${lockButton(`data-op-lock-row="${esc(k.id)}"`, m, busy, `Lock ${f2(k.actual)} (${gameLabel(k.game)}). Locking is final.`, `Lock ${f2(k.actual)}`)}${toggle}`
+        ? `${lockButton(`data-op-lock-row="${esc(k.id)}"`, m, busy, `Lock ${f2(k.actual)} (${gameLabel(k.game)}). Locking is final${k.unsure ? '; Sleeper only allows it if they were starting at tip-off and haven\'t been benched since' : ''}.`, `Lock ${f2(k.actual)}`)}${toggle}`
         : `<span class="os-status">Open</span>${toggle}`}</span>
     </div>`;
   }
@@ -234,6 +234,16 @@
   // What keeping the slot open is worth, and who from the bench would bring it.
   function openText(s, k) {
     return `open ${f2(k.open)}${k.openBy ? ` with ${esc(shortName(s.players[k.openBy]))}` : ''}`;
+  }
+
+  // A finished game the extension couldn't confirm they started.
+  function unsureTag(k) {
+    return k.unsure ? ' <span title="Lockable only if they were starting when it tipped off; the extension didn\'t see your lineup then">· lockable if started</span>' : '';
+  }
+
+  // A score within a tenth of what leaving the slot open is worth: close either way.
+  function closeTag(k) {
+    return k.close ? ' <span class="close-call" title="This score is within 10% of what leaving the slot open is worth, so it\'s close either way">close call</span>' : '';
   }
 
   // The player's next game this week, e.g. "Fri vs BOS 7:00pm".

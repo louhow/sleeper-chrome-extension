@@ -666,6 +666,8 @@
     const perGame = left.length ? left.reduce((sum, d) => sum + (d.proj ?? 0), 0) / left.length : 0;
     // Only starters can lock, so only a starter's finished game is worth keeping.
     const banked = starting && st.lockable ? st.current : null;
+    // The finished game a lock can go to: one they started, or may have (unknown).
+    const offer = starting && (st.lockable || st.unsure) ? st.current : null;
     // A starter with no games left: with no lock, the week's final game counts,
     // so kept, their slot scores it (unless they're known to have played it on the bench).
     const done = st.games.filter((d) => d.game.status === 'complete').at(-1);
@@ -674,6 +676,8 @@
       final,
       // A finished game that may be lockable: it's unknown whether they started it.
       maybe: starting && st.unsure ? st.current : null,
+      offer,
+      unsure: Boolean(offer) && st.unsure,
       perGame,
       gamesLeft: left.length,
       left,
@@ -866,7 +870,10 @@
     l.bench.forEach((id) => consider(id, false));
     const date = Object.values(look).map((o) => o.left[0]?.date).filter(Boolean).sort()[0] ?? null;
     // A finished game is worth keeping if it beats what leaving the slot open is worth.
-    const worthy = (o) => (o.banked && o.banked.actual > 0 && o.banked.actual > o.open ? o.banked : null);
+    const worthy = (o) => (o.offer && o.offer.actual > 0 && o.offer.actual > o.open ? o.offer : null);
+    // Within a tenth of the score either way: worth a second look before locking, or not.
+    const CLOSE = 0.1;
+    const close = (o, game) => Math.abs(game.actual - o.open) <= CLOSE * game.actual;
     const skip = new Set(noLock);
     const today = (id) => Math.max(look[id].left.find((d) => d.date === date)?.proj ?? 0, worthy(look[id])?.actual ?? 0,
       look[id].final?.actual ?? 0);
@@ -932,14 +939,14 @@
     // Unticked ones stay listed, so they can be ticked again.
     plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {
       const o = look[id];
-      return { id, on: locking.has(id), game: o.banked, actual: o.banked.actual, open: o.open, openBy: o.openBy ?? null, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
+      return { id, on: locking.has(id), game: o.offer, actual: o.offer.actual, unsure: o.unsure, close: close(o, o.offer), open: o.open, openBy: o.openBy ?? null, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
     });
     // Starters whose finished game can still be locked, but isn't worth it yet.
     // Starters with a finished game that may be lockable: whether they started it is unknown.
     plan.maybe = l.starters.filter((id) => look[id]?.maybe && look[id].gamesLeft > 0)
       .map((id) => ({ id, actual: look[id].maybe.actual ?? 0, game: look[id].maybe }));
-    plan.notYet = l.starters.filter((id) => look[id]?.banked?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
-      .map((id) => ({ id, actual: look[id].banked.actual, open: look[id].open, openBy: look[id].openBy ?? null, game: look[id].banked }));
+    plan.notYet = l.starters.filter((id) => look[id]?.offer?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
+      .map((id) => ({ id, actual: look[id].offer.actual, unsure: look[id].unsure, close: close(look[id], look[id].offer), open: look[id].open, openBy: look[id].openBy ?? null, game: look[id].offer }));
     plan.changes = plan.changes.map((c) => {
       const o = look[c.id];
       const { perGame, gamesLeft, banked } = o;
@@ -980,7 +987,7 @@
       if (!id || id === '0' || !look[id]) return 0;
       const o = look[id];
       if (o.locked) return o.locked.actual ?? 0;
-      if (lockedOn.has(id)) return o.banked?.actual ?? 0;
+      if (lockedOn.has(id)) return o.offer?.actual ?? 0;
       return o.gamesLeft > 0 ? o.left.at(-1)?.proj ?? 0 : o.final?.actual ?? 0;
     };
     plan.week = { before: l.starters.reduce((sum, id) => sum + counts(id), 0), after: plan.starters.reduce((sum, id) => sum + counts(id), 0) };

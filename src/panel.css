@@ -2112,6 +2112,17 @@ button.optimize:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--warn) 45%, transparent);
   background: color-mix(in srgb, var(--warn) 5%, transparent);
 }
+.os-row.same.close {
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 5%, transparent);
+}
+.os-row.same.close > :not(.os-act, .dp-form) {
+  opacity: 0.9;
+}
+.close-call {
+  color: var(--warn);
+  font-weight: 700;
+}
 .os-row.swap.losing {
   border-color: color-mix(in srgb, var(--danger) 50%, transparent);
   background: color-mix(in srgb, var(--danger) 6%, transparent);

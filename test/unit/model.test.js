@@ -576,7 +576,7 @@ test('lineup reads follow tip-offs: one per tip-off time, never on a timer', () 
   assert.equal(reads, 3);
 });
 
-test('best lineup: a game played on the bench can\'t be locked after moving in, and an unseen one is only a maybe', () => {
+test('best lineup: a game played on the bench can\'t be locked after moving in, and an unseen one is recommended but flagged', () => {
   // dillon moved in after his finished game; it scored well over what's left, but he was on the bench for it.
   const games = {
     dillon: [['d1', '2026-10-20', 'complete', 10, 30], ['d2', '2026-10-22', 'pre_game', 10]],
@@ -587,10 +587,23 @@ test('best lineup: a game played on the bench can\'t be locked after moving in, 
   assert.deepEqual(plain(benched.locks), []);
   assert.deepEqual(plain(benched.maybe), []);
   const unseen = model.bestLineup({ ...l, started: () => null }, OPT_NOW);
-  assert.deepEqual(plain(unseen.locks), [], 'never recommended without knowing');
+  assert.deepEqual(plain(unseen.locks.map((k) => [k.id, k.actual, k.unsure])), [['dillon', 30, true]], 'recommended, flagged as unconfirmed');
   assert.deepEqual(plain(unseen.maybe.map((k) => [k.id, k.actual])), [['dillon', 30]]);
   const seen = model.bestLineup({ ...l, started: () => true }, OPT_NOW);
-  assert.deepEqual(plain(seen.locks.map((k) => k.id)), ['dillon']);
+  assert.deepEqual(plain(seen.locks.map((k) => [k.id, k.unsure])), [['dillon', false]]);
+});
+
+test('best lineup: open value is Sleeper\'s best projection left; a score within a tenth of it is flagged as a close call', () => {
+  const games = {
+    // Locked 42.10 vs a best projection of 43.49 (Saturday): not worth locking, but close.
+    wag: [['w1', '2026-10-20', 'complete', 30, 42.1], ['w2', '2026-10-22', 'pre_game', 37.72], ['w3', '2026-10-23', 'pre_game', 38.58], ['w4', '2026-10-25', 'pre_game', 43.49]],
+    // 45.10 vs 40.21: worth locking, and clear.
+    lend: [['l1', '2026-10-20', 'complete', 30, 45.1], ['l2', '2026-10-22', 'pre_game', 39.97], ['l3', '2026-10-23', 'pre_game', 40.21], ['l4', '2026-10-25', 'pre_game', 32.39]],
+  };
+  const l = optimizerLineup(['SF', 'PF'], ['wag', 'lend'], [], { wag: ['SF'], lend: ['PF'] }, games);
+  const plan = model.bestLineup({ ...l, started: () => true }, OPT_NOW);
+  assert.deepEqual(plain(plan.locks.map((k) => [k.id, k.open, k.close])), [['lend', 40.21, false]]);
+  assert.deepEqual(plain(plan.notYet.map((k) => [k.id, k.open, k.close])), [['wag', 43.49, true]]);
 });
 
 test('best lineup: a starter with no games left keeps their final game, which counts without a lock', () => {

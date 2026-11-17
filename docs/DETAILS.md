@@ -30,7 +30,7 @@ How the extension works: what it shows, the Sleeper API calls it makes, and how 
   It reads your leg on each load and after each save, plus once 5 minutes after each tip-off time of your players' games (games tipping off together share the read), only while the tab is visible; a read missed while it was hidden happens when it comes back, if the game is still on. Reads are never closer than a minute apart.
   Sleeper won't move a player whose game is on, so a lineup seen in the two hours after tip-off settles it; so does the same lineup seen before and after.
   A game it saw them starting for is lockable; one it saw them benched for isn't; anything else is a maybe, still lockable from the strip, with a title saying it depends on whether they started.
-  Optimize only recommends locks it's sure of; a maybe shows in its row ("lockable if started"), and benching that player says "May drop lock-in".
+  Optimize recommends a maybe too, marked "lockable if started"; benching that player says "May drop lock-in".
 - Rostered and start percentages, as the mobile app shows them (rounded up, for the league's type).
 - A third line under the percentages: the player's latest finished game this week as the mobile app shows it ("@ NYK · 26 PTS, 4 REB, 4 AST, 9/22 FG, 4/9 3PM, 4/4 FT, 3 TO, 2 PF"; steals, blocks and fouls only when there are some), from the week's stats already loaded. Cut short with an ellipsis when the row is narrow, the whole line in its tooltip; none before a player's first game of the week.
 - Draft picks held, including picks acquired by trade.
@@ -93,6 +93,8 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
   The week's last game counts unless an earlier one gets locked, and any game can be locked once played, so the slot is worth the best of Sleeper's projections for the games left.
   Only Sleeper's projections go in; nothing is modelled on top of them.
 - A starter with a finished game that can still be locked, scoring more than the open value, is worth that score.
+  A game the extension couldn't confirm they started (it didn't see your lineup at tip-off) counts too: it's recommended with "lockable if started", since Sleeper only accepts the lock if they were starting at tip-off.
+  A score within a tenth of the open value, locked or not, is marked "close call" (amber row), since it's near a coin flip against Sleeper's own projections.
 - A starter with no games left is worth their final game's score: with no lock, the week's final game counts, so kept, their slot scores it (unless the extension knows they played it on the bench). So a starter who's done for the week isn't benched for a smaller projection.
 - Lock in: such a starter is recommended for locking when the best lineup keeps them and they have a game left (with none, the last game counts anyway).
   Each recommendation shows the score, the open value and when the window closes (their next tip-off).
