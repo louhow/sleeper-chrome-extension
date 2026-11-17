@@ -2128,11 +2128,11 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   const lockRow = page.locator(dialog('.os-row.lock'));
   assert.equal(await lockRow.count(), 1, 'one game worth locking');
   assert.equal(await lockRow.locator('.os-p [data-player]').first().getAttribute('data-player'), locker);
-  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · open \d+\.\d\d( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm)[\s\S]*LOCK \d+\.\d\d\s+Keep open instead/i);
+  assert.match(await lockRow.innerText(), /\w{3} (vs|@) \w+ · proj \d+\.\d\d( \w{3})?( with \S+ [^\n]+)?\s+Lockable until \w{3} \d{1,2}:\d\d(am|pm)[\s\S]*LOCK \d+\.\d\d\s+Keep open instead/i);
   assert.ok(Number(await lockRow.locator('.sub .score-chip.tier-green').textContent()) >= 70, 'the score, in its tier color');
   // The live week's projections set the open value, so it's judged against the score, not a fixed number.
   const locked = Number(await lockRow.locator('.sub .score-chip.tier-green').textContent());
-  assert.ok(Number((await lockRow.innerText()).match(/open (\d+\.\d\d)/)[1]) < locked / 2, 'keeping it open is worth far less');
+  assert.ok(Number((await lockRow.innerText()).match(/proj (\d+\.\d\d)/)[1]) < locked / 2, 'keeping it open is worth far less');
   assert.match(await lockRow.locator('[data-op-lock-row]').textContent(), /^Lock \d+\.\d\d$/);
   const applyButton = page.locator(dialog('[data-action="apply-lineup"]'));
   assert.equal(await applyButton.textContent(), 'Lock in 1 game and apply all');

@@ -2119,7 +2119,8 @@ button.optimize:hover:not(:disabled) {
 .os-row.same.close > :not(.os-act, .dp-form) {
   opacity: 0.9;
 }
-.close-call {
+.close-call,
+.os-row .dp-open.close-call {
   color: var(--warn);
   font-weight: 700;
 }

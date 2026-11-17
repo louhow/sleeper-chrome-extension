@@ -72,7 +72,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
     The one coming in says where from and their next game ("From bench · Sat @ CHI 7:00pm").
     Their headshots carry substitution marks, as soccer apps show them: a green arrow up coming in, a red arrow down going out (the NFL dialog too).
     Its two options are spelled out: the filled "Apply change", and, when the one going out has a finished game that could still be locked, a gold link under it naming them ("Keep F. Wagner, lock 3.00"), which keeps them in the lineup and locks it (its tooltip says when it depends on them having started); the dialog stays open on the plan around the lock.
-  - A finished game worth locking shows its score, the open value and when the window closes, with a filled "Lock 74.90" button and a "Keep open instead" link under it.
+  - A finished game worth locking shows its score, the best projection left (Proj) and when the window closes, with a filled "Lock 74.90" button and a "Keep open instead" link under it.
   - A lock is final and pins the player to their slot, so the one being locked takes the most specific slot they fit (SF before F, PG before G) and whoever was there moves to the flexible slot they leave; the row of the player coming in says "Then locks", its filled "Apply + lock 53.00" button saves the move and the lock together (as Apply all does), and "Apply without locking" under it saves the move alone.
   - A slot that stays is dimmed and says why: "No change", "Locked" (with the locked score), "Playing" or "Empty".
 - Numbers per row (NBA), for the player in the Starting column: **Lock** (the finished score you could lock), the next day's projection (**Fri** and so on), **Open** (what leaving the slot open is worth over the games left) and **Form**.
@@ -88,19 +88,19 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - It picks for the next day of games, since Lock-In lineups can change daily: a starter with no game that day can sit for someone who plays, and come back for their next game.
   Run it again each game day.
 - Worth: a player's projection for that day (0 with no game). Out games project 0, so injuries count.
-- Open value: what leaving a starter's slot open is worth, from their projections for the games left.
-  A lock shuts the slot for the rest of the week, to the bench too, so a player the best lineup leaves on the bench who fits the slot counts when they're worth more ("open 31.91 with L. Dončić").
+- Proj (the open value): what leaving a starter's slot open is worth, the best of Sleeper's projections for the games left. Hover the Proj cell for the game.
+  A lock shuts the slot for the rest of the week, to the bench too, so a player the best lineup leaves on the bench who fits the slot counts when they're worth more ("proj 31.91 Fri with L. Dončić").
   The week's last game counts unless an earlier one gets locked, and any game can be locked once played, so the slot is worth the best of Sleeper's projections for the games left.
   Only Sleeper's projections go in; nothing is modelled on top of them.
 - A starter with a finished game that can still be locked, scoring more than the open value, is worth that score.
   A game the extension couldn't confirm they started (it didn't see your lineup at tip-off) counts too: it's recommended with "lockable if started", since Sleeper only accepts the lock if they were starting at tip-off.
-  A score within a tenth of the open value, locked or not, is marked "close call" (amber row), since it's near a coin flip against Sleeper's own projections.
+  A score within a tenth of the open value, locked or not, is marked "close call" (amber row and amber Proj), since it's near a coin flip against Sleeper's own projections.
 - A starter with no games left is worth their final game's score: with no lock, the week's final game counts, so kept, their slot scores it (unless the extension knows they played it on the bench). So a starter who's done for the week isn't benched for a smaller projection.
 - Lock in: such a starter is recommended for locking when the best lineup keeps them and they have a game left (with none, the last game counts anyway).
-  Each recommendation shows the score, the open value and when the window closes (their next tip-off).
+  Each recommendation shows the score, the Proj and when the window closes (their next tip-off).
   "Keep open" leaves it out and keeps the player in the lineup, so the score can still be locked later; the rest of the plan is worked out again. "Lock instead" brings it back.
   A player being locked always starts but can take any slot they fit (so they can leave UTIL for a specific slot and free UTIL for someone on the bench); the rest of the lineup is worked out around them.
-- Starters whose finished game can be locked but isn't worth it yet show the score and the open value in their row ("16.50 Wed vs MIL · open 31.91"), with no action.
+- Starters whose finished game can be locked but isn't worth it yet show the score and the open value in their row ("16.50 Wed vs MIL · proj 31.91 Fri"), with no action.
 - Slots no one can fill that day go to the players with the most projected points per game left this week.
 - Lineup: tries every way to fit the movable players into the starting slots and keeps the highest total, so scarce slots go to the players who can only fill them. Ties keep the most players where they are, then put players in their most specific slot.
 - Locked-in players and players in a game right now stay put.

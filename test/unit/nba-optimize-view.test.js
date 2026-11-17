@@ -31,13 +31,15 @@ test('lock rows and not-yet rows say when the game is unconfirmed, and flag a cl
   const game = (id, actual) => ({ actual, game: { id, home: 'ORL', away: 'BOS', start: 0, status: 'complete' }, home: false, opponent: 'BOS' });
   const info = { today: null, perGame: 30, gamesLeft: 3, open: 40 };
   const lock = { id: 'f', on: true, unsure: true, close: false, game: game('g1', 43.5), actual: 43.5, open: 36.2, gamesLeft: 3, until: null };
-  const notYet = { id: 'w', unsure: true, close: true, game: game('g2', 42.1), actual: 42.1, open: 43.49 };
-  const pl = { ...plan, slots: ['G', 'SF'], current: ['f', 'w'], starters: ['f', 'w'], changes: [], locks: [lock], notYet: [notYet], future: {}, info: { f: info, w: info } };
+  const notYet = { id: 'w', unsure: true, close: true, openGame: { date: '2026-10-24', home: false, opponent: 'WAS' }, game: game('g2', 42.1), actual: 42.1, open: 43.49 };
+  const pl = { ...plan, slots: ['G', 'SF'], current: ['f', 'w'], starters: ['f', 'w'], changes: [], locks: [lock], notYet: [notYet], future: {}, info: { f: info, w: { ...info, open: 43.49, close: true, openGame: { date: '2026-10-24', home: false, opponent: 'WAS' } } } };
   const html = view.render(s, { kind: 'optimize', plan: pl, noLock: [], errors: [], saving: false, busy: null });
   const t = text(html);
   assert.match(t, /Lockable if they started/);
   assert.match(t, /lockable if started/);
   assert.equal((t.match(/close call/g) || []).length, 1, 'only the near one is flagged');
   assert.match(html, /os-row nba same close/);
+  assert.match(t, /proj 43\.49 Sat/, 'the projection, with its day');
+  assert.match(html, /dp-open close-call" title="Best projection left: Sat @ WAS|dp-open close-call" title="Best projection left: Sat @WAS/);
   assert.doesNotMatch(html.split('os-row nba lock')[1].split('</div>')[0], /close call/);
 });

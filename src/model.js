@@ -671,6 +671,7 @@
     // A starter with no games left: with no lock, the week's final game counts,
     // so kept, their slot scores it (unless they're known to have played it on the bench).
     const done = st.games.filter((d) => d.game.status === 'complete').at(-1);
+    const best = left.reduce((top, d) => ((d.proj ?? 0) > (top?.proj ?? 0) ? d : top), null);
     const final = starting && !st.locked && !left.length && done && !st.benched ? done : null;
     return {
       final,
@@ -683,6 +684,8 @@
       left,
       banked,
       open: openValue(left.map((d) => Math.max(0, d.proj ?? 0))),
+      // The game that projection is for.
+      openGame: best && (best.proj ?? 0) > 0 ? best : null,
       value: Math.max(perGame, banked?.actual ?? 0, final?.actual ?? 0),
       fixed: st.locked ? 'locked' : st.games.some((d) => gameLive(d.game, now)) ? 'live' : null,
       locked: st.locked,
@@ -906,6 +909,7 @@
       for (const b of free) {
         if (look[b].open > o.open && fits(l.slots[i] ?? 'UTIL', l.players[b] || {})) {
           o.open = look[b].open;
+          o.openGame = look[b].openGame;
           o.openBy = b;
         }
       }
@@ -939,14 +943,14 @@
     // Unticked ones stay listed, so they can be ticked again.
     plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {
       const o = look[id];
-      return { id, on: locking.has(id), game: o.offer, actual: o.offer.actual, unsure: o.unsure, close: close(o, o.offer), open: o.open, openBy: o.openBy ?? null, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
+      return { id, on: locking.has(id), game: o.offer, actual: o.offer.actual, unsure: o.unsure, close: close(o, o.offer), open: o.open, openGame: o.openGame, openBy: o.openBy ?? null, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
     });
     // Starters whose finished game can still be locked, but isn't worth it yet.
     // Starters with a finished game that may be lockable: whether they started it is unknown.
     plan.maybe = l.starters.filter((id) => look[id]?.maybe && look[id].gamesLeft > 0)
       .map((id) => ({ id, actual: look[id].maybe.actual ?? 0, game: look[id].maybe }));
     plan.notYet = l.starters.filter((id) => look[id]?.offer?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
-      .map((id) => ({ id, actual: look[id].offer.actual, unsure: look[id].unsure, close: close(look[id], look[id].offer), open: look[id].open, openBy: look[id].openBy ?? null, game: look[id].offer }));
+      .map((id) => ({ id, actual: look[id].offer.actual, unsure: look[id].unsure, close: close(look[id], look[id].offer), open: look[id].open, openGame: look[id].openGame, openBy: look[id].openBy ?? null, game: look[id].offer }));
     plan.changes = plan.changes.map((c) => {
       const o = look[c.id];
       const { perGame, gamesLeft, banked } = o;
@@ -975,6 +979,9 @@
       perGame: o.perGame,
       gamesLeft: o.gamesLeft,
       open: o.open,
+      openGame: o.openGame,
+      openBy: o.openBy ?? null,
+      close: Boolean(o.offer?.actual > 0) && close(o, o.offer),
       fixed: o.fixed,
       locked: o.locked,
       // The score a starter with no games left keeps in the slot (the week's final game).

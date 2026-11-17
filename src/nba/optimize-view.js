@@ -47,7 +47,7 @@
         <div class="os-head nba"><span>Slot</span><span>Starting</span><span>Replaces</span>
           <span class="dp-lock" title="A finished game's score you could lock in">Lock</span>
           <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span>
-          <span class="dp-open" title="What leaving the slot open is worth over the games left this week">Open</span>
+          <span class="dp-open" title="Sleeper's best projection among the games left this week, which is what leaving the slot open is worth. Hover a value for the game">Proj</span>
           <span class="dp-form" title="Their last games' fantasy points, and the average. Hover a bar for its scores. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span>
           <span class="os-act-head" title="The filled button on each row is what Apply all does for it. The link under it is the other choice.">Action</span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
@@ -114,7 +114,7 @@
       : info.fixed === 'live' ? 'Playing'
       : 'No change';
     const sub = info.fixed === 'locked' ? `${score(s, info.locked.actual ?? 0)} ${esc(gameLabel(info.locked))}`
-      : notYet ? `${score(s, notYet.actual)} ${esc(gameLabel(notYet.game))}${unsureTag(notYet)} · ${openText(s, notYet)}${closeTag(notYet)} · ${esc(upcoming(s, cur))}`
+      : notYet ? `${score(s, notYet.actual)} ${esc(gameLabel(notYet.game))}${unsureTag(notYet)} · ${openText(s, notYet)} · ${esc(upcoming(s, cur))}`
       : maybe ? `<span title="Lockable only if they were starting when it tipped off; the extension didn't see your lineup then">${score(s, maybe.actual)} ${esc(gameLabel(maybe.game))} · lockable if started</span> · ${esc(upcoming(s, cur))}`
       : info.final > 0 ? `${esc(upcoming(s, cur))} · their ${score(s, info.final)} stays in the slot`
       : esc(upcoming(s, cur));
@@ -163,7 +163,7 @@
     const toggle = k.on
       ? `<button class="os-link" data-op-keep="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Keep open instead</button>`
       : `<button class="os-link lock" data-op-relock="${esc(k.id)}" ${m.saving ? 'disabled' : ''}>Lock instead</button>`;
-    const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameLabel(k.game))} · ${openText(s, k)}${closeTag(k)}</span>
+    const sub = `<span class="sub">${score(s, k.actual)} ${esc(gameLabel(k.game))} · ${openText(s, k)}</span>
       <span class="sub">${k.on ? `${k.unsure ? 'Lockable if they started' : 'Lockable'}${esc(until)}` : 'Keeping open'}</span>`;
     return `<div class="os-row nba lock${k.on ? '' : ' off'}${k.close ? ' close' : ''}">
       <span class="os-slot">${slotBadge(slot)}</span>
@@ -190,7 +190,7 @@
     const lockCell = lock != null && lock > 0 ? score(s, lock) : '–';
     if (locked) return `<span class="dp-lock">${lockCell}</span><span class="dp-pts">–</span><span class="dp-open" title="Locked in, so later games don't count">–</span>${form(s, plan, id, lock)}`;
     return `<span class="dp-lock">${lockCell}</span><span class="dp-pts">${pts(info.today)}</span>`
-      + `<span class="dp-open" title="${esc(games(info.gamesLeft ?? 0))} left">${info.gamesLeft ? f2(info.open ?? 0) : '–'}</span>${form(s, plan, id, lock)}`;
+      + `<span class="dp-open${info.close ? ' close-call' : ''}" title="${esc(info.gamesLeft ? `Best projection left: ${projGame(s, info)} (${games(info.gamesLeft)} left)${info.close ? '. ' + CLOSE_NOTE : ''}` : 'No games left')}">${info.gamesLeft ? f2(info.open ?? 0) : '–'}</span>${form(s, plan, id, lock)}`;
   }
 
   // The Form cell: a bar per score bucket over the player's last games (taller
@@ -231,19 +231,20 @@
     return `${kind === 'out' ? 'To' : 'From'} ${esc(where)}`;
   }
 
-  // What keeping the slot open is worth, and who from the bench would bring it.
+  // Sleeper's best projection left (what keeping the slot open is worth), its day,
+  // and who from the bench would bring it; amber when the score is a close call against it.
   function openText(s, k) {
-    return `open ${f2(k.open)}${k.openBy ? ` with ${esc(shortName(s.players[k.openBy]))}` : ''}`;
+    const text = `proj ${f2(k.open)}${k.openGame ? ` ${esc(weekday(k.openGame.date))}` : ''}${k.openBy ? ` with ${esc(shortName(s.players[k.openBy]))}` : ''}`;
+    return k.close ? `<span class="close-call" title="${esc(CLOSE_NOTE)}">${text} · close call</span>` : text;
   }
+
+  // The game behind a projection: "Sat @WAS", with the bench player it comes from.
+  const projGame = (s, k) => (k.openGame ? `${gameLabel(k.openGame)}${k.openBy ? ` with ${s.players[k.openBy]?.name || 'a bench player'}` : ''}` : '');
+  const CLOSE_NOTE = 'This score is within 10% of Sleeper\'s best projection left, so it\'s close either way';
 
   // A finished game the extension couldn't confirm they started.
   function unsureTag(k) {
     return k.unsure ? ' <span title="Lockable only if they were starting when it tipped off; the extension didn\'t see your lineup then">· lockable if started</span>' : '';
-  }
-
-  // A score within a tenth of what leaving the slot open is worth: close either way.
-  function closeTag(k) {
-    return k.close ? ' <span class="close-call" title="This score is within 10% of what leaving the slot open is worth, so it\'s close either way">close call</span>' : '';
   }
 
   // The player's next game this week, e.g. "Fri vs BOS 7:00pm".
