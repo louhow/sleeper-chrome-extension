@@ -456,13 +456,12 @@ test('best lineup: benching a starter with a lockable finished game flags the lo
   assert.deepEqual(plain(model.bestLineup(close, OPT_NOW).changes), []);
 });
 
-test('open value: the last game counts, and an earlier one gets locked when it beats what is left', () => {
+test('open value: the best of Sleeper\'s projections for the games left', () => {
   assert.equal(model.openValue([]), 0);
   assert.equal(model.openValue([20]), 20);
-  // Two games left: the first is worth locking only when it beats the second, so the open slot is worth more than either.
-  const two = model.openValue([22.42, 22.99]);
-  assert.ok(two > 25.7 && two < 26, `about 25.8 (${two})`);
-  assert.ok(model.openValue([10, 20, 30]) > 30, 'each extra game adds a chance');
+  assert.equal(model.openValue([22.42, 22.99]), 22.99);
+  assert.equal(model.openValue([37.72, 38.58, 43.49]), 43.49);
+  assert.equal(model.openValue([39.97, 40.21, 32.39]), 40.21, 'an earlier game can be the best');
   assert.equal(model.openValue([0, 0]), 0, 'nothing projected is worth nothing');
 });
 

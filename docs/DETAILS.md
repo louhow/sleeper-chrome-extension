@@ -90,8 +90,8 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - Worth: a player's projection for that day (0 with no game). Out games project 0, so injuries count.
 - Open value: what leaving a starter's slot open is worth, from their projections for the games left.
   A lock shuts the slot for the rest of the week, to the bench too, so a player the best lineup leaves on the bench who fits the slot counts when they're worth more ("open 31.91 with L. Dončić").
-  The week's last game counts unless an earlier one gets locked, and a game is worth locking when it beats what the games after it are worth.
-  Each game's points are taken to spread about 35% of the projection either way (a normal distribution), so two games left are worth more than either alone.
+  The week's last game counts unless an earlier one gets locked, and any game can be locked once played, so the slot is worth the best of Sleeper's projections for the games left.
+  Only Sleeper's projections go in; nothing is modelled on top of them.
 - A starter with a finished game that can still be locked, scoring more than the open value, is worth that score.
 - A starter with no games left is worth their final game's score: with no lock, the week's final game counts, so kept, their slot scores it (unless the extension knows they played it on the bench). So a starter who's done for the week isn't benched for a smaller projection.
 - Lock in: such a starter is recommended for locking when the best lineup keeps them and they have a game left (with none, the last game counts anyway).

@@ -629,24 +629,12 @@
   // per game left) breaks ties. Locked players and players in a game right now stay put.
   const gameLive = (game, now) => gameState(game, now) === 'live';
 
-  // How far a game's fantasy points stray from the projection, as a share of
-  // it (a standard deviation): NBA game logs run about a third either way.
-  const GAME_SPREAD = 0.35;
-
-  // E[max(X, floor)] for X ~ Normal(mean, sd).
-  function expectedMax(mean, sd, floor) {
-    if (!(sd > 0)) return Math.max(mean, floor);
-    const z = (mean - floor) / sd;
-    const below = 0.5 * erfc(z / Math.SQRT2);
-    return mean * (1 - below) + sd * Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI) + floor * below;
-  }
-
-  // What leaving a slot open is worth, given the player's projections for the
-  // games left: the last game counts unless an earlier one gets locked, and a
-  // game gets locked when it beats what the games after it are worth.
+  // What leaving a slot open is worth, from Sleeper's projections for the games
+  // left: the last game counts unless an earlier one gets locked, and any game
+  // can be locked once played, so the slot is worth the best game projected.
+  // Only Sleeper's numbers go in; nothing is modelled on top of them.
   function openValue(projections) {
-    return projections.reduceRight((after, mean, i) =>
-      (i === projections.length - 1 ? mean : expectedMax(mean, GAME_SPREAD * mean, after)), 0);
+    return Math.max(0, ...projections);
   }
 
   // The Optimize dialog's form chart: a player's recent game scores in `bins`
