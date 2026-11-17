@@ -193,6 +193,23 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
     if (result?.ok && state.ready) setTimeout(() => loadWeek(state.week, true).catch(() => {}), 1500);
   });
 
+  // A roster change Sleeper's own page made (a drop, an add, a trade): read the
+  // rosters and the week again. Moves in a burst (and our own lineup saves,
+  // which also tell) are read once.
+  let movedTimer = null;
+  const stopMoved = bridge.on('snp:roster-moved', () => {
+    clearTimeout(movedTimer);
+    movedTimer = setTimeout(async () => {
+      if (destroyed || !state.ready) return;
+      try {
+        const rosters = await data.rosters();
+        if (destroyed) return;
+        state.rosters = rosters;
+        await loadWeek(state.week, true);
+      } catch (err) { /* the next read catches up */ }
+    }, 1500);
+  });
+
   function setWeek(week) {
     if (week < state.minWeek || week > state.maxWeek || state.saving) return;
     state.week = week;
@@ -525,6 +542,8 @@ update_matchup_leg(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(r
   function destroy() {
     destroyed = true;
     stopSaved();
+    stopMoved();
+    clearTimeout(movedTimer);
     document.removeEventListener('visibilitychange', onVisible);
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('click', onOutsideClick, true);

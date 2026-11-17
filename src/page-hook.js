@@ -1751,6 +1751,23 @@
     target?.click();
   });
 
+  // Any GraphQL mutation Sleeper's own page sends (a drop, an add, a trade, a
+  // lineup move) may have changed a roster behind the extension's back: say so
+  // once it has gone through, and the panel reads the rosters again.
+  const isMutation = (body) => typeof body === 'string' && /^\s*(\{\s*"query"\s*:\s*")?\s*mutation\b/.test(body);
+  const movedSoon = () => bridge.tell('snp:roster-moved', null);
+  const nativeFetch = window.fetch;
+  window.fetch = function (input, init) {
+    const result = nativeFetch.apply(this, arguments);
+    if (isMutation(init?.body)) result.then(movedSoon, () => {});
+    return result;
+  };
+  const nativeSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function (body) {
+    if (isMutation(body)) this.addEventListener('loadend', movedSoon);
+    return nativeSend.apply(this, arguments);
+  };
+
   // Saves a lineup through Sleeper's own actions, so its screen updates as if you'd made the swaps.
   bridge.answerLater('snp:nfl-lineup-save', async ({ leagueId, rosterId, round, starters }) => {
     try {
