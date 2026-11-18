@@ -382,12 +382,15 @@
     if (!(leg > 0)) return;
     const name = `Week ${leg} (Current)`;
     for (const el of document.querySelectorAll(`${PLAYERS_PANEL} .filter-dropdown .app-dropdown`)) {
-      const options = fiber(el, (x) => Array.isArray(x.options) && x.options.some((o) => o.value === 'season'))?.memoizedProps.options;
+      const f = fiber(el, (x) => Array.isArray(x.options) && x.options.some((o) => o.value === 'season'));
+      const options = f?.memoizedProps.options;
       const week = options?.find((o) => String(o.value) === String(leg));
       if (!week) continue;
-      if (week.name !== name) week.name = name;
-      if (options[0] === week || options[0].snpCurrent) continue;
-      options.unshift({ ...week, snpCurrent: true });
+      let changed = false;
+      if (week.name !== name) { week.name = name; changed = true; }
+      if (options[0] !== week && !options[0].snpCurrent) { options.unshift({ ...week, snpCurrent: true }); changed = true; }
+      // Sleeper draws from what it was given, not from the array afterwards.
+      if (changed) f.stateNode?.forceUpdate?.();
     }
   }
 
