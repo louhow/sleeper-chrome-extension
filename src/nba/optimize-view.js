@@ -18,7 +18,6 @@
   // Why Apply waits while a green score would be given up.
   const BLOCKED = 'Tick the box above to confirm giving up that score';
 
-  const games = (n) => `${n} game${n === 1 ? '' : 's'}`;
   const pts = (x) => (x == null ? '–' : f2(x));
   const names = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0]);
 
@@ -47,7 +46,7 @@
         <div class="os-head nba"><span>Slot</span><span>Starting</span><span>Replaces</span>
           <span class="dp-lock" title="A finished game's score you could lock in">Lock</span>
           <span class="dp-pts" title="Projected points on ${esc(day(plan))}">${esc(day(plan))}</span>
-          <span class="dp-open" title="Sleeper's best projection among the games left this week, which is what leaving the slot open is worth. Hover a value for the game">Proj</span>
+          <span class="dp-open" title="Sleeper's best projection among the games left this week, which is what leaving the slot open is worth. Hover a value for the player and game">Proj</span>
           <span class="dp-form" title="Their last games' fantasy points, and the average. Hover a bar for its scores. Gold marks the lock score; the tick under a bar is the ${esc(day(plan))} projection">Form</span>
           <span class="os-act-head" title="The filled button on each row is what Apply all does for it. The link under it is the other choice.">Action</span></div>
         ${plan.slots.map((slot, i) => slotRow(s, m, plan, slot, i, blocked)).join('')}` : '';
@@ -190,7 +189,15 @@
     const lockCell = lock != null && lock > 0 ? score(s, lock) : '–';
     if (locked) return `<span class="dp-lock">${lockCell}</span><span class="dp-pts">–</span><span class="dp-open" title="Locked in, so later games don't count">–</span>${form(s, plan, id, lock)}`;
     return `<span class="dp-lock">${lockCell}</span><span class="dp-pts">${pts(info.today)}</span>`
-      + `<span class="dp-open${info.close ? ' close-call' : ''}" title="${esc(info.gamesLeft ? `Best projection left: ${projGame(s, info)} (${games(info.gamesLeft)} left)${info.close ? '. ' + CLOSE_NOTE : ''}` : 'No games left')}">${info.gamesLeft ? f2(info.open ?? 0) : '–'}</span>${form(s, plan, id, lock)}`;
+      + `<span class="dp-open${info.close ? ' close-call' : ''}"${info.gamesLeft ? '' : ' title="No games left"'}><span class="open-val">${info.gamesLeft ? f2(info.open ?? 0) : '–'}</span>${info.gamesLeft ? openTip(s, id, info) : ''}</span>${form(s, plan, id, lock)}`;
+  }
+
+  // The Proj cell's tooltip (CSS, no delay): whose game the projection is for, the
+  // slot's own player or one on the bench, and when: "Luka Dončić, Friday vs SAC".
+  function openTip(s, id, info) {
+    const g = info.openGame;
+    if (!g) return '';
+    return `<span class="open-tip"><b>${esc(playerName(s.players, info.openBy ?? id))}</b>, ${esc(weekday(g.date, 'long'))} ${g.home ? 'vs' : 'at'} ${esc(g.opponent)}</span>`;
   }
 
   // The Form cell: a bar per score bucket over the player's last games (taller
@@ -238,8 +245,6 @@
     return k.close ? `<span class="close-call" title="${esc(CLOSE_NOTE)}">${text} · close call</span>` : text;
   }
 
-  // The game behind a projection: "Sat @WAS", with the bench player it comes from.
-  const projGame = (s, k) => (k.openGame ? `${gameLabel(k.openGame)}${k.openBy ? ` with ${s.players[k.openBy]?.name || 'a bench player'}` : ''}` : '');
   const CLOSE_NOTE = 'This score is within 10% of Sleeper\'s best projection left, so it\'s close either way';
 
   // A finished game the extension couldn't confirm they started.

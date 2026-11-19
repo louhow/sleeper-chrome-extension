@@ -2094,6 +2094,15 @@ test('optimize lineup: proposes changes, guards green scores, and saves only onc
   assert.ok(await sameCol.locator('.form-tip').evaluate((el) => { let o = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) o *= Number(getComputedStyle(n).opacity); return o === 1; }), 'tooltip is opaque on a dimmed row');
   await page.screenshot({ path: `${OUT}optimize-form-hover-same.png` });
   await page.mouse.move(0, 0);
+  // The Proj value's tooltip names the player and game it's for, as opaque as the form's.
+  const openCell = page.locator(dialog('.os-row.same .dp-open:has(.open-tip)')).first();
+  await openCell.hover();
+  const openTip = openCell.locator('.open-tip');
+  assert.ok(await openTip.isVisible(), 'the Proj tooltip shows on hover');
+  assert.match(await openTip.innerText(), /^.+, (Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day (vs|at) [A-Z]{2,3}$/);
+  assert.ok(await openTip.evaluate((el) => { let o = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) o *= Number(getComputedStyle(n).opacity); return o === 1; }), 'Proj tooltip is opaque on a dimmed row');
+  await page.screenshot({ path: `${OUT}optimize-proj-hover.png` });
+  await page.mouse.move(0, 0);
   // One row per starting slot, in lineup order, each showing who's there now.
   const slots = league.roster_positions.filter((p) => p !== 'BN');
   assert.deepEqual(await page.locator(dialog('.os-row .os-slot')).allTextContents(), slots);

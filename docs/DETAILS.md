@@ -88,7 +88,7 @@ Nothing is written until you apply a row or press Apply all; Cancel, ✕, the ba
 - It picks for the next day of games, since Lock-In lineups can change daily: a starter with no game that day can sit for someone who plays, and come back for their next game.
   Run it again each game day.
 - Worth: a player's projection for that day (0 with no game). Out games project 0, so injuries count.
-- Proj (the open value): what leaving a starter's slot open is worth, the best of Sleeper's projections for the games left. Hover the Proj cell for the game.
+- Proj (the open value): what leaving a starter's slot open is worth, the best of Sleeper's projections for the games left. It counts a player the plan leaves on the bench who fits the slot, so it belongs to the slot the plan puts the starter in. Hover the Proj cell for whose game it is and when ("Luka Dončić, Friday vs SAC").
   A lock shuts the slot for the rest of the week, to the bench too, so a player the best lineup leaves on the bench who fits the slot counts when they're worth more ("proj 31.91 Fri with L. Dončić").
   The week's last game counts unless an earlier one gets locked, and any game can be locked once played, so the slot is worth the best of Sleeper's projections for the games left.
   Only Sleeper's projections go in; nothing is modelled on top of them.

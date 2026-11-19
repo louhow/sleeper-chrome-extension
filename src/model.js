@@ -899,23 +899,26 @@
     const lockable = (id) => Boolean(look[id]) && l.lockable !== false && worthy(look[id]) && look[id].gamesLeft > 0;
     // A lock closes the slot for the rest of the week, to the bench too: keeping
     // it open is worth the best of the starter's own games left or a player the
-    // best lineup leaves on the bench who fits the slot (`openBy`). Those bench
-    // players depend on the lineup, so it's worked out once more after.
-    const pick = solve(new Set());
-    const free = [...l.starters, ...l.bench].filter((id) => id && id !== '0' && !pick.starters.includes(id));
-    pick.starters.forEach((id, i) => {
-      if (!id || id === '0') return;
-      const o = look[id];
-      for (const b of free) {
-        if (look[b].open > o.open && fits(l.slots[i] ?? 'UTIL', l.players[b] || {})) {
-          o.open = look[b].open;
-          o.openGame = look[b].openGame;
-          o.openBy = b;
+    // lineup leaves on the bench who fits the slot (`openBy`). So a player's open
+    // value belongs to the slot they start in, and `widen` works it out for one lineup.
+    const own = Object.fromEntries(Object.entries(look).map(([id, o]) => [id, { open: o.open, openGame: o.openGame }]));
+    const widen = (starters) => {
+      for (const [id, o] of Object.entries(look)) Object.assign(o, own[id], { openBy: null });
+      const free = Object.keys(look).filter((id) => !starters.includes(id));
+      starters.forEach((id, i) => {
+        const o = look[id];
+        if (!o) return;
+        for (const b of free) {
+          if (own[b].open > o.open && fits(l.slots[i] ?? 'UTIL', l.players[b] || {})) Object.assign(o, own[b], { openBy: b });
         }
-      }
-    });
+      });
+    };
+    // Locks are decided against the best lineup with nothing locked: who that leaves on
+    // the bench says what each of its slots is worth open.
+    widen(solve(new Set()).starters);
     const first = solve(new Set());
-    const locking = new Set(l.starters.filter((id) => lockable(id) && !skip.has(id) && first.starters.includes(id)));
+    const offered = new Set(l.starters.filter(lockable));
+    const locking = new Set([...offered].filter((id) => !skip.has(id) && first.starters.includes(id)));
     const plan = locking.size ? solve(locking) : first;
     // Nothing today beats a starter with no games left (they score the week's
     // final game, played): the slot goes to the next day that gets played. A bench
@@ -939,9 +942,12 @@
       plan.future[o.id] = { date: o.date, tip: o.tip, gain: o.gain };
     }
     if (Object.keys(plan.future).length) plan.changes = lineupChanges(l.starters, plan.starters, slotAt);
+    // The plan can end on other slots than that first lineup, with other players on the
+    // bench: the open values it reports are for the lineup it ends on.
+    widen(plan.starters);
     plan.date = date;
     // Unticked ones stay listed, so they can be ticked again.
-    plan.locks = l.starters.filter((id) => locking.has(id) || (lockable(id) && skip.has(id))).map((id) => {
+    plan.locks = l.starters.filter((id) => locking.has(id) || (offered.has(id) && skip.has(id))).map((id) => {
       const o = look[id];
       return { id, on: locking.has(id), game: o.offer, actual: o.offer.actual, unsure: o.unsure, close: close(o, o.offer), open: o.open, openGame: o.openGame, openBy: o.openBy ?? null, gamesLeft: o.gamesLeft, until: o.left[0].game.start ?? null };
     });
@@ -949,7 +955,7 @@
     // Starters with a finished game that may be lockable: whether they started it is unknown.
     plan.maybe = l.starters.filter((id) => look[id]?.maybe && look[id].gamesLeft > 0)
       .map((id) => ({ id, actual: look[id].maybe.actual ?? 0, game: look[id].maybe }));
-    plan.notYet = l.starters.filter((id) => look[id]?.offer?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
+    plan.notYet = l.starters.filter((id) => !offered.has(id) && look[id]?.offer?.actual > 0 && !worthy(look[id]) && look[id].gamesLeft > 0)
       .map((id) => ({ id, actual: look[id].offer.actual, unsure: look[id].unsure, close: close(look[id], look[id].offer), open: look[id].open, openGame: look[id].openGame, openBy: look[id].openBy ?? null, game: look[id].offer }));
     plan.changes = plan.changes.map((c) => {
       const o = look[c.id];

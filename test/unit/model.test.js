@@ -1212,3 +1212,21 @@ test('a traded pick became the player its original team\'s slot drafted in that 
   assert.equal(model.pickBecame(pick(2, 9), board), null, 'a slot that has not picked yet');
   assert.equal(model.pickBecame(pick(1, 4), board), null, 'a team with no slot');
 });
+
+test('best lineup: a slot\'s open value is worked out for the slot the plan ends on', () => {
+  // A first pass has walt at G (his finished 38.9 counts) and kel at F. luka's 57.05 on the bench
+  // then makes walt's score not worth keeping, so the plan ends on jaq at G instead.
+  const l = optimizerLineup(['G', 'F'], ['luka', 'walt'], ['kel', 'jaq'],
+    { luka: ['PG'], walt: ['SF', 'SG'], kel: ['PF', 'SF'], jaq: ['PF', 'SF', 'SG'] }, {
+      luka: [['l1', '2026-10-20', 'complete', 50, 41.5], ['l2', '2026-10-23', 'pre_game', 57.05]],
+      walt: [['w1', '2026-10-20', 'complete', 25, 38.9], ['w2', '2026-10-23', 'pre_game', 25.18]],
+      kel: [['k1', '2026-10-22', 'pre_game', 25.41]],
+      jaq: [['j1', '2026-10-22', 'pre_game', 24.45]],
+    });
+  const plan = model.bestLineup(l, OPT_NOW);
+  assert.deepEqual(plain(plan.starters), ['jaq', 'kel']);
+  const open = (id) => [plan.info[id].open, plan.info[id].openBy, plan.info[id].openGame.game.id];
+  assert.deepEqual(open('jaq'), [57.05, 'luka', 'l2'], 'G is open to luka, on the bench');
+  assert.deepEqual(open('kel'), [25.41, null, 'k1'], 'luka can\'t play F, and walt\'s 25.18 is less than kel\'s own game');
+  assert.deepEqual(open('walt'), [25.18, null, 'w2'], 'off the lineup, a player\'s own best game');
+});

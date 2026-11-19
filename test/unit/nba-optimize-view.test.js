@@ -40,6 +40,8 @@ test('lock rows and not-yet rows say when the game is unconfirmed, and flag a cl
   assert.equal((t.match(/close call/g) || []).length, 1, 'only the near one is flagged');
   assert.match(html, /os-row nba same close/);
   assert.match(t, /proj 43\.49 Sat/, 'the projection, with its day');
-  assert.match(html, /dp-open close-call" title="Best projection left: Sat @ WAS|dp-open close-call" title="Best projection left: Sat @WAS/);
+  assert.match(html, /dp-open close-call"><span class="open-val">43\.49<\/span><span class="open-tip"><b>Franz Wagner<\/b>, Saturday at WAS<\/span>/, 'the slot\'s own player and game');
+  const backed = { ...pl, info: { ...pl.info, w: { ...pl.info.w, openBy: 'f', openGame: { date: '2026-10-23', home: true, opponent: 'SAC' } } } };
+  assert.match(view.render(s, { kind: 'optimize', plan: backed, noLock: [], errors: [], saving: false, busy: null }), /<span class="open-tip"><b>Jeremiah Fears<\/b>, Friday vs SAC<\/span>/, 'a bench player\'s game');
   assert.doesNotMatch(html.split('os-row nba lock')[1].split('</div>')[0], /close call/);
 });
