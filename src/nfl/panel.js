@@ -193,21 +193,17 @@ roster_standings(league_id: ${JSON.stringify(leagueId)}, round: ${Number(week)})
     if (result?.ok && state.ready) setTimeout(() => loadWeek(state.week, true).catch(() => {}), 1500);
   });
 
-  // A roster change Sleeper's own page made (a drop, an add, a trade): read the
-  // rosters and the week again. Moves in a burst (and our own lineup saves,
-  // which also tell) are read once.
-  let movedTimer = null;
+  // Sleeper's own page put a player on a roster or took one off (a drop, an add,
+  // IR: page-hook saw the mutation go through), so the rosters and the week
+  // are read again, where they'd otherwise wait for a reload.
+  async function readRosters() {
+    const rosters = await data.rosters();
+    if (destroyed) return;
+    state.rosters = rosters;
+    await loadWeek(state.week, true);
+  }
   const stopMoved = bridge.on('snp:roster-moved', () => {
-    clearTimeout(movedTimer);
-    movedTimer = setTimeout(async () => {
-      if (destroyed || !state.ready) return;
-      try {
-        const rosters = await data.rosters();
-        if (destroyed) return;
-        state.rosters = rosters;
-        await loadWeek(state.week, true);
-      } catch (err) { /* the next read catches up */ }
-    }, 1500);
+    if (state.ready) readRosters().catch(() => {});
   });
 
   function setWeek(week) {
@@ -543,7 +539,6 @@ update_matchup_leg(league_id: ${JSON.stringify(leagueId)}, roster_id: ${Number(r
     destroyed = true;
     stopSaved();
     stopMoved();
-    clearTimeout(movedTimer);
     document.removeEventListener('visibilitychange', onVisible);
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('click', onOutsideClick, true);

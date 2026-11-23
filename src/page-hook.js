@@ -361,37 +361,48 @@
     panel.setState({ ...want, leg: +want.statInterval }, () => panel._fetchData?.(panel.props, panel.state));
   }
 
-  // Sleeper's week dropdown keeps the value it was created with, as a string,
-  // while its options are numbers, so on load it shows its placeholder (the
-  // season) rather than "Week 1". It's set to the option the table shows.
-  function weekLabel(panel) {
+  // Sleeper's week dropdown on the Players tab, as its live page has it (looked
+  // at in 2026-11; look again before changing what reads it): a component given
+  // { selectedValue, onSelect, placeholder, options: [{ name, value }] } and
+  // holding { selectedValue, open }. An NBA league's week values are numbers and
+  // an NFL league's strings ("season" on both), so they're compared as strings.
+  function weekDropdown() {
     for (const el of document.querySelectorAll(`${PLAYERS_PANEL} .filter-dropdown .app-dropdown`)) {
       const f = fiber(el, (x) => Array.isArray(x.options) && x.options.some((o) => o.value === 'season'));
-      const dropdown = f?.stateNode;
-      const option = f?.memoizedProps.options.find((o) => String(o.value) === String(panel.state.statInterval));
-      if (dropdown?.state && option && dropdown.state.selectedValue !== option.value) dropdown.setState({ selectedValue: option.value });
+      if (f?.stateNode?.state) return { dropdown: f.stateNode, options: f.memoizedProps.options };
     }
+    return null;
+  }
+  const sameWeek = (option, week) => String(option.value) === String(week);
+
+  // The dropdown starts on the value it was given, a string, which on NBA
+  // matches none of its options: it shows its placeholder (the season) even
+  // with a week on. It's set to the option the table shows.
+  function weekLabel(panel) {
+    const found = weekDropdown();
+    const option = found?.options.find((o) => sameWeek(o, panel.state.statInterval));
+    if (option && found.dropdown.state.selectedValue !== option.value) found.dropdown.setState({ selectedValue: option.value });
   }
 
-  // The week dropdown marks the current week "Week n (Current)", and lists it a
-  // second time at the top, so it's one pick away. The copy has the week's own
-  // value, so Sleeper handles either pick the same way. Sleeper may rebuild its
-  // options, so this runs on every pass and changes only what differs.
+  // The current week (Sleeper's leg) reads "Week n (Current)", and is listed a
+  // second time at the top, one pick away. The copy has the week's own value,
+  // so Sleeper treats either pick alike. They go into the options Sleeper gave
+  // its dropdown, which draws only when it renders: hence the forceUpdate.
+  // Sleeper can hand it new options any time, so this runs on every pass and
+  // touches nothing once they're in.
+  const CURRENT = ' (Current)';
   function currentWeekOption(panel) {
-    const leg = Number(panel.props.leg);
-    if (!(leg > 0)) return;
-    const name = `Week ${leg} (Current)`;
-    for (const el of document.querySelectorAll(`${PLAYERS_PANEL} .filter-dropdown .app-dropdown`)) {
-      const f = fiber(el, (x) => Array.isArray(x.options) && x.options.some((o) => o.value === 'season'));
-      const options = f?.memoizedProps.options;
-      const week = options?.find((o) => String(o.value) === String(leg));
-      if (!week) continue;
-      let changed = false;
-      if (week.name !== name) { week.name = name; changed = true; }
-      if (options[0] !== week && !options[0].snpCurrent) { options.unshift({ ...week, snpCurrent: true }); changed = true; }
-      // Sleeper draws from what it was given, not from the array afterwards.
-      if (changed) f.stateNode?.forceUpdate?.();
-    }
+    const found = panel.props.leg > 0 && weekDropdown();
+    if (!found) return;
+    const { dropdown, options } = found;
+    const own = options.filter((o) => !o.snpCurrent);
+    const week = own.find((o) => sameWeek(o, panel.props.leg));
+    if (!week) return;
+    const names = own.map((o) => o.name.replace(CURRENT, '') + (o === week ? CURRENT : ''));
+    if (options[0].snpCurrent && sameWeek(options[0], week.value) && own.every((o, i) => o.name === names[i])) return;
+    own.forEach((o, i) => { o.name = names[i]; });
+    options.splice(0, options.length, { ...week, snpCurrent: true }, ...own);
+    dropdown.forceUpdate();
   }
 
   // The players the list shows right now (after Sleeper's position, search and owned filters).
@@ -1773,21 +1784,25 @@
     target?.click();
   });
 
-  // Any GraphQL mutation Sleeper's own page sends (a drop, an add, a trade, a
-  // lineup move) may have changed a roster behind the extension's back: say so
-  // once it has gone through, and the panel reads the rosters again.
-  const isMutation = (body) => typeof body === 'string' && /^\s*(\{\s*"query"\s*:\s*")?\s*mutation\b/.test(body);
-  const movedSoon = () => bridge.tell('snp:roster-moved', null);
-  const nativeFetch = window.fetch;
-  window.fetch = function (input, init) {
-    const result = nativeFetch.apply(this, arguments);
-    if (isMutation(init?.body)) result.then(movedSoon, () => {});
-    return result;
-  };
-  const nativeSend = XMLHttpRequest.prototype.send;
+  // Sleeper's own page sends its GraphQL over XMLHttpRequest, the body
+  // { operationName, variables, query } (looked at on its live page in 2026-11).
+  // These of its mutations put a player on a roster or take one off (an add or
+  // drop, a move to or from IR; the names are its web bundle's), which the
+  // extension's panels would otherwise learn only on a reload: once one has
+  // gone through, they're told to read the rosters again.
+  const ROSTER_MOVES = new Set(['league_create_transaction', 'roster_update_reserve']);
+  function isRosterMove(body) {
+    if (typeof body !== 'string' || !body.includes('"operationName"')) return false;
+    try {
+      return ROSTER_MOVES.has(JSON.parse(body).operationName);
+    } catch {
+      return false;
+    }
+  }
+  const sendRequest = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function (body) {
-    if (isMutation(body)) this.addEventListener('loadend', movedSoon);
-    return nativeSend.apply(this, arguments);
+    if (isRosterMove(body)) this.addEventListener('load', () => this.status === 200 && bridge.tell('snp:roster-moved'));
+    return sendRequest.apply(this, arguments);
   };
 
   // Saves a lineup through Sleeper's own actions, so its screen updates as if you'd made the swaps.

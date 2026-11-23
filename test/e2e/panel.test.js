@@ -256,21 +256,34 @@ const playersTable = (players, state = {}, props = {}) => `<!doctype html><meta 
       this.fetched.push([state.statType, state.statInterval]);
     },
   };
-  // Sleeper's week dropdown: it keeps the value it was created with (as a
-  // string, while its options are numbers) and shows the placeholder, the
-  // season, when nothing matches.
-  const OPTIONS = [{ name: 'Season', value: 'season' }, ...[1, 2, 3].map((n) => ({ name: 'Week ' + n, value: String(n) }))];
+  // Sleeper's week dropdown, as its live page has it (looked at in 2026-11; look
+  // again before changing this): a component given { selectedValue, onSelect,
+  // placeholder, options: [{ name, value }] } and holding { selectedValue, open }.
+  // An NBA league's week values are numbers and an NFL league's strings ("season"
+  // on both). It starts on the value it was given, a string, so on NBA nothing
+  // matches and it shows its placeholder, the season. It draws only when it
+  // renders (setState or forceUpdate), from the options it holds then: a change
+  // to them shows no sooner.
+  const weekValue = (n) => (panel.props.sport === 'nfl' ? String(n) : n);
+  const OPTIONS = [{ name: 'Season', value: 'season' }, ...Array.from({ length: 18 }, (_, i) => ({ name: 'Week ' + (i + 1), value: weekValue(i + 1) }))];
   const dropdown = {
-    state: { selectedValue: String(panel.state.statInterval) },
+    state: { selectedValue: String(panel.state.statInterval), open: false },
     setState(update) {
       this.state = { ...this.state, ...update };
-      renderDropdown();
+      this.render();
+    },
+    forceUpdate() {
+      this.render();
+    },
+    render() {
+      const picked = OPTIONS.find((o) => o.value === this.state.selectedValue);
+      const el = document.querySelector('.app-dropdown');
+      el.innerHTML = '<div class="selected"></div><div class="options" hidden></div>';
+      el.querySelector('.selected').textContent = picked ? picked.name : panel.state.season;
+      for (const o of OPTIONS) el.querySelector('.options').appendChild(Object.assign(document.createElement('div'), { className: 'option', textContent: o.name }));
     },
   };
-  function renderDropdown() {
-    document.querySelector('.app-dropdown').textContent = OPTIONS.find((o) => o.value === dropdown.state.selectedValue)?.name || panel.state.season;
-  }
-  renderDropdown();
+  dropdown.render();
   document.querySelector('.app-dropdown').__reactInternalInstance$test = { memoizedProps: { className: 'app-dropdown' }, return: { memoizedProps: { options: OPTIONS }, stateNode: dropdown } };
   function render() {
     const { playerStatsMap: map, statKeys, sort, positionFilter, hideOwned, filterByUser, filterByUserMap } = panel.state;
@@ -541,6 +554,7 @@ const sleeper = {
   legs: {}, // round -> matchup legs
   mutations: [],
   nflReserve: {}, // league -> roster id -> IR, for the NFL leagues
+  nflDropped: {}, // league -> player ids dropped since, off every roster
   nflLegs: false, // answer the NFL league's matchup legs (your own, with nflSubs)
   nflSubs: null, // the AutoSubs on that leg: starter id -> sub id
   failNextMutation: false,
@@ -668,8 +682,13 @@ async function answerGraphql(route) {
       // The live league can have a healthy player on IR, which freezes the lineup; these tests need it editable.
       const live = await (await fetch(`https://api.sleeper.app/v1/league/${nfl}/rosters`)).json();
       for (const r of live) r.reserve = sleeper.nflReserve?.[nfl]?.[r.roster_id] || [];
+      const dropped = sleeper.nflDropped[nfl] || [];
+      // A chopped team's roster has no players at all (null).
+      for (const r of live) if (r.players) r.players = r.players.filter((id) => !dropped.includes(id));
       return json({ data: { league_rosters: live } });
     }
+    // A drop sent by Sleeper's own page; what it dropped is in nflDropped.
+    if (/mutation league_create_transaction\b/.test(query) && query.includes(nfl)) return json({ data: { league_create_transaction: { status: 'complete' } } });
     if (/query matchup_legs\b/.test(query) && query.includes(nfl)) {
       if (!sleeper.nflLegs || nfl !== NFL_LEAGUE) return json({ data: { matchup_legs: null } });
       // Your leg for the week asked, with the AutoSubs the mock holds.
@@ -2570,16 +2589,16 @@ async function forgetPlayersView() {
 test('players tab opens on Projection for the current week, then on whatever you had on last', async () => {
   const STAT_KEYS = ['fpts', 'sp', 'pts', 'tpm', 'reb', 'ast', 'stl', 'blk', 'to'];
   const players = [{ id: 'guard', pos: 'PG', team: 'LAL', stats: { fpts: 10, fpts_proj: 12, pts: 10 } }];
-  const dropdown = page.locator('.app-dropdown');
+  const dropdown = page.locator('.app-dropdown .selected');
   documentBody = playersTable(players, { statType: 'stat', statInterval: 'season', statKeys: STAT_KEYS, sort: 'fpts' }, { leg: 2 });
   await forgetPlayersView();
   await page.goto(PLAYERS_URL);
   await page.waitForFunction(() => panel.state.statType === 'proj' && panel.state.statInterval === 2, null, { timeout: 30000 });
   assert.deepEqual(await page.evaluate(() => panel.fetched), [['proj', 2]], 'loaded the way Sleeper\'s own dropdown loads a week');
-  await page.waitForFunction(() => document.querySelector('.app-dropdown').textContent === 'Week 2');
+  await page.waitForFunction(() => document.querySelector('.app-dropdown .selected').textContent === 'Week 2 (Current)');
   // The current week is listed twice: first, and in its place, both marked.
-  const names = await page.evaluate(() => document.querySelector('.app-dropdown').__reactInternalInstance$test.return.memoizedProps.options.map((o) => o.name));
-  assert.deepEqual(names, ['Week 2 (Current)', 'Season', 'Week 1', 'Week 2 (Current)', 'Week 3']);
+  assert.deepEqual(await page.locator('.app-dropdown .option').allTextContents().then((names) => names.slice(0, 5)),
+    ['Week 2 (Current)', 'Season', 'Week 1', 'Week 2 (Current)', 'Week 3']);
   // What the user picks next sticks.
   await page.evaluate(() => panel.setState({ statType: 'stat', statInterval: 'season' }));
   await page.waitForTimeout(1200);
@@ -2636,7 +2655,7 @@ test('players tab opens on Projection for the current week, then on whatever you
   documentBody = playersTable(players, { statInterval: 1 }, { leg: 1 });
   await forgetPlayersView();
   await page.goto(PLAYERS_URL);
-  await page.waitForFunction(() => document.querySelector('.app-dropdown').textContent === 'Week 1', null, { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('.app-dropdown .selected').textContent === 'Week 1 (Current)', null, { timeout: 30000 });
   assert.deepEqual(await page.evaluate(() => panel.fetched), []);
   await forgetPlayersView();
   documentBody = LOGGED_OUT;
@@ -3211,6 +3230,43 @@ test('NFL team tab, logged in: your lineup swaps from its slot badges and Optimi
   await context.unroute('https://api.sleeper.app/v1/state/nfl');
   sleeper.me = null;
   documentBody = LOGGED_OUT;
+});
+
+test('NFL team tab, logged in: a player dropped through Sleeper\'s own page leaves the roster without a reload', async () => {
+  const users = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/users`)).json();
+  const rosters = await (await fetch(`https://api.sleeper.app/v1/league/${NFL_LEAGUE}/rosters`)).json();
+  const me = users.find((u) => u.display_name === 'louhow');
+  const mine = rosters.find((r) => r.owner_id === me.user_id);
+  sleeper.me = me.user_id;
+  documentBody = nflTeamTab({ wrapped: true, rosterId: mine.roster_id, token: true });
+  await page.goto(NFL_TEAM_URL);
+  await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
+  if (await page.locator(nflPanel('.my-team')).count()) await page.locator(nflPanel('.my-team')).click();
+  const benched = mine.players.find((id) => !mine.starters.includes(id) && !(mine.taxi || []).includes(id));
+  assert.ok(benched, 'a bench player to drop');
+  const row = page.locator(nflPanel(`button[data-player="${benched}"]`));
+  await row.first().waitFor({ timeout: 30000 });
+  try {
+    // Sleeper's page sends its mutations over XMLHttpRequest, as { operationName, variables, query }.
+    // One that isn't a roster move changes nothing: the player stays though Sleeper no longer lists him.
+    sleeper.nflDropped[NFL_LEAGUE] = [benched];
+    const send = (operationName) => page.evaluate(({ operationName, token, league }) => new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'https://sleeper.com/graphql');
+      xhr.setRequestHeader('content-type', 'application/json');
+      xhr.setRequestHeader('authorization', token);
+      xhr.onloadend = resolve;
+      xhr.send(JSON.stringify({ operationName, variables: {}, query: `mutation ${operationName} {\n  ${operationName}(league_id: "${league}") { status }\n}` }));
+    }), { operationName, token: FAKE_TOKEN, league: NFL_LEAGUE });
+    await send('create_message');
+    await page.waitForTimeout(1000);
+    assert.ok(await row.count(), 'a mutation that moves no player reads nothing again');
+    // The drop itself: the rosters are read again and he's gone.
+    await send('league_create_transaction');
+    await row.first().waitFor({ state: 'detached', timeout: 15000 });
+  } finally {
+    sleeper.nflDropped = {};
+  }
 });
 
 test('NFL team tab, logged in: a week ahead of the one Sleeper edits is yours to set and to Optimize, saved to that week', async () => {

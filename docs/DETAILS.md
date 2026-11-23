@@ -346,6 +346,7 @@ Sleeper's Team tab shows only your team, so a link to someone else's team (a mat
 - Points are Sleeper's stats scored with the league's settings; the live projection is what's scored plus the projection for the game time left. Win chance is Sleeper's own formula (see the League tab).
 - The data: `/v1/league/<id>/matchups/<week>` (logged in, `matchup_legs`) for who's starting, `/projections/nfl/<season>/<week>` and `/stats/nfl/<season>/<week>` for players, projections and points, GraphQL `scores` for each game, `/players/nfl/research/...` for start and rostered %.
   While a game of the current week is on, stats and games are read again every 90 seconds (only while the tab is visible); otherwise once the next kickoff comes.
+- An add, drop or IR move made through Sleeper's own page (the Players tab, its player card) shows without a reload: `src/page-hook.js` sees Sleeper's `league_create_transaction` or `roster_update_reserve` mutation go through and says so (`snp:roster-moved`), and the panel reads the rosters and the week again. Other mutations (chat, lineup saves) read nothing.
 
 ### NFL: League tab
 
