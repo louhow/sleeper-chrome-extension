@@ -415,6 +415,7 @@ The gear at the bottom left of Sleeper's sidebar opens the extension's settings 
 Settings are saved for the whole browser (`chrome.storage.local`, key `settings`) and followed by every tab.
 
 - **NFL tabs and tools** (on by default): the Team and Matchup tabs, League cards, Optimize lineup and the Players tab's Last 5. Off, an NFL league shows Sleeper's own pages and the extension stays out of them; changing it starts each league's session over, no reload needed.
+- **Sleeper's new beta site**: Sleeper's "Try the new beta" sidebar card (`.nav-beta-fantasy-home-item`) is hidden on every page, and the dialog has a row with a Switch button instead, shown only when Sleeper offers the beta. The button clicks Sleeper's own link, so the address (it carries the open league) is Sleeper's. The extension doesn't run on the beta site; its menu has "Back to Classic Fantasy".
 
 ### Chat, compact
 

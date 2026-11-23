@@ -1,12 +1,17 @@
 // The extension's own settings, saved for the whole browser, and the dialog
 // Sleeper's sidebar gear opens for them (settings-view.js draws it); the gear's
-// account settings stay one button away.
+// account settings stay one button away. Sleeper's "Try the new beta" sidebar
+// card is hidden on every page; the dialog has a row for it instead.
 //   settings() -> { ready, values, onChange(fn), set(patch), attach, destroy }
 (globalThis.SNP ||= {}).settings = () => {
   const { settingsView, shared } = globalThis.SNP;
   const KEY = 'settings';
   const DEFAULTS = { nflUi: true };
   const GEAR = '.profile-wrapper .settings-icon';
+  // Sleeper's sidebar card for its beta site: a link, there only when Sleeper offers the beta to this user.
+  const BETA = '.nav-beta-fantasy-home-item';
+  const hideBeta = shared.hideSleeper('beta-card', BETA);
+  hideBeta.set(true);
   const listeners = new Set();
   let values = { ...DEFAULTS };
   let open = false;
@@ -37,7 +42,7 @@
     if (!layer.styled) return;
     if (!open) return host.remove();
     if (!host.isConnected) document.documentElement.appendChild(host);
-    root.innerHTML = settingsView.render(values);
+    root.innerHTML = settingsView.render(values, { beta: !!document.querySelector(BETA) });
   }
 
   function close() {
@@ -48,6 +53,11 @@
   root.addEventListener('click', (e) => {
     const action = e.target.closest?.('[data-action]')?.dataset.action;
     if (action === 'close-modal') close();
+    // Sleeper's own link, so its address (the open league) and its tracking stay Sleeper's.
+    if (action === 'beta') {
+      close();
+      document.querySelector(BETA)?.click();
+    }
     if (action === 'account') {
       close();
       bypass = true;
@@ -73,5 +83,5 @@
     }, true),
   ];
 
-  return { ready, values: () => values, onChange: (fn) => listeners.add(fn), set, destroy: () => stops.forEach((stop) => stop()) };
+  return { ready, values: () => values, onChange: (fn) => listeners.add(fn), set, destroy: () => { stops.forEach((stop) => stop()); hideBeta.remove(); } };
 };

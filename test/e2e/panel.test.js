@@ -3470,7 +3470,7 @@ test('NFL matchup tab: the League tab\'s card on top, the picker picks a matchup
   await context.unroute('https://api.sleeper.app/v1/state/nfl');
 });
 
-test('settings: the sidebar gear opens the extension\'s dialog, the NFL pages switch off and on, account settings stay a button away', async () => {
+test('settings: the sidebar gear opens the extension\'s dialog, the NFL pages switch off and on, Sleeper\'s beta card is a row in it, account settings stay a button away', async () => {
   documentBody = nflTeamTab({ wrapped: true });
   await page.goto(`https://sleeper.com/leagues/${NFL_LEAGUE}/team`);
   await page.locator(nflPanel('.team-card')).waitFor({ timeout: 30000 });
@@ -3483,6 +3483,23 @@ test('settings: the sidebar gear opens the extension\'s dialog, the NFL pages sw
   await addGear();
   const dialog = (sel = '') => `#sleeper-settings .dialog ${sel}`;
   const nflSwitch = page.locator(dialog('[data-setting="nflUi"]'));
+  // Without Sleeper's beta card, the dialog has no row for it.
+  await page.locator('.settings-icon').click();
+  await nflSwitch.waitFor();
+  assert.equal(await page.locator(dialog('[data-action="beta"]')).count(), 0);
+  await page.keyboard.press('Escape');
+  // Sleeper's "Try the new beta" card: hidden in the sidebar, a row in the dialog that follows its link.
+  await page.evaluate(() => {
+    window.__beta = 0;
+    document.body.insertAdjacentHTML('afterbegin', '<a class="nav-beta-fantasy-home-item" href="#beta"><span class="card-title">Try the new beta</span><span class="card-footer"><span class="convert">Switch</span></span></a>');
+    document.querySelector('.nav-beta-fantasy-home-item').addEventListener('click', () => window.__beta++);
+  });
+  assert.equal(await page.locator('.nav-beta-fantasy-home-item').isVisible(), false, 'Sleeper\'s card is hidden');
+  await page.locator('.settings-icon').click();
+  await page.locator(dialog('[data-action="beta"]')).click();
+  await page.locator('#sleeper-settings .dialog').waitFor({ state: 'detached' });
+  assert.equal(await page.evaluate(() => window.__beta), 1, 'Sleeper\'s own link');
+  assert.equal(new URL(page.url()).hash, '#beta');
   await page.locator('.settings-icon').click();
   await nflSwitch.waitFor();
   assert.equal(await page.evaluate(() => window.__account), 0, 'not Sleeper\'s account settings');

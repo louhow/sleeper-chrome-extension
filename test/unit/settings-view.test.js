@@ -12,3 +12,8 @@ test('settings dialog: a switch per setting, as saved, with account settings a c
   assert.match(on, /data-action="close-modal"/);
   assert.doesNotMatch(settingsView.render({ nflUi: false }), /data-setting="nflUi" checked/);
 });
+
+test('settings dialog: a row for Sleeper\'s beta site only when Sleeper offers it', () => {
+  assert.doesNotMatch(settingsView.render({ nflUi: true }), /data-action="beta"/);
+  assert.match(settingsView.render({ nflUi: true }, { beta: true }), /new beta site[\s\S]*data-action="beta">Switch</);
+});

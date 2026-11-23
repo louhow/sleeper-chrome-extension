@@ -75,7 +75,7 @@ To update, `git pull`, hit the reload icon on the extension card, and refresh th
 - Score colors (green, yellow, red) from the league's own games: the thirds of its starters' recent scores, per position in NFL.
 - Trend tab: players your league has no starting slot for (a defense or kicker in a league without one) are left out.
 - Each league opens on the tab you were last on in it when you switch leagues in the sidebar.
-- Settings: the gear in Sleeper's sidebar opens the extension's settings (a switch for the NFL pages and tools, so Sleeper's own show instead), with Sleeper's account settings a button away.
+- Settings: the gear in Sleeper's sidebar opens the extension's settings (a switch for the NFL pages and tools, so Sleeper's own show instead; a Switch button for Sleeper's new beta site, in place of the "Try the new beta" card in the sidebar), with Sleeper's account settings a button away.
 - Chat: hovering a message's emoji reactions no longer shifts the chat around, and who reacted shows in full.
 - Chat: compact messages, free agent and waiver moves (one line a player) and weekly reports, about half the height.
 - Chat: trades written out as on Sleeper's mobile app, each team and everything it gets, with no VIEW to click.

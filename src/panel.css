@@ -3428,6 +3428,17 @@ button.danger.solid:hover:not(:disabled) {
   color: var(--muted);
   font-size: 12px;
 }
+/* A row with a button in place of a switch; its text lines up with the switches' labels. */
+.setting.link {
+  padding-left: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: default;
+}
+.setting.link button {
+  flex: none;
+}
 .settings-foot {
   display: flex;
   align-items: center;
